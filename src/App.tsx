@@ -1,56 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles, KeyRound, ArrowLeft } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 const COLUMN_THEMES = [
-  {
-    headerBg: 'bg-blue-100/80',
-    headerBorder: 'border-blue-200',
-    titleColor: 'text-blue-950',
-    badgeBg: 'bg-blue-200/80',
-    badgeText: 'text-blue-800',
-    iconColor: 'text-blue-500 hover:text-blue-800'
-  },
-  {
-    headerBg: 'bg-amber-100/80',
-    headerBorder: 'border-amber-200',
-    titleColor: 'text-amber-950',
-    badgeBg: 'bg-amber-200/80',
-    badgeText: 'text-amber-800',
-    iconColor: 'text-amber-500 hover:text-amber-800'
-  },
-  {
-    headerBg: 'bg-indigo-100/80',
-    headerBorder: 'border-indigo-200',
-    titleColor: 'text-indigo-950',
-    badgeBg: 'bg-indigo-200/80',
-    badgeText: 'text-indigo-800',
-    iconColor: 'text-indigo-500 hover:text-indigo-800'
-  },
-  {
-    headerBg: 'bg-purple-100/80',
-    headerBorder: 'border-purple-200',
-    titleColor: 'text-purple-950',
-    badgeBg: 'bg-purple-200/80',
-    badgeText: 'text-purple-800',
-    iconColor: 'text-purple-500 hover:text-purple-800'
-  },
-  {
-    headerBg: 'bg-emerald-100/80',
-    headerBorder: 'border-emerald-200',
-    titleColor: 'text-emerald-950',
-    badgeBg: 'bg-emerald-200/80',
-    badgeText: 'text-emerald-800',
-    iconColor: 'text-emerald-600 hover:text-emerald-900'
-  },
-  {
-    headerBg: 'bg-rose-100/80',
-    headerBorder: 'border-rose-200',
-    titleColor: 'text-rose-950',
-    badgeBg: 'bg-rose-200/80',
-    badgeText: 'text-rose-800',
-    iconColor: 'text-rose-500 hover:text-rose-800'
-  }
+  { headerBg: 'bg-blue-100/80', headerBorder: 'border-blue-200', titleColor: 'text-blue-950', badgeBg: 'bg-blue-200/80', badgeText: 'text-blue-800', iconColor: 'text-blue-500 hover:text-blue-800' },
+  { headerBg: 'bg-amber-100/80', headerBorder: 'border-amber-200', titleColor: 'text-amber-950', badgeBg: 'bg-amber-200/80', badgeText: 'text-amber-800', iconColor: 'text-amber-500 hover:text-amber-800' },
+  { headerBg: 'bg-indigo-100/80', headerBorder: 'border-indigo-200', titleColor: 'text-indigo-950', badgeBg: 'bg-indigo-200/80', badgeText: 'text-indigo-800', iconColor: 'text-indigo-500 hover:text-indigo-800' },
+  { headerBg: 'bg-purple-100/80', headerBorder: 'border-purple-200', titleColor: 'text-purple-950', badgeBg: 'bg-purple-200/80', badgeText: 'text-purple-800', iconColor: 'text-purple-500 hover:text-purple-800' },
+  { headerBg: 'bg-emerald-100/80', headerBorder: 'border-emerald-200', titleColor: 'text-emerald-950', badgeBg: 'bg-emerald-200/80', badgeText: 'text-emerald-800', iconColor: 'text-emerald-600 hover:text-emerald-900' },
+  { headerBg: 'bg-rose-100/80', headerBorder: 'border-rose-200', titleColor: 'text-rose-950', badgeBg: 'bg-rose-200/80', badgeText: 'text-rose-800', iconColor: 'text-rose-500 hover:text-rose-800' }
 ];
 
 const DEFAULT_COLUMNS = [
@@ -65,7 +23,7 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Modalità di autenticazione: 'login' o 'signup'
+  // Modalità di autenticazione: 'login', 'signup', 'forgot', 'reset'
   const [authMode, setAuthMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -77,7 +35,7 @@ export default function App() {
   const [columns, setColumns] = useState([]);
   const [cards, setCards] = useState([]);
 
-  // Stati UI per le azioni
+  // Stati UI
   const [editingColumnId, setEditingColumnId] = useState(null);
   const [editingColumnName, setEditingColumnName] = useState('');
   const [isAddingColumn, setIsAddingColumn] = useState(false);
@@ -89,22 +47,25 @@ export default function App() {
   const [dropTarget, setDropTarget] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
-  // Gestione della sessione utente
+  // Gestione sessione e ascolto evento di Reset Password
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setAuthMode('reset');
+      } else {
+        setSession(session);
+      }
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Caricamento dati
   useEffect(() => {
     if (session?.user) {
       fetchBoardData();
@@ -154,7 +115,7 @@ export default function App() {
     }
   };
 
-  // Autenticazione (Accedi / Registrati)
+  // Gestione flussi Auth
   const handleAuth = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -165,11 +126,25 @@ export default function App() {
       if (authMode === 'signup') {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        setAuthSuccessMsg('Registrazione completata! Puoi effettuare l\'accesso con le tue credenziali.');
-        setAuthMode('login');
-      } else {
+        setAuthSuccessMsg('Registrazione completata! Controlla la tua email per confermare l\'account.');
+        switchAuthMode('login');
+      } else if (authMode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        setEmail('');
+        setPassword('');
+      } else if (authMode === 'forgot') {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin
+        });
+        if (error) throw error;
+        setAuthSuccessMsg('Ti abbiamo inviato un\'email con il link per reimpostare la password!');
+        setEmail('');
+      } else if (authMode === 'reset') {
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+        setAuthSuccessMsg('Password aggiornata con successo! Ora puoi accedere.');
+        switchAuthMode('login');
       }
     } catch (err) {
       setAuthError(err.message);
@@ -182,14 +157,18 @@ export default function App() {
     await supabase.auth.signOut();
     setColumns([]);
     setCards([]);
-    setAuthMode('login'); // Reimposta sulla scheda di Login al momento dell'uscita
+    switchAuthMode('login');
+  };
+
+  const switchAuthMode = (mode) => {
+    setAuthMode(mode);
     setEmail('');
     setPassword('');
     setAuthError('');
     setAuthSuccessMsg('');
   };
 
-  // Azioni sulle colonne
+  // Azioni colonne e schede
   const handleAddColumn = async () => {
     const trimmed = newColumnName.trim();
     if (!trimmed || !session) return;
@@ -219,7 +198,6 @@ export default function App() {
     setEditingColumnName('');
   };
 
-  // Azioni sulle schede
   const handleAddCard = async (columnId) => {
     const trimmedTitle = newTitle.trim();
     if (!trimmedTitle || !session) return;
@@ -258,7 +236,7 @@ export default function App() {
     setConfirmDelete(null);
   };
 
-  // Drag and Drop
+  // Drag & Drop
   const handleDragStart = (e, cardId) => {
     setDraggedCardId(cardId);
     e.dataTransfer.setData('text/plain', cardId);
@@ -322,7 +300,6 @@ export default function App() {
       .eq('id', cardId);
   };
 
-  // Caricamento iniziale
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
@@ -334,65 +311,55 @@ export default function App() {
     );
   }
 
-  // Schermata Login / Registrazione moderna
-  if (!session) {
+  // Schermate Auth
+  if (!session || authMode === 'reset') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
-        {/* Sfondo decorativo con sfumature */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-orange-500/15 rounded-full blur-3xl pointer-events-none" />
 
         <div className="w-full max-w-md bg-slate-900/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-800/80 p-8 z-10">
-          {/* Header del Form */}
-          <div className="flex flex-col items-center text-center mb-8">
+          <div className="flex flex-col items-center text-center mb-6">
             <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-400 flex items-center justify-center shadow-lg shadow-orange-500/20 mb-4">
               <LayoutDashboard className="text-white" size={24} />
             </div>
             <h2 className="text-2xl font-bold text-white tracking-tight">
-              Bacheca Kanban
+              {authMode === 'forgot' && 'Recupera Password'}
+              {authMode === 'reset' && 'Nuova Password'}
+              {(authMode === 'login' || authMode === 'signup') && 'Bacheca Kanban'}
             </h2>
             <p className="text-xs text-slate-400 mt-1">
-              Gestisci i tuoi task e progetti in un unico posto
+              {authMode === 'forgot' && 'Inserisci l\'email per ricevere il link di ripristino'}
+              {authMode === 'reset' && 'Inserisci la tua nuova password'}
+              {(authMode === 'login' || authMode === 'signup') && 'Gestisci i tuoi task e progetti in un unico posto'}
             </p>
           </div>
 
-          {/* Selettore Schede (Accedi / Registrati) */}
-          <div className="grid grid-cols-2 bg-slate-800/60 p-1 rounded-2xl mb-6 border border-slate-700/50">
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode('login');
-                setAuthError('');
-                setAuthSuccessMsg('');
-              }}
-              className={`flex items-center justify-center space-x-2 py-2.5 text-xs font-semibold rounded-xl transition-all ${
-                authMode === 'login'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <LogIn size={14} />
-              <span>Accedi</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode('signup');
-                setAuthError('');
-                setAuthSuccessMsg('');
-              }}
-              className={`flex items-center justify-center space-x-2 py-2.5 text-xs font-semibold rounded-xl transition-all ${
-                authMode === 'signup'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <UserPlus size={14} />
-              <span>Registrati</span>
-            </button>
-          </div>
+          {(authMode === 'login' || authMode === 'signup') && (
+            <div className="grid grid-cols-2 bg-slate-800/60 p-1 rounded-2xl mb-6 border border-slate-700/50">
+              <button
+                type="button"
+                onClick={() => switchAuthMode('login')}
+                className={`flex items-center justify-center space-x-2 py-2.5 text-xs font-semibold rounded-xl transition-all ${
+                  authMode === 'login' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <LogIn size={14} />
+                <span>Accedi</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => switchAuthMode('signup')}
+                className={`flex items-center justify-center space-x-2 py-2.5 text-xs font-semibold rounded-xl transition-all ${
+                  authMode === 'signup' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <UserPlus size={14} />
+                <span>Registrati</span>
+              </button>
+            </div>
+          )}
 
-          {/* Messaggi di Errore / Successo */}
           {authError && (
             <div className="mb-4 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 flex items-center space-x-2.5">
               <AlertTriangle size={16} className="shrink-0 text-rose-400" />
@@ -407,46 +374,59 @@ export default function App() {
             </div>
           )}
 
-          {/* Form con chiave dinamica per forzare il reset del browser */}
           <form onSubmit={handleAuth} className="space-y-4" autoComplete="off" key={authMode}>
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Indirizzo Email
-              </label>
-              <div className="relative">
-                <Mail size={16} className="absolute left-3.5 top-3 text-slate-500" />
-                <input
-                  key={`email-${authMode}`}
-                  type="email"
-                  required
-                  autoComplete="none"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nome@esempio.com"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-                />
+            {authMode !== 'reset' && (
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">Indirizzo Email</label>
+                <div className="relative">
+                  <Mail size={16} className="absolute left-3.5 top-3 text-slate-500" />
+                  <input
+                    key={`email-${authMode}`}
+                    type="email"
+                    required
+                    autoComplete="none"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="nome@esempio.com"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <Lock size={16} className="absolute left-3.5 top-3 text-slate-500" />
-                <input
-                  key={`password-${authMode}`}
-                  type="password"
-                  required
-                  minLength={6}
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-                />
+            {authMode !== 'forgot' && (
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                  {authMode === 'reset' ? 'Nuova Password' : 'Password'}
+                </label>
+                <div className="relative">
+                  <Lock size={16} className="absolute left-3.5 top-3 text-slate-500" />
+                  <input
+                    key={`password-${authMode}`}
+                    type="password"
+                    required
+                    minLength={6}
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                  />
+                </div>
               </div>
-            </div>
+            )}
+
+            {authMode === 'login' && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => switchAuthMode('forgot')}
+                  className="text-[11px] text-indigo-400 hover:text-indigo-300 transition-colors"
+                >
+                  Password dimenticata?
+                </button>
+              </div>
+            )}
 
             <button
               type="submit"
@@ -456,23 +436,32 @@ export default function App() {
               {authLoading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
-                <span>{authMode === 'login' ? 'Accedi all\'Account' : 'Crea Nuovo Account'}</span>
+                <span>
+                  {authMode === 'login' && 'Accedi all\'Account'}
+                  {authMode === 'signup' && 'Crea Nuovo Account'}
+                  {authMode === 'forgot' && 'Invia Link di Ripristino'}
+                  {authMode === 'reset' && 'Salva Nuova Password'}
+                </span>
               )}
             </button>
           </form>
 
-          {/* Dettaglio footer */}
-          <p className="mt-6 text-center text-[11px] text-slate-500">
-            {authMode === 'login' 
-              ? 'Non hai ancora un account? Seleziona "Registrati" in alto.' 
-              : 'Hai già un account? Seleziona "Accedi" in alto per rientrare.'}
-          </p>
+          {authMode === 'forgot' && (
+            <button
+              type="button"
+              onClick={() => switchAuthMode('login')}
+              className="mt-6 w-full flex items-center justify-center space-x-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              <ArrowLeft size={14} />
+              <span>Torna al Login</span>
+            </button>
+          )}
         </div>
       </div>
     );
   }
 
-  // Interfaccia Applicazione Kanban
+  // Interfaccia Bacheca
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 antialiased selection:bg-orange-100">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur-md shadow-xs">
@@ -513,7 +502,6 @@ export default function App() {
         </div>
       </header>
 
-      {/* Area Colonne Kanban */}
       <main className="flex-1 overflow-x-auto p-6">
         <div className="flex items-start gap-5 min-w-max pb-4">
           {columns.map((col, colIdx) => {
@@ -527,9 +515,7 @@ export default function App() {
                 onDragOver={(e) => handleColumnDragOver(e, col.id, columnCards.length)}
                 onDrop={(e) => handleDrop(e, col.id)}
                 className={`w-80 shrink-0 flex flex-col rounded-xl border transition-colors duration-150 ${
-                  isColumnActive
-                    ? 'border-indigo-500 bg-indigo-50/30 ring-1 ring-indigo-500/30'
-                    : 'border-slate-200 bg-slate-100/75'
+                  isColumnActive ? 'border-indigo-500 bg-indigo-50/30 ring-1 ring-indigo-500/30' : 'border-slate-200 bg-slate-100/75'
                 }`}
               >
                 <div className={`p-3.5 flex items-center justify-between border-b rounded-t-xl transition-colors ${theme.headerBg} ${theme.headerBorder}`}>
@@ -556,9 +542,7 @@ export default function App() {
                   ) : (
                     <>
                       <div className="flex items-center space-x-2">
-                        <span className={`font-semibold text-sm tracking-tight ${theme.titleColor}`}>
-                          {col.name}
-                        </span>
+                        <span className={`font-semibold text-sm tracking-tight ${theme.titleColor}`}>{col.name}</span>
                         <span className={`text-[11px] font-bold rounded-full px-2 py-0.5 ${theme.badgeBg} ${theme.badgeText}`}>
                           {columnCards.length}
                         </span>
@@ -595,8 +579,7 @@ export default function App() {
 
                 <div className="p-3 flex flex-col space-y-2.5 min-h-[320px]">
                   {columnCards.map((card, idx) => {
-                    const isTargetBeforeThis =
-                      dropTarget?.columnId === col.id && dropTarget?.index === idx;
+                    const isTargetBeforeThis = dropTarget?.columnId === col.id && dropTarget?.index === idx;
 
                     return (
                       <React.Fragment key={card.id}>
@@ -621,9 +604,7 @@ export default function App() {
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center space-x-1.5 flex-1 min-w-0">
                               <GripVertical size={12} className="text-slate-300 group-hover:text-slate-500 shrink-0" />
-                              <h4 className="text-xs font-semibold text-slate-900 truncate leading-tight">
-                                {card.title}
-                              </h4>
+                              <h4 className="text-xs font-semibold text-slate-900 truncate leading-tight">{card.title}</h4>
                             </div>
                             <button
                               onClick={() =>
@@ -639,11 +620,7 @@ export default function App() {
                             </button>
                           </div>
 
-                          {card.details && (
-                            <p className="mt-2 text-xs text-slate-500 leading-relaxed line-clamp-3">
-                              {card.details}
-                            </p>
-                          )}
+                          {card.details && <p className="mt-2 text-xs text-slate-500 leading-relaxed line-clamp-3">{card.details}</p>}
                         </div>
                       </React.Fragment>
                     );
@@ -754,7 +731,6 @@ export default function App() {
         </div>
       </main>
 
-      {/* Modale di eliminazione */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-lg">
