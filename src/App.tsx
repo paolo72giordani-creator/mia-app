@@ -72,7 +72,6 @@ export default function App() {
   const [dropTarget, setDropTarget] = useState(null); // { columnId, index }
 
   // Stato per la finestra modale di conferma cancellazione
-  // Formato: null oppure { type: 'card' | 'column', id: string, name: string, cardCount?: number }
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   // Avvia modifica nome colonna
@@ -181,7 +180,7 @@ export default function App() {
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  // Fine trascinamento (reset stati)
+  // Fine trascinamento
   const handleDragEnd = () => {
     setDraggedCardId(null);
     setDropTarget(null);
@@ -204,6 +203,7 @@ export default function App() {
   // Trascinamento nello spazio vuoto della colonna
   const handleColumnDragOver = (e, columnId, cardCount) => {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
 
     if (!dropTarget || dropTarget.columnId !== columnId) {
@@ -235,17 +235,14 @@ export default function App() {
 
     let targetIndex = dropTarget ? dropTarget.index : targetCards.length;
 
-    // Se lo spostamento avviene nella stessa colonna e la scheda era prima dell'indice target, aggiustiamo l'indice
     const currentIndexInTarget = targetCards.findIndex((c) => c.id === cardId);
     if (currentIndexInTarget !== -1 && currentIndexInTarget < targetIndex) {
       targetIndex = Math.max(0, targetIndex - 1);
     }
 
-    // Rimuoviamo la scheda dalla lista attuale
     const remainingCards = cards.filter((c) => c.id !== cardId);
     const updatedCard = { ...draggedCard, columnId: targetColId };
 
-    // Troviamo l'indice globale corretto in cui inserire
     const colCardsAfterRemoval = remainingCards.filter((c) => c.columnId === targetColId);
 
     if (targetIndex >= colCardsAfterRemoval.length) {
@@ -271,30 +268,30 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 antialiased selection:bg-[#ecad0a]/20">
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 antialiased selection:bg-orange-100">
       {/* Intestazione */}
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white shadow-xs">
         <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="h-6 w-2 rounded bg-[#ecad0a]" />
+            <div className="h-6 w-2 rounded bg-orange-500" />
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-[#032147]">
+              <h1 className="text-xl font-bold tracking-tight text-slate-900">
                 Bacheca di Progetto
               </h1>
-              <p className="text-xs text-[#888888]">
+              <p className="text-xs text-slate-500">
                 Flusso di lavoro a bacheca singola
               </p>
             </div>
           </div>
-          <div className="flex items-center space-x-3 text-xs font-medium text-[#888888]">
-            <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-[#209dd7]">
+          <div className="flex items-center space-x-3 text-xs font-medium text-slate-500">
+            <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-600 font-semibold">
               {columns.length} {columns.length === 1 ? 'Colonna' : 'Colonne'}
             </span>
             <span>{cards.length} Schede totali</span>
             <button
               type="button"
               onClick={() => setIsAddingColumn(true)}
-              className="inline-flex items-center space-x-1.5 rounded-lg bg-[#753991] hover:bg-[#632f7c] text-white px-3 py-1.5 text-xs font-medium shadow-2xs transition-colors"
+              className="inline-flex items-center space-x-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-xs font-medium shadow-2xs transition-colors"
             >
               <Plus size={14} />
               <span>Nuova colonna</span>
@@ -317,8 +314,8 @@ export default function App() {
                 onDrop={(e) => handleDrop(e, col.id)}
                 className={`w-80 shrink-0 flex flex-col rounded-xl border transition-colors duration-150 ${
                   isColumnActive
-                    ? 'border-[#209dd7] bg-blue-50/30 ring-1 ring-[#209dd7]/30'
-                    : 'border-slate-200 bg-slate-100/70'
+                    ? 'border-indigo-500 bg-indigo-50/30 ring-1 ring-indigo-500/30'
+                    : 'border-slate-200 bg-slate-100/75'
                 }`}
               >
                 {/* Intestazione colonna */}
@@ -334,7 +331,7 @@ export default function App() {
                           if (e.key === 'Escape') cancelRenameColumn();
                         }}
                         autoFocus
-                        className="w-full text-xs font-semibold px-2 py-1 border border-[#209dd7] rounded outline-none text-[#032147]"
+                        className="w-full text-xs font-semibold px-2 py-1 border border-indigo-500 rounded outline-none text-slate-900"
                       />
                       <button
                         onClick={() => saveRenameColumn(col.id)}
@@ -354,10 +351,10 @@ export default function App() {
                   ) : (
                     <>
                       <div className="flex items-center space-x-2">
-                        <span className="font-semibold text-sm text-[#032147] tracking-tight">
+                        <span className="font-semibold text-sm text-slate-900 tracking-tight">
                           {col.name}
                         </span>
-                        <span className="text-[11px] font-semibold text-[#888888] bg-slate-100 rounded-full px-2 py-0.5">
+                        <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">
                           {columnCards.length}
                         </span>
                       </div>
@@ -365,7 +362,7 @@ export default function App() {
                         <button
                           onClick={() => startRenameColumn(col)}
                           aria-label={`Rinomina ${col.name}`}
-                          className="p-1 text-[#888888] hover:text-[#032147] rounded transition-colors"
+                          className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors"
                         >
                           <Edit2 size={13} />
                         </button>
@@ -373,7 +370,7 @@ export default function App() {
                           <button
                             onClick={() => requestDeleteColumn(col)}
                             aria-label={`Elimina colonna ${col.name}`}
-                            className="p-1 text-[#888888] hover:text-rose-600 rounded transition-colors"
+                            className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors"
                           >
                             <Trash2 size={13} />
                           </button>
@@ -393,8 +390,8 @@ export default function App() {
                       <React.Fragment key={card.id}>
                         {/* Indicatore visivo di rilascio prima di questa scheda */}
                         {isTargetBeforeThis && (
-                          <div className="rounded-lg border-2 border-dashed border-[#ecad0a] bg-[#ecad0a]/10 py-2.5 px-3 flex items-center justify-center space-x-2 text-[#032147] text-xs font-semibold animate-pulse transition-all">
-                            <div className="w-2 h-2 rounded-full bg-[#ecad0a]" />
+                          <div className="rounded-lg border-2 border-dashed border-orange-500 bg-orange-50 py-2.5 px-3 flex items-center justify-center space-x-2 text-orange-950 text-xs font-semibold animate-pulse transition-all">
+                            <div className="w-2 h-2 rounded-full bg-orange-500" />
                             <span>Rilascia qui la scheda</span>
                           </div>
                         )}
@@ -404,33 +401,36 @@ export default function App() {
                           onDragStart={(e) => handleDragStart(e, card.id)}
                           onDragEnd={handleDragEnd}
                           onDragOver={(e) => handleCardDragOver(e, col.id, idx)}
-                          className={`group relative flex flex-col rounded-lg border border-slate-200 bg-white p-3.5 shadow-xs transition-all duration-150 cursor-grab active:cursor-grabbing hover:border-[#209dd7] hover:shadow-sm ${
+                          className={`group relative flex flex-col rounded-lg border border-slate-200 bg-white p-3.5 shadow-xs transition-all duration-150 cursor-grab active:cursor-grabbing hover:shadow-sm overflow-hidden ${
                             draggedCardId === card.id
-                              ? 'opacity-30 border-dashed border-[#209dd7]'
+                              ? 'opacity-30 border-dashed border-orange-400'
                               : ''
                           }`}
                         >
+                          {/* Barra laterale sinistra spessa arancione al passaggio del mouse (roll-on) */}
+                          <div className="absolute inset-y-0 left-0 w-1.5 bg-orange-500 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none" />
+
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center space-x-1.5 flex-1 min-w-0">
                               <GripVertical
                                 size={12}
                                 className="text-slate-300 group-hover:text-slate-500 shrink-0"
                               />
-                              <h4 className="text-xs font-semibold text-[#032147] truncate leading-tight">
+                              <h4 className="text-xs font-semibold text-slate-900 truncate leading-tight">
                                 {card.title}
                               </h4>
                             </div>
                             <button
                               onClick={() => requestDeleteCard(card)}
                               aria-label={`Elimina scheda ${card.title}`}
-                              className="opacity-0 group-hover:opacity-100 text-[#888888] hover:text-rose-600 transition-opacity p-0.5"
+                              className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 transition-opacity p-0.5"
                             >
                               <Trash2 size={13} />
                             </button>
                           </div>
 
                           {card.details && (
-                            <p className="mt-2 text-xs text-[#888888] leading-relaxed line-clamp-3">
+                            <p className="mt-2 text-xs text-slate-500 leading-relaxed line-clamp-3">
                               {card.details}
                             </p>
                           )}
@@ -442,29 +442,29 @@ export default function App() {
                   {/* Indicatore visivo di rilascio in fondo alla colonna */}
                   {dropTarget?.columnId === col.id &&
                     dropTarget?.index === columnCards.length && (
-                      <div className="rounded-lg border-2 border-dashed border-[#ecad0a] bg-[#ecad0a]/10 py-2.5 px-3 flex items-center justify-center space-x-2 text-[#032147] text-xs font-semibold animate-pulse transition-all">
-                        <div className="w-2 h-2 rounded-full bg-[#ecad0a]" />
+                      <div className="rounded-lg border-2 border-dashed border-orange-500 bg-orange-50 py-2.5 px-3 flex items-center justify-center space-x-2 text-orange-950 text-xs font-semibold animate-pulse transition-all">
+                        <div className="w-2 h-2 rounded-full bg-orange-500" />
                         <span>Rilascia qui la scheda</span>
                       </div>
                     )}
 
                   {/* Modulo o pulsante per aggiungere una nuova scheda */}
                   {activeNewCardColumnId === col.id ? (
-                    <div className="rounded-lg border border-[#209dd7] bg-white p-3 shadow-xs mt-2">
+                    <div className="rounded-lg border border-indigo-500 bg-white p-3 shadow-xs mt-2">
                       <input
                         type="text"
                         placeholder="Titolo scheda"
                         value={newTitle}
                         onChange={(e) => setNewTitle(e.target.value)}
                         autoFocus
-                        className="w-full text-xs font-medium px-2 py-1.5 border border-slate-200 rounded outline-none focus:border-[#209dd7] text-[#032147] mb-2"
+                        className="w-full text-xs font-medium px-2 py-1.5 border border-slate-200 rounded outline-none focus:border-indigo-500 text-slate-900 mb-2"
                       />
                       <textarea
                         placeholder="Dettagli scheda"
                         rows={2}
                         value={newDetails}
                         onChange={(e) => setNewDetails(e.target.value)}
-                        className="w-full text-xs text-slate-700 px-2 py-1.5 border border-slate-200 rounded outline-none focus:border-[#209dd7] resize-none mb-3"
+                        className="w-full text-xs text-slate-700 px-2 py-1.5 border border-slate-200 rounded outline-none focus:border-indigo-500 resize-none mb-3"
                       />
                       <div className="flex items-center justify-end space-x-2">
                         <button
@@ -474,14 +474,14 @@ export default function App() {
                             setNewTitle('');
                             setNewDetails('');
                           }}
-                          className="text-xs px-2.5 py-1 text-[#888888] hover:text-slate-700 font-medium"
+                          className="text-xs px-2.5 py-1 text-slate-500 hover:text-slate-800 font-medium"
                         >
                           Annulla
                         </button>
                         <button
                           type="button"
                           onClick={() => handleAddCard(col.id)}
-                          className="text-xs px-3 py-1 bg-[#753991] hover:bg-[#632f7c] text-white font-medium rounded shadow-2xs transition-colors"
+                          className="text-xs px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded shadow-2xs transition-colors"
                         >
                           Aggiungi scheda
                         </button>
@@ -495,7 +495,7 @@ export default function App() {
                         setNewTitle('');
                         setNewDetails('');
                       }}
-                      className="w-full flex items-center justify-center space-x-1.5 rounded-lg border border-dashed border-slate-300 py-2 text-xs font-medium text-[#888888] hover:border-[#209dd7] hover:text-[#209dd7] hover:bg-white transition-colors mt-auto"
+                      className="w-full flex items-center justify-center space-x-1.5 rounded-lg border border-dashed border-slate-300 py-2 text-xs font-medium text-slate-500 hover:border-indigo-500 hover:text-indigo-600 hover:bg-white transition-colors mt-auto"
                     >
                       <Plus size={14} />
                       <span>Aggiungi scheda</span>
@@ -508,8 +508,8 @@ export default function App() {
 
           {/* Modulo per aggiungere una nuova colonna */}
           {isAddingColumn ? (
-            <div className="w-80 shrink-0 rounded-xl border border-[#209dd7] bg-white p-3.5 shadow-xs">
-              <h4 className="text-xs font-semibold text-[#032147] mb-2">
+            <div className="w-80 shrink-0 rounded-xl border border-indigo-500 bg-white p-3.5 shadow-xs">
+              <h4 className="text-xs font-semibold text-slate-900 mb-2">
                 Aggiungi colonna
               </h4>
               <input
@@ -525,7 +525,7 @@ export default function App() {
                   }
                 }}
                 autoFocus
-                className="w-full text-xs font-medium px-2 py-1.5 border border-slate-200 rounded outline-none focus:border-[#209dd7] text-[#032147] mb-3"
+                className="w-full text-xs font-medium px-2 py-1.5 border border-slate-200 rounded outline-none focus:border-indigo-500 text-slate-900 mb-3"
               />
               <div className="flex items-center justify-end space-x-2">
                 <button
@@ -534,14 +534,14 @@ export default function App() {
                     setIsAddingColumn(false);
                     setNewColumnName('');
                   }}
-                  className="text-xs px-2.5 py-1 text-[#888888] hover:text-slate-700 font-medium"
+                  className="text-xs px-2.5 py-1 text-slate-500 hover:text-slate-800 font-medium"
                 >
                   Annulla
                 </button>
                 <button
                   type="button"
                   onClick={handleAddColumn}
-                  className="text-xs px-3 py-1 bg-[#753991] hover:bg-[#632f7c] text-white font-medium rounded shadow-2xs transition-colors"
+                  className="text-xs px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded shadow-2xs transition-colors"
                 >
                   Salva colonna
                 </button>
@@ -551,7 +551,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsAddingColumn(true)}
-              className="w-80 shrink-0 h-14 rounded-xl border-2 border-dashed border-slate-300 hover:border-[#209dd7] hover:bg-white flex items-center justify-center space-x-2 text-xs font-medium text-[#888888] hover:text-[#209dd7] transition-all"
+              className="w-80 shrink-0 h-14 rounded-xl border-2 border-dashed border-slate-300 hover:border-indigo-500 hover:bg-white flex items-center justify-center space-x-2 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-all"
             >
               <Plus size={16} />
               <span>Aggiungi un'altra colonna</span>
@@ -573,16 +573,16 @@ export default function App() {
                 <AlertTriangle size={20} />
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-bold text-[#032147]">
+                <h3 className="text-sm font-bold text-slate-900">
                   {confirmDelete.type === 'column'
                     ? 'Elimina colonna'
                     : 'Elimina scheda'}
                 </h3>
-                <p className="mt-1.5 text-xs text-[#888888] leading-relaxed">
+                <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
                   {confirmDelete.type === 'column' ? (
                     <>
                       Sei sicuro di voler eliminare la colonna{' '}
-                      <span className="font-semibold text-[#032147]">
+                      <span className="font-semibold text-slate-900">
                         "{confirmDelete.name}"
                       </span>
                       {confirmDelete.cardCount > 0 && (
@@ -593,7 +593,7 @@ export default function App() {
                   ) : (
                     <>
                       Sei sicuro di voler eliminare la scheda{' '}
-                      <span className="font-semibold text-[#032147]">
+                      <span className="font-semibold text-slate-900">
                         "{confirmDelete.name}"
                       </span>
                       ? L'azione non può essere annullata.
@@ -607,7 +607,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setConfirmDelete(null)}
-                className="rounded-lg px-3 py-1.5 text-xs font-medium text-[#888888] hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
               >
                 Annulla
               </button>
