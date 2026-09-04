@@ -1,6 +1,58 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle } from 'lucide-react';
 
+// Palette per gli sfondi e gli accenti delle intestazioni delle colonne
+const COLUMN_THEMES = [
+  {
+    headerBg: 'bg-blue-100/80',
+    headerBorder: 'border-blue-200',
+    titleColor: 'text-blue-950',
+    badgeBg: 'bg-blue-200/80',
+    badgeText: 'text-blue-800',
+    iconColor: 'text-blue-500 hover:text-blue-800'
+  },
+  {
+    headerBg: 'bg-amber-100/80',
+    headerBorder: 'border-amber-200',
+    titleColor: 'text-amber-950',
+    badgeBg: 'bg-amber-200/80',
+    badgeText: 'text-amber-800',
+    iconColor: 'text-amber-500 hover:text-amber-800'
+  },
+  {
+    headerBg: 'bg-indigo-100/80',
+    headerBorder: 'border-indigo-200',
+    titleColor: 'text-indigo-950',
+    badgeBg: 'bg-indigo-200/80',
+    badgeText: 'text-indigo-800',
+    iconColor: 'text-indigo-500 hover:text-indigo-800'
+  },
+  {
+    headerBg: 'bg-purple-100/80',
+    headerBorder: 'border-purple-200',
+    titleColor: 'text-purple-950',
+    badgeBg: 'bg-purple-200/80',
+    badgeText: 'text-purple-800',
+    iconColor: 'text-purple-500 hover:text-purple-800'
+  },
+  {
+    headerBg: 'bg-emerald-100/80',
+    headerBorder: 'border-emerald-200',
+    titleColor: 'text-emerald-950',
+    badgeBg: 'bg-emerald-200/80',
+    badgeText: 'text-emerald-800',
+    iconColor: 'text-emerald-600 hover:text-emerald-900'
+  },
+  {
+    headerBg: 'bg-rose-100/80',
+    headerBorder: 'border-rose-200',
+    titleColor: 'text-rose-950',
+    badgeBg: 'bg-rose-200/80',
+    badgeText: 'text-rose-800',
+    iconColor: 'text-rose-500 hover:text-rose-800'
+  }
+];
+
 // Colonne fisse iniziali
 const INITIAL_COLUMNS = [
   { id: 'col-1', name: 'Backlog' },
@@ -203,7 +255,6 @@ export default function App() {
   // Trascinamento nello spazio vuoto della colonna
   const handleColumnDragOver = (e, columnId, cardCount) => {
     e.preventDefault();
-    e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
 
     if (!dropTarget || dropTarget.columnId !== columnId) {
@@ -269,7 +320,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 antialiased selection:bg-orange-100">
-      {/* Intestazione */}
+      {/* Intestazione principale */}
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white shadow-xs">
         <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -303,9 +354,10 @@ export default function App() {
       {/* Area della bacheca */}
       <main className="flex-1 overflow-x-auto p-6">
         <div className="flex items-start gap-5 min-w-max pb-4">
-          {columns.map((col) => {
+          {columns.map((col, colIdx) => {
             const columnCards = cards.filter((c) => c.columnId === col.id);
             const isColumnActive = dropTarget?.columnId === col.id;
+            const theme = COLUMN_THEMES[colIdx % COLUMN_THEMES.length];
 
             return (
               <div
@@ -318,8 +370,10 @@ export default function App() {
                     : 'border-slate-200 bg-slate-100/75'
                 }`}
               >
-                {/* Intestazione colonna */}
-                <div className="p-3.5 flex items-center justify-between border-b border-slate-200 bg-white rounded-t-xl">
+                {/* Intestazione colonna con sfondo colorato tematico */}
+                <div
+                  className={`p-3.5 flex items-center justify-between border-b rounded-t-xl transition-colors ${theme.headerBg} ${theme.headerBorder}`}
+                >
                   {editingColumnId === col.id ? (
                     <div className="flex items-center space-x-1 w-full">
                       <input
@@ -331,12 +385,12 @@ export default function App() {
                           if (e.key === 'Escape') cancelRenameColumn();
                         }}
                         autoFocus
-                        className="w-full text-xs font-semibold px-2 py-1 border border-indigo-500 rounded outline-none text-slate-900"
+                        className="w-full text-xs font-semibold px-2 py-1 border border-indigo-500 rounded outline-none bg-white text-slate-900"
                       />
                       <button
                         onClick={() => saveRenameColumn(col.id)}
                         aria-label="Salva nome colonna"
-                        className="p-1 text-emerald-600 hover:text-emerald-700"
+                        className="p-1 text-emerald-700 hover:text-emerald-900"
                       >
                         <Check size={14} />
                       </button>
@@ -351,10 +405,10 @@ export default function App() {
                   ) : (
                     <>
                       <div className="flex items-center space-x-2">
-                        <span className="font-semibold text-sm text-slate-900 tracking-tight">
+                        <span className={`font-semibold text-sm tracking-tight ${theme.titleColor}`}>
                           {col.name}
                         </span>
-                        <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">
+                        <span className={`text-[11px] font-bold rounded-full px-2 py-0.5 ${theme.badgeBg} ${theme.badgeText}`}>
                           {columnCards.length}
                         </span>
                       </div>
@@ -362,7 +416,7 @@ export default function App() {
                         <button
                           onClick={() => startRenameColumn(col)}
                           aria-label={`Rinomina ${col.name}`}
-                          className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors"
+                          className={`p-1 rounded transition-colors ${theme.iconColor}`}
                         >
                           <Edit2 size={13} />
                         </button>
@@ -370,7 +424,7 @@ export default function App() {
                           <button
                             onClick={() => requestDeleteColumn(col)}
                             aria-label={`Elimina colonna ${col.name}`}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors"
+                            className="p-1 text-rose-500 hover:text-rose-700 rounded transition-colors"
                           >
                             <Trash2 size={13} />
                           </button>
@@ -407,7 +461,7 @@ export default function App() {
                               : ''
                           }`}
                         >
-                          {/* Barra laterale sinistra spessa arancione al passaggio del mouse (roll-on) */}
+                          {/* Barra laterale sinistra spessa arancione al passaggio del mouse */}
                           <div className="absolute inset-y-0 left-0 w-1.5 bg-orange-500 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none" />
 
                           <div className="flex items-start justify-between gap-2">
