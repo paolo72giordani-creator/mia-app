@@ -407,8 +407,8 @@ export default function App() {
             </div>
           )}
 
-          {/* Form */}
-          <form onSubmit={handleAuth} className="space-y-4">
+          {/* Form con chiave dinamica per forzare il reset del browser */}
+          <form onSubmit={handleAuth} className="space-y-4" autoComplete="off" key={authMode}>
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1.5">
                 Indirizzo Email
@@ -416,8 +416,10 @@ export default function App() {
               <div className="relative">
                 <Mail size={16} className="absolute left-3.5 top-3 text-slate-500" />
                 <input
+                  key={`email-${authMode}`}
                   type="email"
                   required
+                  autoComplete="none"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="nome@esempio.com"
@@ -433,9 +435,11 @@ export default function App() {
               <div className="relative">
                 <Lock size={16} className="absolute left-3.5 top-3 text-slate-500" />
                 <input
+                  key={`password-${authMode}`}
                   type="password"
                   required
                   minLength={6}
+                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
