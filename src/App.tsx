@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock } from 'lucide-react';
+import { supabase } from './supabaseClient';
 
-// Palette per gli sfondi e gli accenti delle intestazioni delle colonne
 const COLUMN_THEMES = [
   {
     headerBg: 'bg-blue-100/80',
@@ -53,192 +53,224 @@ const COLUMN_THEMES = [
   }
 ];
 
-// Colonne fisse iniziali
-const INITIAL_COLUMNS = [
-  { id: 'col-1', name: 'Backlog' },
-  { id: 'col-2', name: 'Da fare' },
-  { id: 'col-3', name: 'In corso' },
-  { id: 'col-4', name: 'In revisione' },
-  { id: 'col-5', name: 'Completato' }
-];
-
-// Schede dimostrative iniziali
-const INITIAL_CARDS = [
-  {
-    id: 'card-1',
-    columnId: 'col-1',
-    title: 'Ricerca di mercato',
-    details: 'Valutare le soluzioni attuali nei flussi di lavoro e nella produttività.'
-  },
-  {
-    id: 'card-2',
-    columnId: 'col-2',
-    title: 'Allineamento risorse brand',
-    details: 'Verificare i token di stile e assicurare gli standard di contrasto colore.'
-  },
-  {
-    id: 'card-3',
-    columnId: 'col-2',
-    title: 'Bozza schema database',
-    details: 'Definire le entità e le relazioni per progetti, bacheche e schede.'
-  },
-  {
-    id: 'card-4',
-    columnId: 'col-3',
-    title: 'Implementazione Drag and Drop',
-    details: 'Garantire il riordinamento fluido sia intra-colonna che inter-colonna.'
-  },
-  {
-    id: 'card-5',
-    columnId: 'col-4',
-    title: 'Verifica cross-browser',
-    details: 'Controllare il comportamento del layout e dei puntatori su diversi browser.'
-  },
-  {
-    id: 'card-6',
-    columnId: 'col-5',
-    title: 'Rilascio in produzione',
-    details: 'Preparare i pacchetti frontend ed eseguire i controlli automatizzati.'
-  }
+const DEFAULT_COLUMNS = [
+  { name: 'Backlog', position: 0 },
+  { name: 'Da fare', position: 1 },
+  { name: 'In corso', position: 2 },
+  { name: 'In revisione', position: 3 },
+  { name: 'Completato', position: 4 }
 ];
 
 export default function App() {
-  const [columns, setColumns] = useState(INITIAL_COLUMNS);
-  const [cards, setCards] = useState(INITIAL_CARDS);
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Stato per rinominare la colonna
+  // Auth States
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
+  // App States
+  const [columns, setColumns] = useState([]);
+  const [cards, setCards] = useState([]);
+
+  // UI States
   const [editingColumnId, setEditingColumnId] = useState(null);
   const [editingColumnName, setEditingColumnName] = useState('');
-
-  // Stato per la creazione di una nuova colonna
   const [isAddingColumn, setIsAddingColumn] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
-
-  // Stato per la creazione di una nuova scheda
   const [activeNewCardColumnId, setActiveNewCardColumnId] = useState(null);
   const [newTitle, setNewTitle] = useState('');
   const [newDetails, setNewDetails] = useState('');
-
-  // Stato per Drag and Drop e indicatore visivo di posizione
   const [draggedCardId, setDraggedCardId] = useState(null);
-  const [dropTarget, setDropTarget] = useState(null); // { columnId, index }
-
-  // Stato per la finestra modale di conferma cancellazione
+  const [dropTarget, setDropTarget] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
-  // Avvia modifica nome colonna
-  const startRenameColumn = (col) => {
-    setEditingColumnId(col.id);
-    setEditingColumnName(col.name);
-  };
+  // Gestione sessione utente Supabase
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
 
-  // Salva nuovo nome colonna
-  const saveRenameColumn = (id) => {
-    const trimmed = editingColumnName.trim();
-    if (trimmed) {
-      setColumns((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, name: trimmed } : c))
-      );
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Caricamento dati utente dal cloud
+  useEffect(() => {
+    if (session?.user) {
+      fetchBoardData();
     }
-    setEditingColumnId(null);
-    setEditingColumnName('');
+  }, [session]);
+
+  const fetchBoardData = async () => {
+    setLoading(true);
+    try {
+      // 1. Carica colonne
+      let { data: cols, error: colsErr } = await supabase
+        .from('columns')
+        .select('*')
+        .order('position', { ascending: true });
+
+      if (colsErr) throw colsErr;
+
+      // Se l'utente non ha ancora colonne, inizializza quelle di default
+      if (!cols || cols.length === 0) {
+        const initialCols = DEFAULT_COLUMNS.map((col) => ({
+          id: `col-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          user_id: session.user.id,
+          name: col.name,
+          position: col.position
+        }));
+
+        const { data: insertedCols, error: insertErr } = await supabase
+          .from('columns')
+          .insert(initialCols)
+          .select();
+
+        if (insertErr) throw insertErr;
+        cols = insertedCols;
+      }
+
+      setColumns(cols || []);
+
+      // 2. Carica schede
+      const { data: crds, error: crdsErr } = await supabase
+        .from('cards')
+        .select('*')
+        .order('position', { ascending: true });
+
+      if (crdsErr) throw crdsErr;
+      setCards(crds || []);
+    } catch (err) {
+      console.error('Errore nel caricamento dati:', err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Annulla rinomina
-  const cancelRenameColumn = () => {
-    setEditingColumnId(null);
-    setEditingColumnName('');
+  // Gestione Autenticazione (Login / Registrazione)
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthLoading(true);
+
+    try {
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        alert('Registrazione completata! Controlla la tua email se è richiesta la conferma dell\'account.');
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      }
+    } catch (err) {
+      setAuthError(err.message);
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
-  // Aggiunta di una nuova colonna
-  const handleAddColumn = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setColumns([]);
+    setCards([]);
+  };
+
+  // Operazioni su Colonne
+  const handleAddColumn = async () => {
     const trimmed = newColumnName.trim();
-    if (!trimmed) return;
+    if (!trimmed || !session) return;
 
     const newCol = {
       id: `col-${Date.now()}`,
-      name: trimmed
+      user_id: session.user.id,
+      name: trimmed,
+      position: columns.length
     };
 
     setColumns((prev) => [...prev, newCol]);
     setNewColumnName('');
     setIsAddingColumn(false);
-  };
 
-  // Apertura modale per eliminazione colonna
-  const requestDeleteColumn = (col) => {
-    if (columns.length <= 1) return;
-    const count = cards.filter((c) => c.columnId === col.id).length;
-    setConfirmDelete({
-      type: 'column',
-      id: col.id,
-      name: col.name,
-      cardCount: count
-    });
-  };
-
-  // Apertura modale per eliminazione scheda
-  const requestDeleteCard = (card) => {
-    setConfirmDelete({
-      type: 'card',
-      id: card.id,
-      name: card.title
-    });
-  };
-
-  // Conferma effettiva dell'eliminazione
-  const handleConfirmDelete = () => {
-    if (!confirmDelete) return;
-
-    if (confirmDelete.type === 'card') {
-      setCards((prev) => prev.filter((c) => c.id !== confirmDelete.id));
-    } else if (confirmDelete.type === 'column') {
-      setColumns((prev) => prev.filter((c) => c.id !== confirmDelete.id));
-      setCards((prev) => prev.filter((c) => c.columnId !== confirmDelete.id));
-
-      if (activeNewCardColumnId === confirmDelete.id) {
-        setActiveNewCardColumnId(null);
-      }
-      if (editingColumnId === confirmDelete.id) {
-        setEditingColumnId(null);
-      }
+    const { error } = await supabase.from('columns').insert([newCol]);
+    if (error) {
+      console.error('Errore creazione colonna:', error);
+      fetchBoardData();
     }
-
-    setConfirmDelete(null);
   };
 
-  // Creazione nuova scheda
-  const handleAddCard = (columnId) => {
-    const trimmedTitle = newTitle.trim();
-    if (!trimmedTitle) return;
+  const saveRenameColumn = async (id) => {
+    const trimmed = editingColumnName.trim();
+    if (trimmed) {
+      setColumns((prev) => prev.map((c) => (c.id === id ? { ...c, name: trimmed } : c)));
+      await supabase.from('columns').update({ name: trimmed }).eq('id', id);
+    }
+    setEditingColumnId(null);
+    setEditingColumnName('');
+  };
 
+  // Operazioni su Schede
+  const handleAddCard = async (columnId) => {
+    const trimmedTitle = newTitle.trim();
+    if (!trimmedTitle || !session) return;
+
+    const colCards = cards.filter((c) => c.column_id === columnId);
     const newCard = {
       id: `card-${Date.now()}`,
-      columnId,
+      user_id: session.user.id,
+      column_id: columnId,
       title: trimmedTitle,
-      details: newDetails.trim()
+      details: newDetails.trim(),
+      position: colCards.length
     };
 
     setCards((prev) => [...prev, newCard]);
     setNewTitle('');
     setNewDetails('');
     setActiveNewCardColumnId(null);
+
+    const { error } = await supabase.from('cards').insert([newCard]);
+    if (error) {
+      console.error('Errore creazione scheda:', error);
+      fetchBoardData();
+    }
   };
 
-  // Inizio trascinamento
+  const handleConfirmDelete = async () => {
+    if (!confirmDelete) return;
+
+    if (confirmDelete.type === 'card') {
+      setCards((prev) => prev.filter((c) => c.id !== confirmDelete.id));
+      await supabase.from('cards').delete().eq('id', confirmDelete.id);
+    } else if (confirmDelete.type === 'column') {
+      setColumns((prev) => prev.filter((c) => c.id !== confirmDelete.id));
+      setCards((prev) => prev.filter((c) => c.column_id !== confirmDelete.id));
+      await supabase.from('columns').delete().eq('id', confirmDelete.id);
+    }
+
+    setConfirmDelete(null);
+  };
+
+  // Drag and Drop
   const handleDragStart = (e, cardId) => {
     setDraggedCardId(cardId);
     e.dataTransfer.setData('text/plain', cardId);
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  // Fine trascinamento
   const handleDragEnd = () => {
     setDraggedCardId(null);
     setDropTarget(null);
   };
 
-  // Calcolo della posizione di inserimento sopra/sotto alla scheda sorvolata
   const handleCardDragOver = (e, columnId, index) => {
     e.preventDefault();
     e.stopPropagation();
@@ -252,7 +284,6 @@ export default function App() {
     setDropTarget({ columnId, index: targetIndex });
   };
 
-  // Trascinamento nello spazio vuoto della colonna
   const handleColumnDragOver = (e, columnId, cardCount) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
@@ -262,8 +293,7 @@ export default function App() {
     }
   };
 
-  // Gestione del rilascio e riposizionamento effettivo della scheda
-  const handleDrop = (e, columnId) => {
+  const handleDrop = async (e, columnId) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -275,52 +305,121 @@ export default function App() {
     }
 
     const draggedCard = cards.find((c) => c.id === cardId);
-    if (!draggedCard) {
-      setDraggedCardId(null);
-      setDropTarget(null);
-      return;
-    }
+    if (!draggedCard) return;
 
     const targetColId = dropTarget ? dropTarget.columnId : columnId;
-    const targetCards = cards.filter((c) => c.columnId === targetColId);
 
-    let targetIndex = dropTarget ? dropTarget.index : targetCards.length;
-
-    const currentIndexInTarget = targetCards.findIndex((c) => c.id === cardId);
-    if (currentIndexInTarget !== -1 && currentIndexInTarget < targetIndex) {
-      targetIndex = Math.max(0, targetIndex - 1);
-    }
-
-    const remainingCards = cards.filter((c) => c.id !== cardId);
-    const updatedCard = { ...draggedCard, columnId: targetColId };
-
-    const colCardsAfterRemoval = remainingCards.filter((c) => c.columnId === targetColId);
-
-    if (targetIndex >= colCardsAfterRemoval.length) {
-      if (colCardsAfterRemoval.length === 0) {
-        setCards([...remainingCards, updatedCard]);
-      } else {
-        const lastCardOfCol = colCardsAfterRemoval[colCardsAfterRemoval.length - 1];
-        const insertPos = remainingCards.indexOf(lastCardOfCol) + 1;
-        const nextCards = [...remainingCards];
-        nextCards.splice(insertPos, 0, updatedCard);
-        setCards(nextCards);
-      }
-    } else {
-      const cardToInsertBefore = colCardsAfterRemoval[targetIndex];
-      const insertPos = remainingCards.indexOf(cardToInsertBefore);
-      const nextCards = [...remainingCards];
-      nextCards.splice(insertPos, 0, updatedCard);
-      setCards(nextCards);
-    }
+    const updatedCards = cards.map((c) =>
+      c.id === cardId ? { ...c, column_id: targetColId } : c
+    );
+    setCards(updatedCards);
 
     setDraggedCardId(null);
     setDropTarget(null);
+
+    await supabase
+      .from('cards')
+      .update({ column_id: targetColId })
+      .eq('id', cardId);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex items-center space-x-3 text-slate-600">
+          <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-medium">Caricamento bacheca...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
+          <div className="flex flex-col items-center mb-6">
+            <div className="h-10 w-3 rounded bg-orange-500 mb-3" />
+            <h2 className="text-2xl font-bold text-slate-900">
+              {isSignUp ? 'Crea un account' : 'Accedi alla bacheca'}
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              {isSignUp ? 'Inizia a gestire i tuoi progetti' : 'Inserisci le tue credenziali per continuare'}
+            </p>
+          </div>
+
+          {authError && (
+            <div className="mb-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-600 flex items-center space-x-2">
+              <AlertTriangle size={16} className="shrink-0" />
+              <span>{authError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleAuth} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Email</label>
+              <div className="relative">
+                <Mail size={16} className="absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="nome@esempio.com"
+                  className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg outline-none focus:border-indigo-500 text-slate-900"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Password</label>
+              <div className="relative">
+                <Lock size={16} className="absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg outline-none focus:border-indigo-500 text-slate-900"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={authLoading}
+              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-2"
+            >
+              {authLoading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <span>{isSignUp ? 'Registrati' : 'Accedi'}</span>
+              )}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center border-t border-slate-100 pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setIsSignUp(!isSignUp);
+                setAuthError('');
+              }}
+              className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+            >
+              {isSignUp ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 antialiased selection:bg-orange-100">
-      {/* Intestazione principale */}
+      {/* Intestazione */}
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white shadow-xs">
         <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -330,32 +429,40 @@ export default function App() {
                 Bacheca di Progetto
               </h1>
               <p className="text-xs text-slate-500">
-                Flusso di lavoro a bacheca singola
+                Sincronizzata nel Cloud per {session.user.email}
               </p>
             </div>
           </div>
-          <div className="flex items-center space-x-3 text-xs font-medium text-slate-500">
+          <div className="flex items-center space-x-4 text-xs font-medium">
             <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-600 font-semibold">
               {columns.length} {columns.length === 1 ? 'Colonna' : 'Colonne'}
             </span>
-            <span>{cards.length} Schede totali</span>
+            <span className="text-slate-500">{cards.length} Schede totali</span>
             <button
               type="button"
               onClick={() => setIsAddingColumn(true)}
-              className="inline-flex items-center space-x-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-xs font-medium shadow-2xs transition-colors"
+              className="inline-flex items-center space-x-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 font-medium shadow-2xs transition-colors"
             >
               <Plus size={14} />
               <span>Nuova colonna</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex items-center space-x-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 py-1.5 font-medium transition-colors"
+            >
+              <LogOut size={14} />
+              <span>Esci</span>
             </button>
           </div>
         </div>
       </header>
 
-      {/* Area della bacheca */}
+      {/* Area bacheca */}
       <main className="flex-1 overflow-x-auto p-6">
         <div className="flex items-start gap-5 min-w-max pb-4">
           {columns.map((col, colIdx) => {
-            const columnCards = cards.filter((c) => c.columnId === col.id);
+            const columnCards = cards.filter((c) => c.column_id === col.id);
             const isColumnActive = dropTarget?.columnId === col.id;
             const theme = COLUMN_THEMES[colIdx % COLUMN_THEMES.length];
 
@@ -370,7 +477,7 @@ export default function App() {
                     : 'border-slate-200 bg-slate-100/75'
                 }`}
               >
-                {/* Intestazione colonna con sfondo colorato tematico */}
+                {/* Intestazione colonna */}
                 <div
                   className={`p-3.5 flex items-center justify-between border-b rounded-t-xl transition-colors ${theme.headerBg} ${theme.headerBorder}`}
                 >
@@ -382,21 +489,19 @@ export default function App() {
                         onChange={(e) => setEditingColumnName(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') saveRenameColumn(col.id);
-                          if (e.key === 'Escape') cancelRenameColumn();
+                          if (e.key === 'Escape') setEditingColumnId(null);
                         }}
                         autoFocus
                         className="w-full text-xs font-semibold px-2 py-1 border border-indigo-500 rounded outline-none bg-white text-slate-900"
                       />
                       <button
                         onClick={() => saveRenameColumn(col.id)}
-                        aria-label="Salva nome colonna"
                         className="p-1 text-emerald-700 hover:text-emerald-900"
                       >
                         <Check size={14} />
                       </button>
                       <button
-                        onClick={cancelRenameColumn}
-                        aria-label="Annulla modifica colonna"
+                        onClick={() => setEditingColumnId(null)}
                         className="p-1 text-slate-400 hover:text-slate-600"
                       >
                         <X size={14} />
@@ -414,16 +519,24 @@ export default function App() {
                       </div>
                       <div className="flex items-center space-x-1">
                         <button
-                          onClick={() => startRenameColumn(col)}
-                          aria-label={`Rinomina ${col.name}`}
+                          onClick={() => {
+                            setEditingColumnId(col.id);
+                            setEditingColumnName(col.name);
+                          }}
                           className={`p-1 rounded transition-colors ${theme.iconColor}`}
                         >
                           <Edit2 size={13} />
                         </button>
                         {columns.length > 1 && (
                           <button
-                            onClick={() => requestDeleteColumn(col)}
-                            aria-label={`Elimina colonna ${col.name}`}
+                            onClick={() =>
+                              setConfirmDelete({
+                                type: 'column',
+                                id: col.id,
+                                name: col.name,
+                                cardCount: columnCards.length
+                              })
+                            }
                             className="p-1 text-rose-500 hover:text-rose-700 rounded transition-colors"
                           >
                             <Trash2 size={13} />
@@ -434,7 +547,7 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Elenco schede */}
+                {/* Schede */}
                 <div className="p-3 flex flex-col space-y-2.5 min-h-[320px]">
                   {columnCards.map((card, idx) => {
                     const isTargetBeforeThis =
@@ -442,9 +555,8 @@ export default function App() {
 
                     return (
                       <React.Fragment key={card.id}>
-                        {/* Indicatore visivo di rilascio prima di questa scheda */}
                         {isTargetBeforeThis && (
-                          <div className="rounded-lg border-2 border-dashed border-orange-500 bg-orange-50 py-2.5 px-3 flex items-center justify-center space-x-2 text-orange-950 text-xs font-semibold animate-pulse transition-all">
+                          <div className="rounded-lg border-2 border-dashed border-orange-500 bg-orange-50 py-2.5 px-3 flex items-center justify-center space-x-2 text-orange-950 text-xs font-semibold animate-pulse">
                             <div className="w-2 h-2 rounded-full bg-orange-500" />
                             <span>Rilascia qui la scheda</span>
                           </div>
@@ -456,27 +568,26 @@ export default function App() {
                           onDragEnd={handleDragEnd}
                           onDragOver={(e) => handleCardDragOver(e, col.id, idx)}
                           className={`group relative flex flex-col rounded-lg border border-slate-200 bg-white p-3.5 shadow-xs transition-all duration-150 cursor-grab active:cursor-grabbing hover:shadow-sm overflow-hidden ${
-                            draggedCardId === card.id
-                              ? 'opacity-30 border-dashed border-orange-400'
-                              : ''
+                            draggedCardId === card.id ? 'opacity-30 border-dashed border-orange-400' : ''
                           }`}
                         >
-                          {/* Barra laterale sinistra spessa arancione al passaggio del mouse */}
                           <div className="absolute inset-y-0 left-0 w-1.5 bg-orange-500 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none" />
 
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center space-x-1.5 flex-1 min-w-0">
-                              <GripVertical
-                                size={12}
-                                className="text-slate-300 group-hover:text-slate-500 shrink-0"
-                              />
+                              <GripVertical size={12} className="text-slate-300 group-hover:text-slate-500 shrink-0" />
                               <h4 className="text-xs font-semibold text-slate-900 truncate leading-tight">
                                 {card.title}
                               </h4>
                             </div>
                             <button
-                              onClick={() => requestDeleteCard(card)}
-                              aria-label={`Elimina scheda ${card.title}`}
+                              onClick={() =>
+                                setConfirmDelete({
+                                  type: 'card',
+                                  id: card.id,
+                                  name: card.title
+                                })
+                              }
                               className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 transition-opacity p-0.5"
                             >
                               <Trash2 size={13} />
@@ -493,16 +604,13 @@ export default function App() {
                     );
                   })}
 
-                  {/* Indicatore visivo di rilascio in fondo alla colonna */}
-                  {dropTarget?.columnId === col.id &&
-                    dropTarget?.index === columnCards.length && (
-                      <div className="rounded-lg border-2 border-dashed border-orange-500 bg-orange-50 py-2.5 px-3 flex items-center justify-center space-x-2 text-orange-950 text-xs font-semibold animate-pulse transition-all">
-                        <div className="w-2 h-2 rounded-full bg-orange-500" />
-                        <span>Rilascia qui la scheda</span>
-                      </div>
-                    )}
+                  {dropTarget?.columnId === col.id && dropTarget?.index === columnCards.length && (
+                    <div className="rounded-lg border-2 border-dashed border-orange-500 bg-orange-50 py-2.5 px-3 flex items-center justify-center space-x-2 text-orange-950 text-xs font-semibold animate-pulse">
+                      <div className="w-2 h-2 rounded-full bg-orange-500" />
+                      <span>Rilascia qui la scheda</span>
+                    </div>
+                  )}
 
-                  {/* Modulo o pulsante per aggiungere una nuova scheda */}
                   {activeNewCardColumnId === col.id ? (
                     <div className="rounded-lg border border-indigo-500 bg-white p-3 shadow-xs mt-2">
                       <input
@@ -523,11 +631,7 @@ export default function App() {
                       <div className="flex items-center justify-end space-x-2">
                         <button
                           type="button"
-                          onClick={() => {
-                            setActiveNewCardColumnId(null);
-                            setNewTitle('');
-                            setNewDetails('');
-                          }}
+                          onClick={() => setActiveNewCardColumnId(null)}
                           className="text-xs px-2.5 py-1 text-slate-500 hover:text-slate-800 font-medium"
                         >
                           Annulla
@@ -560,12 +664,9 @@ export default function App() {
             );
           })}
 
-          {/* Modulo per aggiungere una nuova colonna */}
           {isAddingColumn ? (
             <div className="w-80 shrink-0 rounded-xl border border-indigo-500 bg-white p-3.5 shadow-xs">
-              <h4 className="text-xs font-semibold text-slate-900 mb-2">
-                Aggiungi colonna
-              </h4>
+              <h4 className="text-xs font-semibold text-slate-900 mb-2">Aggiungi colonna</h4>
               <input
                 type="text"
                 placeholder="Nome della colonna"
@@ -573,10 +674,7 @@ export default function App() {
                 onChange={(e) => setNewColumnName(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleAddColumn();
-                  if (e.key === 'Escape') {
-                    setIsAddingColumn(false);
-                    setNewColumnName('');
-                  }
+                  if (e.key === 'Escape') setIsAddingColumn(false);
                 }}
                 autoFocus
                 className="w-full text-xs font-medium px-2 py-1.5 border border-slate-200 rounded outline-none focus:border-indigo-500 text-slate-900 mb-3"
@@ -584,10 +682,7 @@ export default function App() {
               <div className="flex items-center justify-end space-x-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setIsAddingColumn(false);
-                    setNewColumnName('');
-                  }}
+                  onClick={() => setIsAddingColumn(false)}
                   className="text-xs px-2.5 py-1 text-slate-500 hover:text-slate-800 font-medium"
                 >
                   Annulla
@@ -614,13 +709,9 @@ export default function App() {
         </div>
       </main>
 
-      {/* Modale di conferma eliminazione */}
+      {/* Modale Eliminazione */}
       {confirmDelete && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4"
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-lg">
             <div className="flex items-start space-x-3">
               <div className="rounded-full bg-rose-50 p-2 text-rose-600 shrink-0">
@@ -628,47 +719,25 @@ export default function App() {
               </div>
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-slate-900">
-                  {confirmDelete.type === 'column'
-                    ? 'Elimina colonna'
-                    : 'Elimina scheda'}
+                  {confirmDelete.type === 'column' ? 'Elimina colonna' : 'Elimina scheda'}
                 </h3>
                 <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
-                  {confirmDelete.type === 'column' ? (
-                    <>
-                      Sei sicuro di voler eliminare la colonna{' '}
-                      <span className="font-semibold text-slate-900">
-                        "{confirmDelete.name}"
-                      </span>
-                      {confirmDelete.cardCount > 0 && (
-                        <> e le sue {confirmDelete.cardCount} schede associate</>
-                      )}
-                      ? L'azione non può essere annullata.
-                    </>
-                  ) : (
-                    <>
-                      Sei sicuro di voler eliminare la scheda{' '}
-                      <span className="font-semibold text-slate-900">
-                        "{confirmDelete.name}"
-                      </span>
-                      ? L'azione non può essere annullata.
-                    </>
-                  )}
+                  Sei sicuro di voler eliminare <span className="font-semibold text-slate-900">"{confirmDelete.name}"</span>?
                 </p>
               </div>
             </div>
-
             <div className="mt-5 flex items-center justify-end space-x-2 border-t border-slate-100 pt-3">
               <button
                 type="button"
                 onClick={() => setConfirmDelete(null)}
-                className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100"
               >
                 Annulla
               </button>
               <button
                 type="button"
                 onClick={handleConfirmDelete}
-                className="rounded-lg bg-rose-600 hover:bg-rose-700 px-3.5 py-1.5 text-xs font-medium text-white shadow-2xs transition-colors"
+                className="rounded-lg bg-rose-600 hover:bg-rose-700 px-3.5 py-1.5 text-xs font-medium text-white shadow-2xs"
               >
                 Elimina definitivamente
               </button>
