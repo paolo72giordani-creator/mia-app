@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 const COLUMN_THEMES = [
@@ -65,18 +65,19 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Auth States
-  const [isSignUp, setIsSignUp] = useState(false);
+  // Modalità di autenticazione: 'login' o 'signup'
+  const [authMode, setAuthMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [authSuccessMsg, setAuthSuccessMsg] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  // App States
+  // Stati della bacheca
   const [columns, setColumns] = useState([]);
   const [cards, setCards] = useState([]);
 
-  // UI States
+  // Stati UI per le azioni
   const [editingColumnId, setEditingColumnId] = useState(null);
   const [editingColumnName, setEditingColumnName] = useState('');
   const [isAddingColumn, setIsAddingColumn] = useState(false);
@@ -88,7 +89,7 @@ export default function App() {
   const [dropTarget, setDropTarget] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
-  // Gestione sessione utente Supabase
+  // Gestione della sessione utente
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -103,7 +104,7 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Caricamento dati utente dal cloud
+  // Caricamento dati
   useEffect(() => {
     if (session?.user) {
       fetchBoardData();
@@ -113,7 +114,6 @@ export default function App() {
   const fetchBoardData = async () => {
     setLoading(true);
     try {
-      // 1. Carica colonne
       let { data: cols, error: colsErr } = await supabase
         .from('columns')
         .select('*')
@@ -121,7 +121,6 @@ export default function App() {
 
       if (colsErr) throw colsErr;
 
-      // Se l'utente non ha ancora colonne, inizializza quelle di default
       if (!cols || cols.length === 0) {
         const initialCols = DEFAULT_COLUMNS.map((col) => ({
           id: `col-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -141,7 +140,6 @@ export default function App() {
 
       setColumns(cols || []);
 
-      // 2. Carica schede
       const { data: crds, error: crdsErr } = await supabase
         .from('cards')
         .select('*')
@@ -150,23 +148,25 @@ export default function App() {
       if (crdsErr) throw crdsErr;
       setCards(crds || []);
     } catch (err) {
-      console.error('Errore nel caricamento dati:', err.message);
+      console.error('Errore durante il caricamento:', err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Gestione Autenticazione (Login / Registrazione)
+  // Autenticazione (Accedi / Registrati)
   const handleAuth = async (e) => {
     e.preventDefault();
     setAuthError('');
+    setAuthSuccessMsg('');
     setAuthLoading(true);
 
     try {
-      if (isSignUp) {
+      if (authMode === 'signup') {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        alert('Registrazione completata! Controlla la tua email se è richiesta la conferma dell\'account.');
+        setAuthSuccessMsg('Registrazione completata! Puoi effettuare l\'accesso con le tue credenziali.');
+        setAuthMode('login');
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -182,9 +182,14 @@ export default function App() {
     await supabase.auth.signOut();
     setColumns([]);
     setCards([]);
+    setAuthMode('login'); // Reimposta sulla scheda di Login al momento dell'uscita
+    setEmail('');
+    setPassword('');
+    setAuthError('');
+    setAuthSuccessMsg('');
   };
 
-  // Operazioni su Colonne
+  // Azioni sulle colonne
   const handleAddColumn = async () => {
     const trimmed = newColumnName.trim();
     if (!trimmed || !session) return;
@@ -201,10 +206,7 @@ export default function App() {
     setIsAddingColumn(false);
 
     const { error } = await supabase.from('columns').insert([newCol]);
-    if (error) {
-      console.error('Errore creazione colonna:', error);
-      fetchBoardData();
-    }
+    if (error) fetchBoardData();
   };
 
   const saveRenameColumn = async (id) => {
@@ -217,7 +219,7 @@ export default function App() {
     setEditingColumnName('');
   };
 
-  // Operazioni su Schede
+  // Azioni sulle schede
   const handleAddCard = async (columnId) => {
     const trimmedTitle = newTitle.trim();
     if (!trimmedTitle || !session) return;
@@ -238,10 +240,7 @@ export default function App() {
     setActiveNewCardColumnId(null);
 
     const { error } = await supabase.from('cards').insert([newCard]);
-    if (error) {
-      console.error('Errore creazione scheda:', error);
-      fetchBoardData();
-    }
+    if (error) fetchBoardData();
   };
 
   const handleConfirmDelete = async () => {
@@ -323,58 +322,116 @@ export default function App() {
       .eq('id', cardId);
   };
 
+  // Caricamento iniziale
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="flex items-center space-x-3 text-slate-600">
-          <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-medium">Caricamento bacheca...</span>
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
+        <div className="flex flex-col items-center space-y-3">
+          <div className="w-8 h-8 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm font-medium text-slate-300">Sincronizzazione bacheca...</span>
         </div>
       </div>
     );
   }
 
+  // Schermata Login / Registrazione moderna
   if (!session) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
-          <div className="flex flex-col items-center mb-6">
-            <div className="h-10 w-3 rounded bg-orange-500 mb-3" />
-            <h2 className="text-2xl font-bold text-slate-900">
-              {isSignUp ? 'Crea un account' : 'Accedi alla bacheca'}
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
+        {/* Sfondo decorativo con sfumature */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-orange-500/15 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="w-full max-w-md bg-slate-900/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-800/80 p-8 z-10">
+          {/* Header del Form */}
+          <div className="flex flex-col items-center text-center mb-8">
+            <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-400 flex items-center justify-center shadow-lg shadow-orange-500/20 mb-4">
+              <LayoutDashboard className="text-white" size={24} />
+            </div>
+            <h2 className="text-2xl font-bold text-white tracking-tight">
+              Bacheca Kanban
             </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              {isSignUp ? 'Inizia a gestire i tuoi progetti' : 'Inserisci le tue credenziali per continuare'}
+            <p className="text-xs text-slate-400 mt-1">
+              Gestisci i tuoi task e progetti in un unico posto
             </p>
           </div>
 
+          {/* Selettore Schede (Accedi / Registrati) */}
+          <div className="grid grid-cols-2 bg-slate-800/60 p-1 rounded-2xl mb-6 border border-slate-700/50">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode('login');
+                setAuthError('');
+                setAuthSuccessMsg('');
+              }}
+              className={`flex items-center justify-center space-x-2 py-2.5 text-xs font-semibold rounded-xl transition-all ${
+                authMode === 'login'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <LogIn size={14} />
+              <span>Accedi</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode('signup');
+                setAuthError('');
+                setAuthSuccessMsg('');
+              }}
+              className={`flex items-center justify-center space-x-2 py-2.5 text-xs font-semibold rounded-xl transition-all ${
+                authMode === 'signup'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <UserPlus size={14} />
+              <span>Registrati</span>
+            </button>
+          </div>
+
+          {/* Messaggi di Errore / Successo */}
           {authError && (
-            <div className="mb-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-600 flex items-center space-x-2">
-              <AlertTriangle size={16} className="shrink-0" />
+            <div className="mb-4 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 flex items-center space-x-2.5">
+              <AlertTriangle size={16} className="shrink-0 text-rose-400" />
               <span>{authError}</span>
             </div>
           )}
 
+          {authSuccessMsg && (
+            <div className="mb-4 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300 flex items-center space-x-2.5">
+              <Sparkles size={16} className="shrink-0 text-emerald-400" />
+              <span>{authSuccessMsg}</span>
+            </div>
+          )}
+
+          {/* Form */}
           <form onSubmit={handleAuth} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Email</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                Indirizzo Email
+              </label>
               <div className="relative">
-                <Mail size={16} className="absolute left-3 top-2.5 text-slate-400" />
+                <Mail size={16} className="absolute left-3.5 top-3 text-slate-500" />
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="nome@esempio.com"
-                  className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg outline-none focus:border-indigo-500 text-slate-900"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Password</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                Password
+              </label>
               <div className="relative">
-                <Lock size={16} className="absolute left-3 top-2.5 text-slate-400" />
+                <Lock size={16} className="absolute left-3.5 top-3 text-slate-500" />
                 <input
                   type="password"
                   required
@@ -382,7 +439,7 @@ export default function App() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg outline-none focus:border-indigo-500 text-slate-900"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
                 />
               </div>
             </div>
@@ -390,54 +447,48 @@ export default function App() {
             <button
               type="submit"
               disabled={authLoading}
-              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-2"
+              className="w-full py-3 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-600/25 transition-all flex items-center justify-center space-x-2 mt-2"
             >
               {authLoading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
-                <span>{isSignUp ? 'Registrati' : 'Accedi'}</span>
+                <span>{authMode === 'login' ? 'Accedi all\'Account' : 'Crea Nuovo Account'}</span>
               )}
             </button>
           </form>
 
-          <div className="mt-6 text-center border-t border-slate-100 pt-4">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setAuthError('');
-              }}
-              className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
-            >
-              {isSignUp ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati'}
-            </button>
-          </div>
+          {/* Dettaglio footer */}
+          <p className="mt-6 text-center text-[11px] text-slate-500">
+            {authMode === 'login' 
+              ? 'Non hai ancora un account? Seleziona "Registrati" in alto.' 
+              : 'Hai già un account? Seleziona "Accedi" in alto per rientrare.'}
+          </p>
         </div>
       </div>
     );
   }
 
+  // Interfaccia Applicazione Kanban
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 antialiased selection:bg-orange-100">
-      {/* Intestazione */}
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white shadow-xs">
-        <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur-md shadow-xs">
+        <div className="max-w-[1600px] mx-auto px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="h-6 w-2 rounded bg-orange-500" />
+            <div className="h-7 w-2.5 rounded-full bg-gradient-to-b from-orange-500 to-amber-500" />
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-tight">
                 Bacheca di Progetto
               </h1>
-              <p className="text-xs text-slate-500">
-                Sincronizzata nel Cloud per {session.user.email}
+              <p className="text-[11px] text-slate-500">
+                Sincronizzata con <span className="font-medium text-slate-700">{session.user.email}</span>
               </p>
             </div>
           </div>
-          <div className="flex items-center space-x-4 text-xs font-medium">
+          <div className="flex items-center space-x-3 text-xs font-medium">
             <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-600 font-semibold">
               {columns.length} {columns.length === 1 ? 'Colonna' : 'Colonne'}
             </span>
-            <span className="text-slate-500">{cards.length} Schede totali</span>
+            <span className="text-slate-500 hidden sm:inline">{cards.length} Schede</span>
             <button
               type="button"
               onClick={() => setIsAddingColumn(true)}
@@ -449,7 +500,7 @@ export default function App() {
             <button
               type="button"
               onClick={handleLogout}
-              className="inline-flex items-center space-x-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 py-1.5 font-medium transition-colors"
+              className="inline-flex items-center space-x-1.5 rounded-lg border border-slate-300 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 text-slate-700 px-3 py-1.5 font-medium transition-all"
             >
               <LogOut size={14} />
               <span>Esci</span>
@@ -458,7 +509,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Area bacheca */}
+      {/* Area Colonne Kanban */}
       <main className="flex-1 overflow-x-auto p-6">
         <div className="flex items-start gap-5 min-w-max pb-4">
           {columns.map((col, colIdx) => {
@@ -477,10 +528,7 @@ export default function App() {
                     : 'border-slate-200 bg-slate-100/75'
                 }`}
               >
-                {/* Intestazione colonna */}
-                <div
-                  className={`p-3.5 flex items-center justify-between border-b rounded-t-xl transition-colors ${theme.headerBg} ${theme.headerBorder}`}
-                >
+                <div className={`p-3.5 flex items-center justify-between border-b rounded-t-xl transition-colors ${theme.headerBg} ${theme.headerBorder}`}>
                   {editingColumnId === col.id ? (
                     <div className="flex items-center space-x-1 w-full">
                       <input
@@ -494,16 +542,10 @@ export default function App() {
                         autoFocus
                         className="w-full text-xs font-semibold px-2 py-1 border border-indigo-500 rounded outline-none bg-white text-slate-900"
                       />
-                      <button
-                        onClick={() => saveRenameColumn(col.id)}
-                        className="p-1 text-emerald-700 hover:text-emerald-900"
-                      >
+                      <button onClick={() => saveRenameColumn(col.id)} className="p-1 text-emerald-700 hover:text-emerald-900">
                         <Check size={14} />
                       </button>
-                      <button
-                        onClick={() => setEditingColumnId(null)}
-                        className="p-1 text-slate-400 hover:text-slate-600"
-                      >
+                      <button onClick={() => setEditingColumnId(null)} className="p-1 text-slate-400 hover:text-slate-600">
                         <X size={14} />
                       </button>
                     </div>
@@ -547,7 +589,6 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Schede */}
                 <div className="p-3 flex flex-col space-y-2.5 min-h-[320px]">
                   {columnCards.map((card, idx) => {
                     const isTargetBeforeThis =
@@ -709,7 +750,7 @@ export default function App() {
         </div>
       </main>
 
-      {/* Modale Eliminazione */}
+      {/* Modale di eliminazione */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-lg">
