@@ -134,8 +134,9 @@ export default function App() {
         setEmail('');
         setPassword('');
       } else if (authMode === 'forgot') {
+        const redirectUrl = window.location.origin;
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: window.location.origin
+          redirectTo: redirectUrl,
         });
         if (error) throw error;
         setAuthSuccessMsg('Ti abbiamo inviato un\'email con il link per reimpostare la password!');
