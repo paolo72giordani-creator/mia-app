@@ -126,8 +126,12 @@ export default function App() {
       if (authMode === 'signup') {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        setAuthSuccessMsg('Registrazione completata! Controlla la tua email per confermare l\'account.');
-        switchAuthMode('login');
+        
+        // Passiamo alla schermata di Login e mostriamo il messaggio di successo
+        setAuthMode('login');
+        setAuthSuccessMsg('Registrazione completata! Controlla la tua casella di posta per confermare l\'account prima di accedere.');
+        setEmail('');
+        setPassword('');
       } else if (authMode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
