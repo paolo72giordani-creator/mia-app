@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles, KeyRound, ArrowLeft, MoveLeft, MoveRight } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles, KeyRound, ArrowLeft } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 const COLUMN_THEMES = [
@@ -50,7 +50,8 @@ export default function App() {
   
   // Drag & Drop Colonna
   const [draggedColumnId, setDraggedColumnId] = useState(null);
-  
+  const [columnDropTargetIndex, setColumnDropTargetIndex] = useState(null);
+
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   useEffect(() => {
@@ -210,33 +211,56 @@ export default function App() {
     e.stopPropagation();
     setDraggedColumnId(columnId);
     e.dataTransfer.setData('type', 'column');
-    e.dataTransfer.setData('columnId', columnId);
   };
 
-  const handleColumnDrop = async (e, targetColumnId) => {
+  const handleColumnContainerDragOver = (e, index) => {
+    e.preventDefault();
+    if (!draggedColumnId) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midX = rect.left + rect.width / 2;
+    const isLeftHalf = e.clientX < midX;
+    const targetIdx = isLeftHalf ? index : index + 1;
+
+    setColumnDropTargetIndex(targetIdx);
+  };
+
+  const handleColumnDrop = async (e, targetIdx) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (!draggedColumnId || draggedColumnId === targetColumnId) {
+    const insertIdx = targetIdx !== undefined ? targetIdx : columnDropTargetIndex;
+
+    if (!draggedColumnId || insertIdx === null) {
       setDraggedColumnId(null);
+      setColumnDropTargetIndex(null);
       return;
     }
 
-    const draggedIdx = columns.findIndex((c) => c.id === draggedColumnId);
-    const targetIdx = columns.findIndex((c) => c.id === targetColumnId);
+    const currentIdx = columns.findIndex((c) => c.id === draggedColumnId);
+    if (currentIdx === -1) return;
 
-    if (draggedIdx === -1 || targetIdx === -1) return;
+    let destinationIdx = insertIdx;
+    if (currentIdx < insertIdx) {
+      destinationIdx = insertIdx - 1;
+    }
+
+    if (currentIdx === destinationIdx) {
+      setDraggedColumnId(null);
+      setColumnDropTargetIndex(null);
+      return;
+    }
 
     const reorderedCols = [...columns];
-    const [movedCol] = reorderedCols.splice(draggedIdx, 1);
-    reorderedCols.splice(targetIdx, 0, movedCol);
+    const [movedCol] = reorderedCols.splice(currentIdx, 1);
+    reorderedCols.splice(destinationIdx, 0, movedCol);
 
-    // Ricalcola le posizioni
     const updatedCols = reorderedCols.map((col, idx) => ({ ...col, position: idx }));
     setColumns(updatedCols);
-    setDraggedColumnId(null);
 
-    // Salva le nuove posizioni nel DB Supabase
+    setDraggedColumnId(null);
+    setColumnDropTargetIndex(null);
+
     for (const col of updatedCols) {
       await supabase.from('columns').update({ position: col.position }).eq('id', col.id);
     }
@@ -294,13 +318,14 @@ export default function App() {
     setDraggedCardId(null);
     setDropTarget(null);
     setDraggedColumnId(null);
+    setColumnDropTargetIndex(null);
   };
 
   const handleCardDragOver = (e, columnId, index) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (draggedColumnId) return; // Se stiamo trascinando una colonna, ignora le schede
+    if (draggedColumnId) return;
 
     e.dataTransfer.dropEffect = 'move';
 
@@ -327,10 +352,7 @@ export default function App() {
     e.preventDefault();
     e.stopPropagation();
 
-    if (draggedColumnId) {
-      handleColumnDrop(e, columnId);
-      return;
-    }
+    if (draggedColumnId) return;
 
     const cardId = draggedCardId || e.dataTransfer.getData('text/plain');
     if (!cardId) {
@@ -561,198 +583,214 @@ export default function App() {
       </header>
 
       <main className="flex-1 overflow-x-auto p-6">
-        <div className="flex items-start gap-5 min-w-max pb-4">
+        <div className="flex items-start gap-4 min-w-max pb-4">
           {columns.map((col, colIdx) => {
             const columnCards = cards.filter((c) => c.column_id === col.id);
             const isColumnActive = dropTarget?.columnId === col.id;
             const theme = COLUMN_THEMES[colIdx % COLUMN_THEMES.length];
             const isDraggingThisCol = draggedColumnId === col.id;
+            const showLeftIndicator = draggedColumnId && columnDropTargetIndex === colIdx;
 
             return (
-              <div
-                key={col.id}
-                onDragOver={(e) => handleColumnDragOver(e, col.id, columnCards.length)}
-                onDrop={(e) => handleDrop(e, col.id)}
-                className={`w-80 shrink-0 flex flex-col rounded-xl border transition-all duration-150 ${
-                  isDraggingThisCol ? 'opacity-30 border-dashed border-indigo-500 scale-95' : ''
-                } ${
-                  isColumnActive ? 'border-indigo-500 bg-indigo-50/30 ring-1 ring-indigo-500/30' : 'border-slate-200 bg-slate-100/75'
-                }`}
-              >
-                {/* Intestazione della colonna trascinabile */}
+              <React.Fragment key={col.id}>
+                {/* Indicatore visivo prima della colonna */}
+                {showLeftIndicator && (
+                  <div className="w-2.5 h-[420px] rounded-full bg-indigo-500 border-2 border-indigo-300 animate-pulse shrink-0 self-stretch shadow-md shadow-indigo-500/30 transition-all" />
+                )}
+
                 <div
-                  draggable
-                  onDragStart={(e) => handleColumnDragStart(e, col.id)}
-                  onDragEnd={handleDragEnd}
-                  className={`p-3.5 flex items-center justify-between border-b rounded-t-xl cursor-grab active:cursor-grabbing transition-colors ${theme.headerBg} ${theme.headerBorder}`}
+                  onDragOver={(e) => handleColumnContainerDragOver(e, colIdx)}
+                  onDrop={(e) => handleColumnDrop(e, columnDropTargetIndex)}
+                  className={`w-80 shrink-0 flex flex-col rounded-xl border transition-all duration-150 ${
+                    isDraggingThisCol ? 'opacity-30 border-dashed border-indigo-500 scale-95' : ''
+                  } ${
+                    isColumnActive ? 'border-indigo-500 bg-indigo-50/30 ring-1 ring-indigo-500/30' : 'border-slate-200 bg-slate-100/75'
+                  }`}
                 >
-                  {editingColumnId === col.id ? (
-                    <div className="flex items-center space-x-1 w-full" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="text"
-                        value={editingColumnName}
-                        onChange={(e) => setEditingColumnName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') saveRenameColumn(col.id);
-                          if (e.key === 'Escape') setEditingColumnId(null);
-                        }}
-                        autoFocus
-                        className="w-full text-xs font-semibold px-2 py-1 border border-indigo-500 rounded outline-none bg-white text-slate-900"
-                      />
-                      <button onClick={() => saveRenameColumn(col.id)} className="p-1 text-emerald-700 hover:text-emerald-900">
-                        <Check size={14} />
-                      </button>
-                      <button onClick={() => setEditingColumnId(null)} className="p-1 text-slate-400 hover:text-slate-600">
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center space-x-2">
-                        <GripVertical size={14} className="text-slate-400 hover:text-slate-700 shrink-0" />
-                        <span className={`font-semibold text-sm tracking-tight ${theme.titleColor}`}>{col.name}</span>
-                        <span className={`text-[11px] font-bold rounded-full px-2 py-0.5 ${theme.badgeBg} ${theme.badgeText}`}>
-                          {columnCards.length}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => {
-                            setEditingColumnId(col.id);
-                            setEditingColumnName(col.name);
+                  {/* Intestazione della colonna trascinabile */}
+                  <div
+                    draggable
+                    onDragStart={(e) => handleColumnDragStart(e, col.id)}
+                    onDragEnd={handleDragEnd}
+                    className={`p-3.5 flex items-center justify-between border-b rounded-t-xl cursor-grab active:cursor-grabbing transition-colors ${theme.headerBg} ${theme.headerBorder}`}
+                  >
+                    {editingColumnId === col.id ? (
+                      <div className="flex items-center space-x-1 w-full" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="text"
+                          value={editingColumnName}
+                          onChange={(e) => setEditingColumnName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveRenameColumn(col.id);
+                            if (e.key === 'Escape') setEditingColumnId(null);
                           }}
-                          className={`p-1 rounded transition-colors ${theme.iconColor}`}
-                        >
-                          <Edit2 size={13} />
+                          autoFocus
+                          className="w-full text-xs font-semibold px-2 py-1 border border-indigo-500 rounded outline-none bg-white text-slate-900"
+                        />
+                        <button onClick={() => saveRenameColumn(col.id)} className="p-1 text-emerald-700 hover:text-emerald-900">
+                          <Check size={14} />
                         </button>
-                        {columns.length > 1 && (
-                          <button
-                            onClick={() =>
-                              setConfirmDelete({
-                                type: 'column',
-                                id: col.id,
-                                name: col.name,
-                                cardCount: columnCards.length
-                              })
-                            }
-                            className="p-1 text-rose-500 hover:text-rose-700 rounded transition-colors"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        )}
+                        <button onClick={() => setEditingColumnId(null)} className="p-1 text-slate-400 hover:text-slate-600">
+                          <X size={14} />
+                        </button>
                       </div>
-                    </>
-                  )}
-                </div>
-
-                <div className="p-3 flex flex-col space-y-2.5 min-h-[320px]">
-                  {columnCards.map((card, idx) => {
-                    const isTargetBeforeThis = dropTarget?.columnId === col.id && dropTarget?.index === idx;
-
-                    return (
-                      <React.Fragment key={card.id}>
-                        {isTargetBeforeThis && (
-                          <div className="rounded-lg border-2 border-dashed border-orange-500 bg-orange-50 py-2.5 px-3 flex items-center justify-center space-x-2 text-orange-950 text-xs font-semibold animate-pulse">
-                            <div className="w-2 h-2 rounded-full bg-orange-500" />
-                            <span>Rilascia qui la scheda</span>
-                          </div>
-                        )}
-
-                        <div
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, card.id)}
-                          onDragEnd={handleDragEnd}
-                          onDragOver={(e) => handleCardDragOver(e, col.id, idx)}
-                          className={`group relative flex flex-col rounded-lg border border-slate-200 bg-white p-3.5 shadow-xs transition-all duration-150 cursor-grab active:cursor-grabbing hover:shadow-sm overflow-hidden ${
-                            draggedCardId === card.id ? 'opacity-30 border-dashed border-orange-400' : ''
-                          }`}
-                        >
-                          <div className="absolute inset-y-0 left-0 w-1.5 bg-orange-500 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none" />
-
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center space-x-1.5 flex-1 min-w-0">
-                              <GripVertical size={12} className="text-slate-300 group-hover:text-slate-500 shrink-0" />
-                              <h4 className="text-xs font-semibold text-slate-900 truncate leading-tight">{card.title}</h4>
-                            </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center space-x-2">
+                          <GripVertical size={14} className="text-slate-400 hover:text-slate-700 shrink-0" />
+                          <span className={`font-semibold text-sm tracking-tight ${theme.titleColor}`}>{col.name}</span>
+                          <span className={`text-[11px] font-bold rounded-full px-2 py-0.5 ${theme.badgeBg} ${theme.badgeText}`}>
+                            {columnCards.length}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => {
+                              setEditingColumnId(col.id);
+                              setEditingColumnName(col.name);
+                            }}
+                            className={`p-1 rounded transition-colors ${theme.iconColor}`}
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          {columns.length > 1 && (
                             <button
                               onClick={() =>
                                 setConfirmDelete({
-                                  type: 'card',
-                                  id: card.id,
-                                  name: card.title
+                                  type: 'column',
+                                  id: col.id,
+                                  name: col.name,
+                                  cardCount: columnCards.length
                                 })
                               }
-                              className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 transition-opacity p-0.5"
+                              className="p-1 text-rose-500 hover:text-rose-700 rounded transition-colors"
                             >
                               <Trash2 size={13} />
                             </button>
-                          </div>
-
-                          {card.details && <p className="mt-2 text-xs text-slate-500 leading-relaxed line-clamp-3">{card.details}</p>}
+                          )}
                         </div>
-                      </React.Fragment>
-                    );
-                  })}
+                      </>
+                    )}
+                  </div>
 
-                  {dropTarget?.columnId === col.id && dropTarget?.index === columnCards.length && (
-                    <div className="rounded-lg border-2 border-dashed border-orange-500 bg-orange-50 py-2.5 px-3 flex items-center justify-center space-x-2 text-orange-950 text-xs font-semibold animate-pulse">
-                      <div className="w-2 h-2 rounded-full bg-orange-500" />
-                      <span>Rilascia qui la scheda</span>
-                    </div>
-                  )}
+                  <div
+                    onDragOver={(e) => handleColumnDragOver(e, col.id, columnCards.length)}
+                    onDrop={(e) => handleDrop(e, col.id)}
+                    className="p-3 flex flex-col space-y-2.5 min-h-[320px]"
+                  >
+                    {columnCards.map((card, idx) => {
+                      const isTargetBeforeThis = dropTarget?.columnId === col.id && dropTarget?.index === idx;
 
-                  {activeNewCardColumnId === col.id ? (
-                    <div className="rounded-lg border border-indigo-500 bg-white p-3 shadow-xs mt-2">
-                      <input
-                        type="text"
-                        placeholder="Titolo scheda"
-                        value={newTitle}
-                        onChange={(e) => setNewTitle(e.target.value)}
-                        autoFocus
-                        className="w-full text-xs font-medium px-2 py-1.5 border border-slate-200 rounded outline-none focus:border-indigo-500 text-slate-900 mb-2"
-                      />
-                      <textarea
-                        placeholder="Dettagli scheda"
-                        rows={2}
-                        value={newDetails}
-                        onChange={(e) => setNewDetails(e.target.value)}
-                        className="w-full text-xs text-slate-700 px-2 py-1.5 border border-slate-200 rounded outline-none focus:border-indigo-500 resize-none mb-3"
-                      />
-                      <div className="flex items-center justify-end space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => setActiveNewCardColumnId(null)}
-                          className="text-xs px-2.5 py-1 text-slate-500 hover:text-slate-800 font-medium"
-                        >
-                          Annulla
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleAddCard(col.id)}
-                          className="text-xs px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded shadow-2xs transition-colors"
-                        >
-                          Aggiungi scheda
-                        </button>
+                      return (
+                        <React.Fragment key={card.id}>
+                          {isTargetBeforeThis && (
+                            <div className="rounded-lg border-2 border-dashed border-orange-500 bg-orange-50 py-2.5 px-3 flex items-center justify-center space-x-2 text-orange-950 text-xs font-semibold animate-pulse">
+                              <div className="w-2 h-2 rounded-full bg-orange-500" />
+                              <span>Rilascia qui la scheda</span>
+                            </div>
+                          )}
+
+                          <div
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, card.id)}
+                            onDragEnd={handleDragEnd}
+                            onDragOver={(e) => handleCardDragOver(e, col.id, idx)}
+                            className={`group relative flex flex-col rounded-lg border border-slate-200 bg-white p-3.5 shadow-xs transition-all duration-150 cursor-grab active:cursor-grabbing hover:shadow-sm overflow-hidden ${
+                              draggedCardId === card.id ? 'opacity-30 border-dashed border-orange-400' : ''
+                            }`}
+                          >
+                            <div className="absolute inset-y-0 left-0 w-1.5 bg-orange-500 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none" />
+
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center space-x-1.5 flex-1 min-w-0">
+                                <GripVertical size={12} className="text-slate-300 group-hover:text-slate-500 shrink-0" />
+                                <h4 className="text-xs font-semibold text-slate-900 truncate leading-tight">{card.title}</h4>
+                              </div>
+                              <button
+                                onClick={() =>
+                                  setConfirmDelete({
+                                    type: 'card',
+                                    id: card.id,
+                                    name: card.title
+                                  })
+                                }
+                                className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 transition-opacity p-0.5"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+
+                            {card.details && <p className="mt-2 text-xs text-slate-500 leading-relaxed line-clamp-3">{card.details}</p>}
+                          </div>
+                        </React.Fragment>
+                      );
+                    })}
+
+                    {dropTarget?.columnId === col.id && dropTarget?.index === columnCards.length && (
+                      <div className="rounded-lg border-2 border-dashed border-orange-500 bg-orange-50 py-2.5 px-3 flex items-center justify-center space-x-2 text-orange-950 text-xs font-semibold animate-pulse">
+                        <div className="w-2 h-2 rounded-full bg-orange-500" />
+                        <span>Rilascia qui la scheda</span>
                       </div>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveNewCardColumnId(col.id);
-                        setNewTitle('');
-                        setNewDetails('');
-                      }}
-                      className="w-full flex items-center justify-center space-x-1.5 rounded-lg border border-dashed border-slate-300 py-2 text-xs font-medium text-slate-500 hover:border-indigo-500 hover:text-indigo-600 hover:bg-white transition-colors mt-auto"
-                    >
-                      <Plus size={14} />
-                      <span>Aggiungi scheda</span>
-                    </button>
-                  )}
+                    )}
+
+                    {activeNewCardColumnId === col.id ? (
+                      <div className="rounded-lg border border-indigo-500 bg-white p-3 shadow-xs mt-2">
+                        <input
+                          type="text"
+                          placeholder="Titolo scheda"
+                          value={newTitle}
+                          onChange={(e) => setNewTitle(e.target.value)}
+                          autoFocus
+                          className="w-full text-xs font-medium px-2 py-1.5 border border-slate-200 rounded outline-none focus:border-indigo-500 text-slate-900 mb-2"
+                        />
+                        <textarea
+                          placeholder="Dettagli scheda"
+                          rows={2}
+                          value={newDetails}
+                          onChange={(e) => setNewDetails(e.target.value)}
+                          className="w-full text-xs text-slate-700 px-2 py-1.5 border border-slate-200 rounded outline-none focus:border-indigo-500 resize-none mb-3"
+                        />
+                        <div className="flex items-center justify-end space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => setActiveNewCardColumnId(null)}
+                            className="text-xs px-2.5 py-1 text-slate-500 hover:text-slate-800 font-medium"
+                          >
+                            Annulla
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAddCard(col.id)}
+                            className="text-xs px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded shadow-2xs transition-colors"
+                          >
+                            Aggiungi scheda
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveNewCardColumnId(col.id);
+                          setNewTitle('');
+                          setNewDetails('');
+                        }}
+                        className="w-full flex items-center justify-center space-x-1.5 rounded-lg border border-dashed border-slate-300 py-2 text-xs font-medium text-slate-500 hover:border-indigo-500 hover:text-indigo-600 hover:bg-white transition-colors mt-auto"
+                      >
+                        <Plus size={14} />
+                        <span>Aggiungi scheda</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
+              </React.Fragment>
             );
           })}
+
+          {/* Indicatore visivo dopo l'ultima colonna */}
+          {draggedColumnId && columnDropTargetIndex === columns.length && (
+            <div className="w-2.5 h-[420px] rounded-full bg-indigo-500 border-2 border-indigo-300 animate-pulse shrink-0 self-stretch shadow-md shadow-indigo-500/30 transition-all" />
+          )}
 
           {isAddingColumn ? (
             <div className="w-80 shrink-0 rounded-xl border border-indigo-500 bg-white p-3.5 shadow-xs">
