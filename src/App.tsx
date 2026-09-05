@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles, FolderPlus, ArrowLeft, Calendar, Paperclip, UploadCloud, FileText, ExternalLink, Share2, Users, UserCheck } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles, FolderPlus, ArrowLeft, Calendar, Paperclip, UploadCloud, FileText, ExternalLink, Share2, Users, UserCheck, Shield, Eye, Edit3 } from 'lucide-react';
 import { supabase } from './supabaseClient';
+
+const BREVO_API_KEY = import.meta.env.VITE_BREVO_API_KEY || '';
 
 const COLUMN_THEMES = [
   { headerBg: 'bg-blue-100/80', headerBorder: 'border-blue-200', titleColor: 'text-blue-950', badgeBg: 'bg-blue-200/80', badgeText: 'text-blue-800', iconColor: 'text-blue-500 hover:text-blue-800' },
@@ -54,6 +56,7 @@ export default function App() {
   // Condivisione e Membri
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('editor'); // 'editor' o 'viewer'
   const [inviteError, setInviteError] = useState('');
   const [inviteSuccess, setInviteSuccess] = useState('');
   const [boardMembers, setBoardMembers] = useState([]);
@@ -115,7 +118,6 @@ export default function App() {
       fetchBoardData(activeBoardId);
       fetchBoardMembers(activeBoardId);
 
-      // Sincronizzazione Realtime
       const channel = supabase
         .channel(`board-realtime-${activeBoardId}`)
         .on(
@@ -235,6 +237,37 @@ export default function App() {
     }
   };
 
+  // --- Funzione Invio Email tramite Brevo API ---
+  const sendEmailNotification = async (recipientEmail, boardTitle, roleName) => {
+    if (!BREVO_API_KEY || BREVO_API_KEY.includes('INSERISCI_QUI')) return;
+
+    try {
+      await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'api-key': BREVO_API_KEY,
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+          sender: { name: "Kanban Web App", email: session.user.email },
+          to: [{ email: recipientEmail }],
+          subject: `Sei stato invitato a collaborare sulla bacheca "${boardTitle}"`,
+          htmlContent: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+              <h2>Sei stato invitato a una bacheca!</h2>
+              <p>Ciao,</p>
+              <p><strong>${session.user.email}</strong> ti ha invitato a collaborare sulla bacheca Kanban <strong>"${boardTitle}"</strong> con il ruolo di <strong>${roleName}</strong>.</p>
+              <p>Accedi subito alla web app per visualizzare il tuo nuovo spazio di lavoro condiviso.</p>
+            </div>
+          `
+        })
+      });
+    } catch (err) {
+      console.error('Errore invio notifica email:', err);
+    }
+  };
+
   // --- Gestione Invito Collaboratori ---
   const handleInviteUser = async () => {
     setInviteError('');
@@ -249,13 +282,11 @@ export default function App() {
     }
 
     try {
-      // 1. Cerca l'ID dell'utente tramite la tabella pubblica delle bacheche o una funzione
-      // Inserimento diretto nella tabella board_members
       const newMember = {
         id: `bm-${Date.now()}`,
         board_id: activeBoardId,
-        user_id: session.user.id, // Per un invito diretto registriamo l'associazione
-        role: 'editor'
+        user_id: session.user.id,
+        role: inviteRole
       };
 
       const { error } = await supabase
@@ -269,7 +300,13 @@ export default function App() {
         throw error;
       }
 
-      setInviteSuccess(`Invito inviato con successo a ${emailToInvite}!`);
+      const roleLabel = inviteRole === 'editor' ? 'Editor (Modifica)' : 'Visualizzatore (Sola Lettura)';
+      const activeBoardObj = boards.find((b) => b.id === activeBoardId);
+      
+      // Invia la mail di notifica
+      sendEmailNotification(emailToInvite, activeBoardObj?.title || 'Kanban Board', roleLabel);
+
+      setInviteSuccess(`Invito e notifica email inviati con successo a ${emailToInvite}!`);
       setInviteEmail('');
       fetchBoardMembers(activeBoardId);
     } catch (err) {
@@ -297,7 +334,6 @@ export default function App() {
 
     setUploadingFile(true);
     try {
-      // Verifica che la scheda esista nel nostro array locale
       const currentCard = cards.find((c) => c.id === activeCard.id) || activeCard;
 
       for (const file of files) {
@@ -858,6 +894,10 @@ export default function App() {
   const activeBoard = boards.find((b) => b.id === activeBoardId);
   const isOwner = activeBoard?.user_id === session?.user?.id;
 
+  // Separazione bacheche personali e bacheche condivise per la Dashboard
+  const myBoards = boards.filter((b) => b.user_id === session.user.id);
+  const sharedBoards = boards.filter((b) => b.user_id !== session.user.id);
+
   // --- VISTA DASHBOARD ---
   if (currentView === 'dashboard') {
     return (
@@ -896,118 +936,165 @@ export default function App() {
           </div>
         </header>
 
-        <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-10">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white tracking-tight">Le tue Bacheche</h2>
-            <p className="text-xs text-slate-400 mt-1">Seleziona un progetto per visualizzare e gestire i tuoi task.</p>
-          </div>
+        <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-10 space-y-12">
+          
+          {/* Sezione 1: Le Mie Bacheche (Proprietario) */}
+          <div>
+            <div className="mb-6 flex items-center space-x-2">
+              <Shield size={18} className="text-indigo-400" />
+              <h2 className="text-xl font-bold text-white tracking-tight">Le Mie Bacheche (Proprietario)</h2>
+            </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            <button
-              onClick={() => setIsAddingBoard(true)}
-              className="group h-48 rounded-2xl border-2 border-dashed border-slate-800 hover:border-indigo-500/50 bg-slate-900/40 hover:bg-slate-800/40 flex flex-col items-center justify-center p-6 transition-all duration-200 text-center"
-            >
-              <div className="h-12 w-12 rounded-2xl bg-slate-800 group-hover:bg-indigo-600/20 group-hover:text-indigo-400 text-slate-400 flex items-center justify-center mb-3 transition-colors">
-                <Plus size={24} />
-              </div>
-              <span className="text-xs font-semibold text-slate-300 group-hover:text-white transition-colors">Crea nuova bacheca</span>
-              <span className="text-[11px] text-slate-500 mt-1">Organizza un nuovo progetto</span>
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              <button
+                onClick={() => setIsAddingBoard(true)}
+                className="group h-48 rounded-2xl border-2 border-dashed border-slate-800 hover:border-indigo-500/50 bg-slate-900/40 hover:bg-slate-800/40 flex flex-col items-center justify-center p-6 transition-all duration-200 text-center"
+              >
+                <div className="h-12 w-12 rounded-2xl bg-slate-800 group-hover:bg-indigo-600/20 group-hover:text-indigo-400 text-slate-400 flex items-center justify-center mb-3 transition-colors">
+                  <Plus size={24} />
+                </div>
+                <span className="text-xs font-semibold text-slate-300 group-hover:text-white transition-colors">Crea nuova bacheca</span>
+                <span className="text-[11px] text-slate-500 mt-1">Organizza un nuovo progetto</span>
+              </button>
 
-            {boards.map((board, idx) => {
-              const gradient = BOARD_GRADIENTS[idx % BOARD_GRADIENTS.length];
-              const isEditing = editingBoardId === board.id;
-              const isBoardOwner = board.user_id === session.user.id;
+              {myBoards.map((board, idx) => {
+                const gradient = BOARD_GRADIENTS[idx % BOARD_GRADIENTS.length];
+                const isEditing = editingBoardId === board.id;
 
-              return (
-                <div
-                  key={board.id}
-                  onClick={() => !isEditing && handleOpenBoard(board.id)}
-                  className="group relative h-48 rounded-2xl border border-slate-800 hover:border-slate-700 bg-slate-950/40 hover:bg-slate-950/80 p-5 flex flex-col justify-between transition-all duration-200 hover:shadow-2xl hover:shadow-indigo-500/5 cursor-pointer overflow-hidden"
-                >
-                  <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${gradient}`} />
+                return (
+                  <div
+                    key={board.id}
+                    onClick={() => !isEditing && handleOpenBoard(board.id)}
+                    className="group relative h-48 rounded-2xl border border-slate-800 hover:border-indigo-500/50 bg-slate-950/40 hover:bg-slate-950/80 p-5 flex flex-col justify-between transition-all duration-200 hover:shadow-2xl hover:shadow-indigo-500/5 cursor-pointer overflow-hidden"
+                  >
+                    <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${gradient}`} />
 
-                  <div>
-                    <div className="flex items-start justify-between">
-                      {isEditing ? (
-                        <div className="flex items-center space-x-1 w-full mr-2" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="text"
-                            value={editingBoardTitle}
-                            onChange={(e) => setEditingBoardTitle(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveBoardTitle(board.id);
-                              if (e.key === 'Escape') setEditingBoardId(null);
-                            }}
-                            autoFocus
-                            className="w-full text-sm font-bold text-white bg-slate-800 border border-indigo-500 rounded px-2 py-1 outline-none"
-                          />
-                          <button onClick={() => handleSaveBoardTitle(board.id)} className="p-1 text-emerald-400">
-                            <Check size={14} />
-                          </button>
-                        </div>
-                      ) : (
-                        <h3 className="text-base font-bold text-white group-hover:text-indigo-300 transition-colors line-clamp-1 pr-2">
-                          {board.title}
-                        </h3>
-                      )}
-
-                      <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                        {isBoardOwner && (
-                          <>
-                            <button
-                              onClick={() => {
-                                setEditingBoardId(board.id);
-                                setEditingBoardTitle(board.title);
+                    <div>
+                      <div className="flex items-start justify-between">
+                        {isEditing ? (
+                          <div className="flex items-center space-x-1 w-full mr-2" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              value={editingBoardTitle}
+                              onChange={(e) => setEditingBoardTitle(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveBoardTitle(board.id);
+                                if (e.key === 'Escape') setEditingBoardId(null);
                               }}
-                              className="p-1 text-slate-400 hover:text-white"
-                              title="Rinomina"
-                            >
-                              <Edit2 size={13} />
+                              autoFocus
+                              className="w-full text-sm font-bold text-white bg-slate-800 border border-indigo-500 rounded px-2 py-1 outline-none"
+                            />
+                            <button onClick={() => handleSaveBoardTitle(board.id)} className="p-1 text-emerald-400">
+                              <Check size={14} />
                             </button>
-                            {boards.length > 1 && (
-                              <button
-                                onClick={() =>
-                                  setConfirmDelete({
-                                    type: 'board',
-                                    id: board.id,
-                                    name: board.title
-                                  })
-                                }
-                                className="p-1 text-slate-400 hover:text-rose-400"
-                                title="Elimina"
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            )}
-                          </>
+                          </div>
+                        ) : (
+                          <h3 className="text-base font-bold text-white group-hover:text-indigo-300 transition-colors line-clamp-1 pr-2">
+                            {board.title}
+                          </h3>
                         )}
+
+                        <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => {
+                              setEditingBoardId(board.id);
+                              setEditingBoardTitle(board.title);
+                            }}
+                            className="p-1 text-slate-400 hover:text-white"
+                            title="Rinomina"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          {boards.length > 1 && (
+                            <button
+                              onClick={() =>
+                                setConfirmDelete({
+                                  type: 'board',
+                                  id: board.id,
+                                  name: board.title
+                                })
+                              }
+                              className="p-1 text-slate-400 hover:text-rose-400"
+                              title="Elimina"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-2.5">
+                        <span className="inline-flex items-center space-x-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                          <Shield size={10} className="mr-1" />
+                          Proprietario
+                        </span>
                       </div>
                     </div>
 
-                    <div className="mt-2">
-                      <span className={`inline-flex items-center space-x-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                        isBoardOwner ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                      }`}>
-                        <Users size={10} className="mr-1" />
-                        {isBoardOwner ? 'Proprietario' : 'Condivisa con me'}
+                    <div className="flex items-center justify-between text-slate-400 text-[11px] pt-4 border-t border-slate-800/80">
+                      <div className="flex items-center space-x-1.5">
+                        <Calendar size={13} className="text-slate-500" />
+                        <span>{new Date(board.created_at).toLocaleDateString('it-IT')}</span>
+                      </div>
+                      <span className="text-indigo-400 font-medium group-hover:translate-x-0.5 transition-transform">
+                        Apri bacheca &rarr;
                       </span>
                     </div>
                   </div>
-
-                  <div className="flex items-center justify-between text-slate-400 text-[11px] pt-4 border-t border-slate-800/80">
-                    <div className="flex items-center space-x-1.5">
-                      <Calendar size={13} className="text-slate-500" />
-                      <span>{new Date(board.created_at).toLocaleDateString('it-IT')}</span>
-                    </div>
-                    <span className="text-indigo-400 font-medium group-hover:translate-x-0.5 transition-transform">
-                      Apri bacheca &rarr;
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
+
+          {/* Sezione 2: Bacheche Condivise con Me */}
+          {sharedBoards.length > 0 && (
+            <div>
+              <div className="mb-6 flex items-center space-x-2">
+                <Users size={18} className="text-amber-400" />
+                <h2 className="text-xl font-bold text-white tracking-tight">Condivise con Me</h2>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {sharedBoards.map((board, idx) => {
+                  const gradient = BOARD_GRADIENTS[(idx + 3) % BOARD_GRADIENTS.length];
+
+                  return (
+                    <div
+                      key={board.id}
+                      onClick={() => handleOpenBoard(board.id)}
+                      className="group relative h-48 rounded-2xl border border-amber-500/30 bg-slate-950/40 hover:bg-slate-950/80 p-5 flex flex-col justify-between transition-all duration-200 hover:shadow-2xl hover:shadow-amber-500/5 cursor-pointer overflow-hidden"
+                    >
+                      <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${gradient}`} />
+
+                      <div>
+                        <h3 className="text-base font-bold text-white group-hover:text-amber-300 transition-colors line-clamp-1 pr-2">
+                          {board.title}
+                        </h3>
+
+                        <div className="mt-2.5">
+                          <span className="inline-flex items-center space-x-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            <Users size={10} className="mr-1" />
+                            Collaboratore
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-slate-400 text-[11px] pt-4 border-t border-slate-800/80">
+                        <div className="flex items-center space-x-1.5">
+                          <Calendar size={13} className="text-slate-500" />
+                          <span>{new Date(board.created_at).toLocaleDateString('it-IT')}</span>
+                        </div>
+                        <span className="text-amber-400 font-medium group-hover:translate-x-0.5 transition-transform">
+                          Apri bacheca &rarr;
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
         </main>
 
         {isAddingBoard && (
@@ -1425,7 +1512,7 @@ export default function App() {
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900">Condividi Bacheca</h3>
-                <p className="text-xs text-slate-500">Invita altri utenti a collaborare su questa bacheca.</p>
+                <p className="text-xs text-slate-500">Invita altri utenti scegliendo il livello di autorizzazione.</p>
               </div>
             </div>
 
@@ -1443,21 +1530,32 @@ export default function App() {
               </div>
             )}
 
-            <div className="flex items-center space-x-2 mb-6">
+            <div className="space-y-3 mb-6">
               <input
                 type="email"
                 placeholder="email.collega@esempio.com"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleInviteUser()}
-                className="flex-1 text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-slate-900"
+                className="w-full text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-slate-900"
               />
-              <button
-                onClick={handleInviteUser}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xs transition-colors shrink-0"
-              >
-                Invita
-              </button>
+
+              <div className="flex items-center space-x-2">
+                <select
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value)}
+                  className="flex-1 text-xs px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 font-medium text-slate-700 outline-none focus:border-indigo-500"
+                >
+                  <option value="editor">Editor (Modifica Schede & Colonne)</option>
+                  <option value="viewer">Visualizzatore (Solo Lettura)</option>
+                </select>
+
+                <button
+                  onClick={handleInviteUser}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-2xs transition-colors shrink-0"
+                >
+                  Invita
+                </button>
+              </div>
             </div>
 
             <div className="border-t border-slate-100 pt-4">
@@ -1467,15 +1565,23 @@ export default function App() {
               <div className="space-y-2 max-h-40 overflow-y-auto">
                 <div className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50 border border-slate-100">
                   <span className="font-medium text-slate-800">{session.user.email} (Tu)</span>
-                  <span className="text-[10px] font-bold text-indigo-600 uppercase bg-indigo-50 px-2 py-0.5 rounded">
-                    Proprietario
+                  <span className="text-[10px] font-bold text-indigo-600 uppercase bg-indigo-50 px-2 py-0.5 rounded flex items-center space-x-1">
+                    <Shield size={10} className="mr-1 inline" /> Proprietario
                   </span>
                 </div>
                 {boardMembers.map((member) => (
                   <div key={member.id} className="flex items-center justify-between text-xs p-2 rounded-lg border border-slate-100">
                     <span className="text-slate-600">Collaboratore</span>
-                    <span className="text-[10px] font-medium text-slate-500 uppercase bg-slate-100 px-2 py-0.5 rounded">
-                      Editor
+                    <span className="text-[10px] font-medium uppercase bg-slate-100 px-2 py-0.5 rounded text-slate-700 flex items-center space-x-1">
+                      {member.role === 'viewer' ? (
+                        <>
+                          <Eye size={10} className="mr-1 inline text-slate-500" /> Visualizzatore
+                        </>
+                      ) : (
+                        <>
+                          <Edit3 size={10} className="mr-1 inline text-indigo-500" /> Editor
+                        </>
+                      )}
                     </span>
                   </div>
                 ))}
