@@ -239,11 +239,15 @@ export default function App() {
 
   // --- Funzione Invio Email tramite Brevo API ---
   // --- Funzione Invio Email tramite Brevo API ---
+  // --- Funzione Invio Email tramite Brevo API (Mittente Qualificato + ReplyTo Dinamico) ---
   const sendEmailNotification = async (recipientEmail, boardTitle, roleName) => {
     if (!BREVO_API_KEY) {
       console.warn('Chiave API Brevo mancante. Notifica email ignorata.');
       return;
     }
+
+    // Email dell'utente attuale che sta inviando l'invito
+    const senderUserEmail = session?.user?.email || 'Un utente';
 
     try {
       const response = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -254,16 +258,36 @@ export default function App() {
           'content-type': 'application/json'
         },
         body: JSON.stringify({
-          // Inserisci qui l'indirizzo email con cui ti sei registrato su Brevo per evitare blocchi del mittente
-          sender: { name: "Kanban Web App", email: "paolo.giordani@gmail.com" },
+          // 1. Mittente Qualificato fisso (l'indirizzo verificato sul tuo account Brevo)
+          sender: { 
+            name: `${senderUserEmail} via Kanban App`, 
+            email: "paolo.giordani@gmail.com" // <-- Sostituisci se il tuo account Brevo è registrato con un'altra email verificata
+          },
+          
+          // 2. Reply-To dinamico: se il destinatario risponde alla mail, risponde all'utente che lo ha invitato!
+          replyTo: { 
+            email: senderUserEmail 
+          },
+
           to: [{ email: recipientEmail }],
-          subject: `Sei stato invitato a collaborare sulla bacheca "${boardTitle}"`,
+          
+          subject: `${senderUserEmail} ti ha invitato a collaborare su "${boardTitle}"`,
+          
           htmlContent: `
-            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-              <h2>Sei stato invitato a una bacheca!</h2>
+            <div style="font-family: Arial, sans-serif; padding: 24px; color: #1e293b; max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; rounded-radius: 12px;">
+              <h2 style="color: #4f46e5; margin-top: 0;">Invito a collaborare</h2>
               <p>Ciao,</p>
-              <p>Sei stato invitato a collaborare sulla bacheca Kanban <strong>"${boardTitle}"</strong> con il ruolo di <strong>${roleName}</strong>.</p>
-              <p>Accedi alla web app per iniziare a lavorare!</p>
+              <p>L'utente <strong>${senderUserEmail}</strong> ti ha invitato a collaborare sulla bacheca Kanban <strong>"${boardTitle}"</strong>.</p>
+              
+              <div style="background-color: #f8fafc; border-left: 4px solid #4f46e5; padding: 12px 16px; margin: 20px 0;">
+                <p style="margin: 0; font-size: 14px; color: #475569;">
+                  Ruolo assegnato: <strong style="color: #0f172a;">${roleName}</strong>
+                </p>
+              </div>
+
+              <p style="font-size: 13px; color: #64748b;">
+                Accedi alla web app con il tuo account per iniziare subito a lavorare insieme!
+              </p>
             </div>
           `
         })
@@ -272,6 +296,8 @@ export default function App() {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Errore risposta Brevo API:', errorData);
+      } else {
+        console.log('Notifica email inviata con successo via Brevo!');
       }
     } catch (err) {
       console.error('Errore invio notifica email:', err);
