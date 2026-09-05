@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles, KeyRound, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles, KeyRound, ArrowLeft, MoveLeft, MoveRight } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 const COLUMN_THEMES = [
@@ -23,7 +23,7 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Modalità di autenticazione: 'login', 'signup', 'forgot', 'reset'
+  // Modalità Auth
   const [authMode, setAuthMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,7 +35,7 @@ export default function App() {
   const [columns, setColumns] = useState([]);
   const [cards, setCards] = useState([]);
 
-  // Stati UI
+  // Stati UI ed editing
   const [editingColumnId, setEditingColumnId] = useState(null);
   const [editingColumnName, setEditingColumnName] = useState('');
   const [isAddingColumn, setIsAddingColumn] = useState(false);
@@ -43,11 +43,16 @@ export default function App() {
   const [activeNewCardColumnId, setActiveNewCardColumnId] = useState(null);
   const [newTitle, setNewTitle] = useState('');
   const [newDetails, setNewDetails] = useState('');
+  
+  // Drag & Drop Card
   const [draggedCardId, setDraggedCardId] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
+  
+  // Drag & Drop Colonna
+  const [draggedColumnId, setDraggedColumnId] = useState(null);
+  
   const [confirmDelete, setConfirmDelete] = useState(null);
 
-  // Gestione sessione e ascolto evento di Reset Password
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -115,7 +120,6 @@ export default function App() {
     }
   };
 
-  // Gestione flussi Auth
   const handleAuth = async (e) => {
     e.preventDefault();
     setAuthError('');
@@ -126,8 +130,6 @@ export default function App() {
       if (authMode === 'signup') {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        
-        // Passiamo alla schermata di Login e mostriamo il messaggio di successo
         setAuthMode('login');
         setAuthSuccessMsg('Registrazione completata! Controlla la tua casella di posta per confermare l\'account prima di accedere.');
         setEmail('');
@@ -140,7 +142,7 @@ export default function App() {
       } else if (authMode === 'forgot') {
         const redirectUrl = window.location.origin;
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: redirectUrl,
+          redirectTo: redirectUrl
         });
         if (error) throw error;
         setAuthSuccessMsg('Ti abbiamo inviato un\'email con il link per reimpostare la password!');
@@ -173,7 +175,7 @@ export default function App() {
     setAuthSuccessMsg('');
   };
 
-  // Azioni colonne e schede
+  // --- Gestione Colonne ---
   const handleAddColumn = async () => {
     const trimmed = newColumnName.trim();
     if (!trimmed || !session) return;
@@ -203,6 +205,44 @@ export default function App() {
     setEditingColumnName('');
   };
 
+  // Spostamento colonna tramite Drag & Drop
+  const handleColumnDragStart = (e, columnId) => {
+    e.stopPropagation();
+    setDraggedColumnId(columnId);
+    e.dataTransfer.setData('type', 'column');
+    e.dataTransfer.setData('columnId', columnId);
+  };
+
+  const handleColumnDrop = async (e, targetColumnId) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!draggedColumnId || draggedColumnId === targetColumnId) {
+      setDraggedColumnId(null);
+      return;
+    }
+
+    const draggedIdx = columns.findIndex((c) => c.id === draggedColumnId);
+    const targetIdx = columns.findIndex((c) => c.id === targetColumnId);
+
+    if (draggedIdx === -1 || targetIdx === -1) return;
+
+    const reorderedCols = [...columns];
+    const [movedCol] = reorderedCols.splice(draggedIdx, 1);
+    reorderedCols.splice(targetIdx, 0, movedCol);
+
+    // Ricalcola le posizioni
+    const updatedCols = reorderedCols.map((col, idx) => ({ ...col, position: idx }));
+    setColumns(updatedCols);
+    setDraggedColumnId(null);
+
+    // Salva le nuove posizioni nel DB Supabase
+    for (const col of updatedCols) {
+      await supabase.from('columns').update({ position: col.position }).eq('id', col.id);
+    }
+  };
+
+  // --- Gestione Schede ---
   const handleAddCard = async (columnId) => {
     const trimmedTitle = newTitle.trim();
     if (!trimmedTitle || !session) return;
@@ -241,9 +281,11 @@ export default function App() {
     setConfirmDelete(null);
   };
 
-  // Drag & Drop
+  // Drag & Drop Card
   const handleDragStart = (e, cardId) => {
+    e.stopPropagation();
     setDraggedCardId(cardId);
+    e.dataTransfer.setData('type', 'card');
     e.dataTransfer.setData('text/plain', cardId);
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -251,11 +293,15 @@ export default function App() {
   const handleDragEnd = () => {
     setDraggedCardId(null);
     setDropTarget(null);
+    setDraggedColumnId(null);
   };
 
   const handleCardDragOver = (e, columnId, index) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (draggedColumnId) return; // Se stiamo trascinando una colonna, ignora le schede
+
     e.dataTransfer.dropEffect = 'move';
 
     const rect = e.currentTarget.getBoundingClientRect();
@@ -268,6 +314,8 @@ export default function App() {
 
   const handleColumnDragOver = (e, columnId, cardCount) => {
     e.preventDefault();
+    if (draggedColumnId) return;
+
     e.dataTransfer.dropEffect = 'move';
 
     if (!dropTarget || dropTarget.columnId !== columnId) {
@@ -278,6 +326,11 @@ export default function App() {
   const handleDrop = async (e, columnId) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (draggedColumnId) {
+      handleColumnDrop(e, columnId);
+      return;
+    }
 
     const cardId = draggedCardId || e.dataTransfer.getData('text/plain');
     if (!cardId) {
@@ -316,7 +369,7 @@ export default function App() {
     );
   }
 
-  // Schermate Auth
+  // Schermata Auth
   if (!session || authMode === 'reset') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
@@ -513,19 +566,28 @@ export default function App() {
             const columnCards = cards.filter((c) => c.column_id === col.id);
             const isColumnActive = dropTarget?.columnId === col.id;
             const theme = COLUMN_THEMES[colIdx % COLUMN_THEMES.length];
+            const isDraggingThisCol = draggedColumnId === col.id;
 
             return (
               <div
                 key={col.id}
                 onDragOver={(e) => handleColumnDragOver(e, col.id, columnCards.length)}
                 onDrop={(e) => handleDrop(e, col.id)}
-                className={`w-80 shrink-0 flex flex-col rounded-xl border transition-colors duration-150 ${
+                className={`w-80 shrink-0 flex flex-col rounded-xl border transition-all duration-150 ${
+                  isDraggingThisCol ? 'opacity-30 border-dashed border-indigo-500 scale-95' : ''
+                } ${
                   isColumnActive ? 'border-indigo-500 bg-indigo-50/30 ring-1 ring-indigo-500/30' : 'border-slate-200 bg-slate-100/75'
                 }`}
               >
-                <div className={`p-3.5 flex items-center justify-between border-b rounded-t-xl transition-colors ${theme.headerBg} ${theme.headerBorder}`}>
+                {/* Intestazione della colonna trascinabile */}
+                <div
+                  draggable
+                  onDragStart={(e) => handleColumnDragStart(e, col.id)}
+                  onDragEnd={handleDragEnd}
+                  className={`p-3.5 flex items-center justify-between border-b rounded-t-xl cursor-grab active:cursor-grabbing transition-colors ${theme.headerBg} ${theme.headerBorder}`}
+                >
                   {editingColumnId === col.id ? (
-                    <div className="flex items-center space-x-1 w-full">
+                    <div className="flex items-center space-x-1 w-full" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="text"
                         value={editingColumnName}
@@ -547,12 +609,13 @@ export default function App() {
                   ) : (
                     <>
                       <div className="flex items-center space-x-2">
+                        <GripVertical size={14} className="text-slate-400 hover:text-slate-700 shrink-0" />
                         <span className={`font-semibold text-sm tracking-tight ${theme.titleColor}`}>{col.name}</span>
                         <span className={`text-[11px] font-bold rounded-full px-2 py-0.5 ${theme.badgeBg} ${theme.badgeText}`}>
                           {columnCards.length}
                         </span>
                       </div>
-                      <div className="flex items-center space-x-1">
+                      <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => {
                             setEditingColumnId(col.id);
