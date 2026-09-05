@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles, ChevronDown, FolderPlus } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles, FolderPlus, ArrowLeft, Layers, Columns, Calendar } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 const COLUMN_THEMES = [
@@ -9,6 +9,15 @@ const COLUMN_THEMES = [
   { headerBg: 'bg-purple-100/80', headerBorder: 'border-purple-200', titleColor: 'text-purple-950', badgeBg: 'bg-purple-200/80', badgeText: 'text-purple-800', iconColor: 'text-purple-500 hover:text-purple-800' },
   { headerBg: 'bg-emerald-100/80', headerBorder: 'border-emerald-200', titleColor: 'text-emerald-950', badgeBg: 'bg-emerald-200/80', badgeText: 'text-emerald-800', iconColor: 'text-emerald-600 hover:text-emerald-900' },
   { headerBg: 'bg-rose-100/80', headerBorder: 'border-rose-200', titleColor: 'text-rose-950', badgeBg: 'bg-rose-200/80', badgeText: 'text-rose-800', iconColor: 'text-rose-500 hover:text-rose-800' }
+];
+
+const BOARD_GRADIENTS = [
+  'from-indigo-600 to-violet-600',
+  'from-blue-600 to-cyan-600',
+  'from-emerald-600 to-teal-600',
+  'from-amber-500 to-orange-600',
+  'from-rose-600 to-pink-600',
+  'from-slate-700 to-slate-900'
 ];
 
 const DEFAULT_COLUMNS = [
@@ -31,19 +40,22 @@ export default function App() {
   const [authSuccessMsg, setAuthSuccessMsg] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
+  // Vista attiva: 'dashboard' oppure 'board'
+  const [currentView, setCurrentView] = useState('dashboard');
+
   // Stati Multi-Bacheca
   const [boards, setBoards] = useState([]);
   const [activeBoardId, setActiveBoardId] = useState(null);
   const [isAddingBoard, setIsAddingBoard] = useState(false);
   const [newBoardTitle, setNewBoardTitle] = useState('');
-  const [isEditingBoardTitle, setIsEditingBoardTitle] = useState(false);
+  const [editingBoardId, setEditingBoardId] = useState(null);
   const [editingBoardTitle, setEditingBoardTitle] = useState('');
 
   // Stati della bacheca attiva
   const [columns, setColumns] = useState([]);
   const [cards, setCards] = useState([]);
 
-  // Stati UI ed editing
+  // Stati UI ed editing colonne/schede
   const [editingColumnId, setEditingColumnId] = useState(null);
   const [editingColumnName, setEditingColumnName] = useState('');
   const [isAddingColumn, setIsAddingColumn] = useState(false);
@@ -80,19 +92,17 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Caricamento bacheche dell'utente
   useEffect(() => {
     if (session?.user) {
       fetchBoards();
     }
   }, [session]);
 
-  // Caricamento colonne e schede al cambio bacheca attiva
   useEffect(() => {
-    if (activeBoardId) {
+    if (activeBoardId && currentView === 'board') {
       fetchBoardData(activeBoardId);
     }
-  }, [activeBoardId]);
+  }, [activeBoardId, currentView]);
 
   const fetchBoards = async () => {
     setLoading(true);
@@ -100,11 +110,10 @@ export default function App() {
       let { data: userBoards, error } = await supabase
         .from('boards')
         .select('*')
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      // Se l'utente non ha bacheche, ne creiamo una predefinita
       if (!userBoards || userBoards.length === 0) {
         const defaultBoard = {
           id: `board-${Date.now()}`,
@@ -120,7 +129,6 @@ export default function App() {
         if (insertErr) throw insertErr;
         userBoards = inserted;
 
-        // Crea le colonne di default per la prima bacheca
         const initialCols = DEFAULT_COLUMNS.map((col) => ({
           id: `col-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
           user_id: session.user.id,
@@ -133,11 +141,8 @@ export default function App() {
       }
 
       setBoards(userBoards || []);
-      if (userBoards && userBoards.length > 0) {
-        setActiveBoardId(userBoards[0].id);
-      }
     } catch (err) {
-      console.error('Errore durante il caricamento delle bacheche:', err.message);
+      console.error('Errore caricamento bacheche:', err.message);
     } finally {
       setLoading(false);
     }
@@ -162,11 +167,16 @@ export default function App() {
       if (crdsErr) throw crdsErr;
       setCards(crds || []);
     } catch (err) {
-      console.error('Errore durante il caricamento dei dati della bacheca:', err.message);
+      console.error('Errore dati bacheca:', err.message);
     }
   };
 
   // --- Gestione Bacheche ---
+  const handleOpenBoard = (boardId) => {
+    setActiveBoardId(boardId);
+    setCurrentView('board');
+  };
+
   const handleCreateBoard = async () => {
     const trimmed = newBoardTitle.trim();
     if (!trimmed || !session) return;
@@ -177,8 +187,7 @@ export default function App() {
       title: trimmed
     };
 
-    setBoards((prev) => [...prev, newBoard]);
-    setActiveBoardId(newBoard.id);
+    setBoards((prev) => [newBoard, ...prev]);
     setNewBoardTitle('');
     setIsAddingBoard(false);
 
@@ -188,7 +197,6 @@ export default function App() {
       return;
     }
 
-    // Aggiungi colonne predefinite alla nuova bacheca
     const initialCols = DEFAULT_COLUMNS.map((col) => ({
       id: `col-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       user_id: session.user.id,
@@ -198,16 +206,16 @@ export default function App() {
     }));
 
     await supabase.from('columns').insert(initialCols);
-    fetchBoardData(newBoard.id);
+    handleOpenBoard(newBoard.id);
   };
 
-  const handleSaveBoardTitle = async () => {
+  const handleSaveBoardTitle = async (boardId) => {
     const trimmed = editingBoardTitle.trim();
-    if (trimmed && activeBoardId) {
-      setBoards((prev) => prev.map((b) => (b.id === activeBoardId ? { ...b, title: trimmed } : b)));
-      await supabase.from('boards').update({ title: trimmed }).eq('id', activeBoardId);
+    if (trimmed && boardId) {
+      setBoards((prev) => prev.map((b) => (b.id === boardId ? { ...b, title: trimmed } : b)));
+      await supabase.from('boards').update({ title: trimmed }).eq('id', boardId);
     }
-    setIsEditingBoardTitle(false);
+    setEditingBoardId(null);
   };
 
   const handleAuth = async (e) => {
@@ -256,6 +264,7 @@ export default function App() {
     setColumns([]);
     setCards([]);
     setActiveBoardId(null);
+    setCurrentView('dashboard');
     switchAuthMode('login');
   };
 
@@ -396,10 +405,9 @@ export default function App() {
       setBoards(remainingBoards);
       await supabase.from('boards').delete().eq('id', confirmDelete.id);
       
-      if (remainingBoards.length > 0) {
-        setActiveBoardId(remainingBoards[0].id);
-      } else {
-        fetchBoards();
+      if (activeBoardId === confirmDelete.id) {
+        setCurrentView('dashboard');
+        setActiveBoardId(null);
       }
     }
 
@@ -486,7 +494,7 @@ export default function App() {
       <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
         <div className="flex flex-col items-center space-y-3">
           <div className="w-8 h-8 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-medium text-slate-300">Caricamento bacheche...</span>
+          <span className="text-sm font-medium text-slate-300">Caricamento spazio di lavoro...</span>
         </div>
       </div>
     );
@@ -644,90 +652,243 @@ export default function App() {
 
   const activeBoard = boards.find((b) => b.id === activeBoardId);
 
-  // Interfaccia Bacheca
+  // --- VISTA DASHBOARD (Stile NotebookLM) ---
+  if (currentView === 'dashboard') {
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-900 text-slate-100 antialiased selection:bg-indigo-500 selection:text-white">
+        <header className="border-b border-slate-800 bg-slate-950/60 backdrop-blur-md">
+          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <LayoutDashboard size={18} className="text-white" />
+              </div>
+              <div>
+                <h1 className="text-base font-bold text-white tracking-tight leading-tight">Spazio di Lavoro</h1>
+                <p className="text-[11px] text-slate-400">{session.user.email}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <button
+                type="button"
+                onClick={() => setIsAddingBoard(true)}
+                className="inline-flex items-center space-x-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 text-xs font-semibold shadow-lg shadow-indigo-600/20 transition-all"
+              >
+                <Plus size={16} />
+                <span>Nuova bacheca</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-700 hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/30 text-slate-400 px-3 py-2 text-xs font-medium transition-all"
+              >
+                <LogOut size={14} />
+                <span>Esci</span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-10">
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-white tracking-tight">Le tue Bacheche</h2>
+            <p className="text-xs text-slate-400 mt-1">Seleziona un progetto per visualizzare e gestire i tuoi task.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {/* Card per creare nuova bacheca */}
+            <button
+              onClick={() => setIsAddingBoard(true)}
+              className="group h-48 rounded-2xl border-2 border-dashed border-slate-800 hover:border-indigo-500/50 bg-slate-900/40 hover:bg-slate-800/40 flex flex-col items-center justify-center p-6 transition-all duration-200 text-center"
+            >
+              <div className="h-12 w-12 rounded-2xl bg-slate-800 group-hover:bg-indigo-600/20 group-hover:text-indigo-400 text-slate-400 flex items-center justify-center mb-3 transition-colors">
+                <Plus size={24} />
+              </div>
+              <span className="text-xs font-semibold text-slate-300 group-hover:text-white transition-colors">Crea nuova bacheca</span>
+              <span className="text-[11px] text-slate-500 mt-1">Organizza un nuovo progetto</span>
+            </button>
+
+            {/* Elenco bacheche esistenti */}
+            {boards.map((board, idx) => {
+              const gradient = BOARD_GRADIENTS[idx % BOARD_GRADIENTS.length];
+              const isEditing = editingBoardId === board.id;
+
+              return (
+                <div
+                  key={board.id}
+                  onClick={() => !isEditing && handleOpenBoard(board.id)}
+                  className="group relative h-48 rounded-2xl border border-slate-800 hover:border-slate-700 bg-slate-950/40 hover:bg-slate-950/80 p-5 flex flex-col justify-between transition-all duration-200 hover:shadow-2xl hover:shadow-indigo-500/5 cursor-pointer overflow-hidden"
+                >
+                  <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${gradient}`} />
+
+                  <div>
+                    <div className="flex items-start justify-between">
+                      {isEditing ? (
+                        <div className="flex items-center space-x-1 w-full mr-2" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="text"
+                            value={editingBoardTitle}
+                            onChange={(e) => setEditingBoardTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveBoardTitle(board.id);
+                              if (e.key === 'Escape') setEditingBoardId(null);
+                            }}
+                            autoFocus
+                            className="w-full text-sm font-bold text-white bg-slate-800 border border-indigo-500 rounded px-2 py-1 outline-none"
+                          />
+                          <button onClick={() => handleSaveBoardTitle(board.id)} className="p-1 text-emerald-400">
+                            <Check size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <h3 className="text-base font-bold text-white group-hover:text-indigo-300 transition-colors line-clamp-1 pr-2">
+                          {board.title}
+                        </h3>
+                      )}
+
+                      <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => {
+                            setEditingBoardId(board.id);
+                            setEditingBoardTitle(board.title);
+                          }}
+                          className="p-1 text-slate-400 hover:text-white"
+                          title="Rinomina"
+                        >
+                          <Edit2 size={13} />
+                        </button>
+                        {boards.length > 1 && (
+                          <button
+                            onClick={() =>
+                              setConfirmDelete({
+                                type: 'board',
+                                id: board.id,
+                                name: board.title
+                              })
+                            }
+                            className="p-1 text-slate-400 hover:text-rose-400"
+                            title="Elimina"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-slate-400 text-[11px] pt-4 border-t border-slate-800/80">
+                    <div className="flex items-center space-x-1.5">
+                      <Calendar size={13} className="text-slate-500" />
+                      <span>{new Date(board.created_at).toLocaleDateString('it-IT')}</span>
+                    </div>
+                    <span className="text-indigo-400 font-medium group-hover:translate-x-0.5 transition-transform">
+                      Apri bacheca &rarr;
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </main>
+
+        {/* Modal Nuova Bacheca */}
+        {isAddingBoard && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+            <div className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+              <h3 className="text-base font-bold text-white mb-1">Crea nuova bacheca</h3>
+              <p className="text-xs text-slate-400 mb-4">Inserisci il nome del tuo nuovo progetto.</p>
+              <input
+                type="text"
+                placeholder="Es. Marketing, Sviluppo App, Task Casa..."
+                value={newBoardTitle}
+                onChange={(e) => setNewBoardTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateBoard();
+                  if (e.key === 'Escape') setIsAddingBoard(false);
+                }}
+                autoFocus
+                className="w-full text-xs font-medium px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl outline-none focus:border-indigo-500 text-white placeholder-slate-500 mb-5"
+              />
+              <div className="flex items-center justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingBoard(false)}
+                  className="rounded-xl px-4 py-2 text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateBoard}
+                  className="rounded-xl bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-indigo-600/25"
+                >
+                  Crea bacheca
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Conferma Eliminazione */}
+        {confirmDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+            <div className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+              <div className="flex items-start space-x-3">
+                <div className="rounded-xl bg-rose-500/10 p-2.5 text-rose-400 shrink-0">
+                  <AlertTriangle size={20} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-bold text-white">Elimina bacheca</h3>
+                  <p className="mt-1.5 text-xs text-slate-400 leading-relaxed">
+                    Sei sicuro di voler eliminare <span className="font-semibold text-white">"{confirmDelete.name}"</span>? Verranno eliminate anche tutte le sue colonne e schede.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-6 flex items-center justify-end space-x-2 border-t border-slate-800 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(null)}
+                  className="rounded-xl px-4 py-2 text-xs font-medium text-slate-400 hover:text-white"
+                >
+                  Annulla
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  className="rounded-xl bg-rose-600 hover:bg-rose-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-rose-600/25"
+                >
+                  Elimina definitivamente
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- VISTA KANBAN BOARD ---
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 antialiased selection:bg-orange-100">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur-md shadow-xs">
         <div className="max-w-[1600px] mx-auto px-6 py-3.5 flex items-center justify-between">
-          
-          {/* Selettore Bacheche Multiplo */}
           <div className="flex items-center space-x-4">
-            <div className="h-7 w-2.5 rounded-full bg-gradient-to-b from-orange-500 to-amber-500" />
-            
+            {/* Tasto per tornare alla Dashboard */}
+            <button
+              onClick={() => setCurrentView('dashboard')}
+              className="inline-flex items-center space-x-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg px-2.5 py-1.5 transition-all"
+            >
+              <ArrowLeft size={14} />
+              <span>Tutte le bacheche</span>
+            </button>
+
+            <div className="h-4 w-px bg-slate-300" />
+
             <div className="flex items-center space-x-2">
-              {isEditingBoardTitle ? (
-                <div className="flex items-center space-x-1">
-                  <input
-                    type="text"
-                    value={editingBoardTitle}
-                    onChange={(e) => setEditingBoardTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleSaveBoardTitle();
-                      if (e.key === 'Escape') setIsEditingBoardTitle(false);
-                    }}
-                    autoFocus
-                    className="text-base font-bold text-slate-900 border border-indigo-500 rounded px-2 py-0.5 outline-none bg-white"
-                  />
-                  <button onClick={handleSaveBoardTitle} className="p-1 text-emerald-600 hover:text-emerald-800">
-                    <Check size={16} />
-                  </button>
-                  <button onClick={() => setIsEditingBoardTitle(false)} className="p-1 text-slate-400 hover:text-slate-600">
-                    <X size={16} />
-                  </button>
-                </div>
-              ) : (
-                <div className="relative group flex items-center space-x-2">
-                  <select
-                    value={activeBoardId || ''}
-                    onChange={(e) => setActiveBoardId(e.target.value)}
-                    className="text-base font-bold text-slate-900 bg-slate-100/80 hover:bg-slate-200/60 border border-slate-200 rounded-lg px-3 py-1 pr-8 outline-none cursor-pointer transition-all appearance-none"
-                  >
-                    {boards.map((board) => (
-                      <option key={board.id} value={board.id}>
-                        {board.title}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={16} className="absolute right-2.5 text-slate-500 pointer-events-none" />
-
-                  <button
-                    onClick={() => {
-                      setIsEditingBoardTitle(true);
-                      setEditingBoardTitle(activeBoard?.title || '');
-                    }}
-                    className="p-1 text-slate-400 hover:text-slate-700 transition-colors"
-                    title="Rinomina bacheca"
-                  >
-                    <Edit2 size={14} />
-                  </button>
-
-                  {boards.length > 1 && (
-                    <button
-                      onClick={() =>
-                        setConfirmDelete({
-                          type: 'board',
-                          id: activeBoardId,
-                          name: activeBoard?.title
-                        })
-                      }
-                      className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
-                      title="Elimina bacheca"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setIsAddingBoard(true)}
-                className="inline-flex items-center space-x-1 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 px-2.5 py-1 text-xs font-medium transition-all"
-                title="Crea nuova bacheca"
-              >
-                <FolderPlus size={14} />
-                <span className="hidden sm:inline">Nuova bacheca</span>
-              </button>
+              <h1 className="text-base font-bold text-slate-900 tracking-tight">
+                {activeBoard?.title}
+              </h1>
             </div>
           </div>
 
@@ -1008,45 +1169,7 @@ export default function App() {
         </div>
       </main>
 
-      {/* Pop-up creazione nuova bacheca */}
-      {isAddingBoard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
-            <h3 className="text-sm font-bold text-slate-900 mb-1">Crea nuova bacheca</h3>
-            <p className="text-xs text-slate-500 mb-4">Inserisci il nome della nuova bacheca di progetto.</p>
-            <input
-              type="text"
-              placeholder="Es. Marketing, Task Casa, Progetto App..."
-              value={newBoardTitle}
-              onChange={(e) => setNewBoardTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreateBoard();
-                if (e.key === 'Escape') setIsAddingBoard(false);
-              }}
-              autoFocus
-              className="w-full text-xs font-medium px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-indigo-500 text-slate-900 mb-4"
-            />
-            <div className="flex items-center justify-end space-x-2">
-              <button
-                type="button"
-                onClick={() => setIsAddingBoard(false)}
-                className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100"
-              >
-                Annulla
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateBoard}
-                className="rounded-lg bg-indigo-600 hover:bg-indigo-700 px-3.5 py-1.5 text-xs font-medium text-white shadow-2xs"
-              >
-                Crea bacheca
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Pop-up di conferma eliminazione */}
+      {/* Modal Conferma Eliminazione in vista Board */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-lg">
@@ -1056,13 +1179,10 @@ export default function App() {
               </div>
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-slate-900">
-                  {confirmDelete.type === 'board' && 'Elimina bacheca'}
-                  {confirmDelete.type === 'column' && 'Elimina colonna'}
-                  {confirmDelete.type === 'card' && 'Elimina scheda'}
+                  {confirmDelete.type === 'column' ? 'Elimina colonna' : 'Elimina scheda'}
                 </h3>
                 <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
                   Sei sicuro di voler eliminare <span className="font-semibold text-slate-900">"{confirmDelete.name}"</span>?
-                  {confirmDelete.type === 'board' && ' Verranno eliminate anche tutte le colonne e le schede contenute.'}
                 </p>
               </div>
             </div>
