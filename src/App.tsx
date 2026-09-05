@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles, FolderPlus, ArrowLeft, Calendar, Paperclip, UploadCloud, FileText, Image as ImageIcon, Download, ExternalLink } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles, FolderPlus, ArrowLeft, Calendar, Paperclip, UploadCloud, FileText, ExternalLink } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 const COLUMN_THEMES = [
@@ -40,7 +40,7 @@ export default function App() {
   const [authSuccessMsg, setAuthSuccessMsg] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Vista attiva: 'dashboard' oppure 'board'
+  // Vista attiva
   const [currentView, setCurrentView] = useState('dashboard');
 
   // Stati Multi-Bacheca
@@ -51,7 +51,7 @@ export default function App() {
   const [editingBoardId, setEditingBoardId] = useState(null);
   const [editingBoardTitle, setEditingBoardTitle] = useState('');
 
-  // Stati della bacheca attiva
+  // Dati Bacheca Attiva
   const [columns, setColumns] = useState([]);
   const [cards, setCards] = useState([]);
 
@@ -62,7 +62,7 @@ export default function App() {
   const [editingCardTitle, setEditingCardTitle] = useState('');
   const [editingCardDetails, setEditingCardDetails] = useState('');
 
-  // Stati UI ed editing colonne/schede
+  // Stati UI colonne/schede
   const [editingColumnId, setEditingColumnId] = useState(null);
   const [editingColumnName, setEditingColumnName] = useState('');
   const [isAddingColumn, setIsAddingColumn] = useState(false);
@@ -71,11 +71,9 @@ export default function App() {
   const [newTitle, setNewTitle] = useState('');
   const [newDetails, setNewDetails] = useState('');
   
-  // Drag & Drop Card
+  // Drag & Drop
   const [draggedCardId, setDraggedCardId] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
-  
-  // Drag & Drop Colonna
   const [draggedColumnId, setDraggedColumnId] = useState(null);
   const [columnDropTargetIndex, setColumnDropTargetIndex] = useState(null);
 
@@ -111,7 +109,6 @@ export default function App() {
     }
   }, [activeBoardId, currentView]);
 
-  // Carica allegati della scheda attiva
   useEffect(() => {
     if (activeCard) {
       fetchCardAttachments(activeCard.id);
@@ -177,9 +174,10 @@ export default function App() {
       if (colsErr) throw colsErr;
       setColumns(cols || []);
 
+      // Carichiamo le schede includendo il conteggio degli allegati
       const { data: crds, error: crdsErr } = await supabase
         .from('cards')
-        .select('*')
+        .select('*, attachments(id)')
         .order('position', { ascending: true });
 
       if (crdsErr) throw crdsErr;
@@ -204,7 +202,6 @@ export default function App() {
     }
   };
 
-  // --- Gestione Caricamento File ---
   const handleFileUpload = async (files) => {
     if (!files || files.length === 0 || !activeCard) return;
 
@@ -215,19 +212,16 @@ export default function App() {
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
         const filePath = `${session.user.id}/${activeCard.id}/${fileName}`;
 
-        // 1. Carica il file nello Storage di Supabase
         const { error: uploadErr } = await supabase.storage
           .from('card-attachments')
           .upload(filePath, file);
 
         if (uploadErr) throw uploadErr;
 
-        // 2. Ottieni l'URL pubblico del file
         const { data: urlData } = supabase.storage
           .from('card-attachments')
           .getPublicUrl(filePath);
 
-        // 3. Salva i dettagli del file nel database
         const newAttachment = {
           id: `att-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
           card_id: activeCard.id,
@@ -245,9 +239,10 @@ export default function App() {
         if (dbErr) throw dbErr;
       }
 
-      fetchCardAttachments(activeCard.id);
+      await fetchCardAttachments(activeCard.id);
+      fetchBoardData(activeBoardId);
     } catch (err) {
-      alert('Errore durante il caricamento del file: ' + err.message);
+      alert('Errore caricamento file: ' + err.message);
     } finally {
       setUploadingFile(false);
     }
@@ -256,15 +251,13 @@ export default function App() {
   const handleDeleteAttachment = async (attachment) => {
     try {
       setCardAttachments((prev) => prev.filter((a) => a.id !== attachment.id));
-
-      // Rimuovi dal DB
       await supabase.from('attachments').delete().eq('id', attachment.id);
 
-      // Estrai il percorso per rimuoverlo dallo Storage
       const urlParts = attachment.file_url.split('/card-attachments/');
       if (urlParts[1]) {
         await supabase.storage.from('card-attachments').remove([urlParts[1]]);
       }
+      fetchBoardData(activeBoardId);
     } catch (err) {
       console.error('Errore eliminazione allegato:', err.message);
     }
@@ -1127,6 +1120,7 @@ export default function App() {
                   >
                     {columnCards.map((card, idx) => {
                       const isTargetBeforeThis = dropTarget?.columnId === col.id && dropTarget?.index === idx;
+                      const attachmentCount = card.attachments?.length || 0;
 
                       return (
                         <React.Fragment key={card.id}>
@@ -1170,6 +1164,16 @@ export default function App() {
                             </div>
 
                             {card.details && <p className="mt-2 text-xs text-slate-500 leading-relaxed line-clamp-2">{card.details}</p>}
+
+                            {/* Indicatore allegati presenti */}
+                            {attachmentCount > 0 && (
+                              <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-end">
+                                <div className="inline-flex items-center space-x-1 text-[11px] font-medium text-slate-500 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-md">
+                                  <Paperclip size={12} className="text-indigo-500" />
+                                  <span>{attachmentCount}</span>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </React.Fragment>
                       );
@@ -1317,7 +1321,6 @@ export default function App() {
               />
             </div>
 
-            {/* Sezione Allegati */}
             <div className="mb-6 border-t border-slate-100 pt-5">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-2">
@@ -1326,7 +1329,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Area di Caricamento File */}
               <label className="group relative flex flex-col items-center justify-center border-2 border-dashed border-slate-200 hover:border-indigo-500 rounded-xl p-4 bg-slate-50 hover:bg-indigo-50/30 cursor-pointer transition-colors mb-4">
                 <input
                   type="file"
@@ -1341,7 +1343,6 @@ export default function App() {
                 <span className="text-[10px] text-slate-400 mt-0.5">Immagini, PDF, Documenti Word, Excel...</span>
               </label>
 
-              {/* Lista degli Allegati */}
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                 {cardAttachments.map((att) => {
                   const isImage = att.file_type?.startsWith('image/');
