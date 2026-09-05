@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles, KeyRound, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles, ChevronDown, FolderPlus } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 const COLUMN_THEMES = [
@@ -31,7 +31,15 @@ export default function App() {
   const [authSuccessMsg, setAuthSuccessMsg] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Stati della bacheca
+  // Stati Multi-Bacheca
+  const [boards, setBoards] = useState([]);
+  const [activeBoardId, setActiveBoardId] = useState(null);
+  const [isAddingBoard, setIsAddingBoard] = useState(false);
+  const [newBoardTitle, setNewBoardTitle] = useState('');
+  const [isEditingBoardTitle, setIsEditingBoardTitle] = useState(false);
+  const [editingBoardTitle, setEditingBoardTitle] = useState('');
+
+  // Stati della bacheca attiva
   const [columns, setColumns] = useState([]);
   const [cards, setCards] = useState([]);
 
@@ -72,39 +80,78 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Caricamento bacheche dell'utente
   useEffect(() => {
     if (session?.user) {
-      fetchBoardData();
+      fetchBoards();
     }
   }, [session]);
 
-  const fetchBoardData = async () => {
+  // Caricamento colonne e schede al cambio bacheca attiva
+  useEffect(() => {
+    if (activeBoardId) {
+      fetchBoardData(activeBoardId);
+    }
+  }, [activeBoardId]);
+
+  const fetchBoards = async () => {
     setLoading(true);
     try {
-      let { data: cols, error: colsErr } = await supabase
-        .from('columns')
+      let { data: userBoards, error } = await supabase
+        .from('boards')
         .select('*')
-        .order('position', { ascending: true });
+        .order('created_at', { ascending: true });
 
-      if (colsErr) throw colsErr;
+      if (error) throw error;
 
-      if (!cols || cols.length === 0) {
+      // Se l'utente non ha bacheche, ne creiamo una predefinita
+      if (!userBoards || userBoards.length === 0) {
+        const defaultBoard = {
+          id: `board-${Date.now()}`,
+          user_id: session.user.id,
+          title: 'Bacheca Principale'
+        };
+
+        const { data: inserted, error: insertErr } = await supabase
+          .from('boards')
+          .insert([defaultBoard])
+          .select();
+
+        if (insertErr) throw insertErr;
+        userBoards = inserted;
+
+        // Crea le colonne di default per la prima bacheca
         const initialCols = DEFAULT_COLUMNS.map((col) => ({
           id: `col-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
           user_id: session.user.id,
+          board_id: defaultBoard.id,
           name: col.name,
           position: col.position
         }));
 
-        const { data: insertedCols, error: insertErr } = await supabase
-          .from('columns')
-          .insert(initialCols)
-          .select();
-
-        if (insertErr) throw insertErr;
-        cols = insertedCols;
+        await supabase.from('columns').insert(initialCols);
       }
 
+      setBoards(userBoards || []);
+      if (userBoards && userBoards.length > 0) {
+        setActiveBoardId(userBoards[0].id);
+      }
+    } catch (err) {
+      console.error('Errore durante il caricamento delle bacheche:', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBoardData = async (boardId) => {
+    try {
+      let { data: cols, error: colsErr } = await supabase
+        .from('columns')
+        .select('*')
+        .eq('board_id', boardId)
+        .order('position', { ascending: true });
+
+      if (colsErr) throw colsErr;
       setColumns(cols || []);
 
       const { data: crds, error: crdsErr } = await supabase
@@ -115,10 +162,52 @@ export default function App() {
       if (crdsErr) throw crdsErr;
       setCards(crds || []);
     } catch (err) {
-      console.error('Errore durante il caricamento:', err.message);
-    } finally {
-      setLoading(false);
+      console.error('Errore durante il caricamento dei dati della bacheca:', err.message);
     }
+  };
+
+  // --- Gestione Bacheche ---
+  const handleCreateBoard = async () => {
+    const trimmed = newBoardTitle.trim();
+    if (!trimmed || !session) return;
+
+    const newBoard = {
+      id: `board-${Date.now()}`,
+      user_id: session.user.id,
+      title: trimmed
+    };
+
+    setBoards((prev) => [...prev, newBoard]);
+    setActiveBoardId(newBoard.id);
+    setNewBoardTitle('');
+    setIsAddingBoard(false);
+
+    const { error } = await supabase.from('boards').insert([newBoard]);
+    if (error) {
+      fetchBoards();
+      return;
+    }
+
+    // Aggiungi colonne predefinite alla nuova bacheca
+    const initialCols = DEFAULT_COLUMNS.map((col) => ({
+      id: `col-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      user_id: session.user.id,
+      board_id: newBoard.id,
+      name: col.name,
+      position: col.position
+    }));
+
+    await supabase.from('columns').insert(initialCols);
+    fetchBoardData(newBoard.id);
+  };
+
+  const handleSaveBoardTitle = async () => {
+    const trimmed = editingBoardTitle.trim();
+    if (trimmed && activeBoardId) {
+      setBoards((prev) => prev.map((b) => (b.id === activeBoardId ? { ...b, title: trimmed } : b)));
+      await supabase.from('boards').update({ title: trimmed }).eq('id', activeBoardId);
+    }
+    setIsEditingBoardTitle(false);
   };
 
   const handleAuth = async (e) => {
@@ -163,8 +252,10 @@ export default function App() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    setBoards([]);
     setColumns([]);
     setCards([]);
+    setActiveBoardId(null);
     switchAuthMode('login');
   };
 
@@ -179,11 +270,12 @@ export default function App() {
   // --- Gestione Colonne ---
   const handleAddColumn = async () => {
     const trimmed = newColumnName.trim();
-    if (!trimmed || !session) return;
+    if (!trimmed || !session || !activeBoardId) return;
 
     const newCol = {
       id: `col-${Date.now()}`,
       user_id: session.user.id,
+      board_id: activeBoardId,
       name: trimmed,
       position: columns.length
     };
@@ -193,7 +285,7 @@ export default function App() {
     setIsAddingColumn(false);
 
     const { error } = await supabase.from('columns').insert([newCol]);
-    if (error) fetchBoardData();
+    if (error) fetchBoardData(activeBoardId);
   };
 
   const saveRenameColumn = async (id) => {
@@ -206,7 +298,6 @@ export default function App() {
     setEditingColumnName('');
   };
 
-  // Spostamento colonna tramite Drag & Drop
   const handleColumnDragStart = (e, columnId) => {
     e.stopPropagation();
     setDraggedColumnId(columnId);
@@ -287,7 +378,7 @@ export default function App() {
     setActiveNewCardColumnId(null);
 
     const { error } = await supabase.from('cards').insert([newCard]);
-    if (error) fetchBoardData();
+    if (error) fetchBoardData(activeBoardId);
   };
 
   const handleConfirmDelete = async () => {
@@ -300,6 +391,16 @@ export default function App() {
       setColumns((prev) => prev.filter((c) => c.id !== confirmDelete.id));
       setCards((prev) => prev.filter((c) => c.column_id !== confirmDelete.id));
       await supabase.from('columns').delete().eq('id', confirmDelete.id);
+    } else if (confirmDelete.type === 'board') {
+      const remainingBoards = boards.filter((b) => b.id !== confirmDelete.id);
+      setBoards(remainingBoards);
+      await supabase.from('boards').delete().eq('id', confirmDelete.id);
+      
+      if (remainingBoards.length > 0) {
+        setActiveBoardId(remainingBoards[0].id);
+      } else {
+        fetchBoards();
+      }
     }
 
     setConfirmDelete(null);
@@ -385,7 +486,7 @@ export default function App() {
       <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
         <div className="flex flex-col items-center space-y-3">
           <div className="w-8 h-8 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-medium text-slate-300">Sincronizzazione bacheca...</span>
+          <span className="text-sm font-medium text-slate-300">Caricamento bacheche...</span>
         </div>
       </div>
     );
@@ -541,22 +642,95 @@ export default function App() {
     );
   }
 
+  const activeBoard = boards.find((b) => b.id === activeBoardId);
+
   // Interfaccia Bacheca
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 antialiased selection:bg-orange-100">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur-md shadow-xs">
         <div className="max-w-[1600px] mx-auto px-6 py-3.5 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+          
+          {/* Selettore Bacheche Multiplo */}
+          <div className="flex items-center space-x-4">
             <div className="h-7 w-2.5 rounded-full bg-gradient-to-b from-orange-500 to-amber-500" />
-            <div>
-              <h1 className="text-lg font-bold tracking-tight text-slate-900 leading-tight">
-                Bacheca di Progetto
-              </h1>
-              <p className="text-[11px] text-slate-500">
-                Sincronizzata con <span className="font-medium text-slate-700">{session.user.email}</span>
-              </p>
+            
+            <div className="flex items-center space-x-2">
+              {isEditingBoardTitle ? (
+                <div className="flex items-center space-x-1">
+                  <input
+                    type="text"
+                    value={editingBoardTitle}
+                    onChange={(e) => setEditingBoardTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveBoardTitle();
+                      if (e.key === 'Escape') setIsEditingBoardTitle(false);
+                    }}
+                    autoFocus
+                    className="text-base font-bold text-slate-900 border border-indigo-500 rounded px-2 py-0.5 outline-none bg-white"
+                  />
+                  <button onClick={handleSaveBoardTitle} className="p-1 text-emerald-600 hover:text-emerald-800">
+                    <Check size={16} />
+                  </button>
+                  <button onClick={() => setIsEditingBoardTitle(false)} className="p-1 text-slate-400 hover:text-slate-600">
+                    <X size={16} />
+                  </button>
+                </div>
+              ) : (
+                <div className="relative group flex items-center space-x-2">
+                  <select
+                    value={activeBoardId || ''}
+                    onChange={(e) => setActiveBoardId(e.target.value)}
+                    className="text-base font-bold text-slate-900 bg-slate-100/80 hover:bg-slate-200/60 border border-slate-200 rounded-lg px-3 py-1 pr-8 outline-none cursor-pointer transition-all appearance-none"
+                  >
+                    {boards.map((board) => (
+                      <option key={board.id} value={board.id}>
+                        {board.title}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={16} className="absolute right-2.5 text-slate-500 pointer-events-none" />
+
+                  <button
+                    onClick={() => {
+                      setIsEditingBoardTitle(true);
+                      setEditingBoardTitle(activeBoard?.title || '');
+                    }}
+                    className="p-1 text-slate-400 hover:text-slate-700 transition-colors"
+                    title="Rinomina bacheca"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+
+                  {boards.length > 1 && (
+                    <button
+                      onClick={() =>
+                        setConfirmDelete({
+                          type: 'board',
+                          id: activeBoardId,
+                          name: activeBoard?.title
+                        })
+                      }
+                      className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
+                      title="Elimina bacheca"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setIsAddingBoard(true)}
+                className="inline-flex items-center space-x-1 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 px-2.5 py-1 text-xs font-medium transition-all"
+                title="Crea nuova bacheca"
+              >
+                <FolderPlus size={14} />
+                <span className="hidden sm:inline">Nuova bacheca</span>
+              </button>
             </div>
           </div>
+
           <div className="flex items-center space-x-3 text-xs font-medium">
             <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-600 font-semibold">
               {columns.length} {columns.length === 1 ? 'Colonna' : 'Colonne'}
@@ -593,7 +767,6 @@ export default function App() {
 
             return (
               <React.Fragment key={col.id}>
-                {/* Indicatore visivo prima della colonna */}
                 {showLeftIndicator && (
                   <div className="w-2.5 h-[420px] rounded-full bg-indigo-500 border-2 border-indigo-300 animate-pulse shrink-0 self-stretch shadow-md shadow-indigo-500/30 transition-all" />
                 )}
@@ -607,7 +780,6 @@ export default function App() {
                     isColumnActive ? 'border-indigo-500 bg-indigo-50/30 ring-1 ring-indigo-500/30' : 'border-slate-200 bg-slate-100/75'
                   }`}
                 >
-                  {/* Intestazione della colonna trascinabile */}
                   <div
                     draggable
                     onDragStart={(e) => handleColumnDragStart(e, col.id)}
@@ -787,7 +959,6 @@ export default function App() {
             );
           })}
 
-          {/* Indicatore visivo dopo l'ultima colonna */}
           {draggedColumnId && columnDropTargetIndex === columns.length && (
             <div className="w-2.5 h-[420px] rounded-full bg-indigo-500 border-2 border-indigo-300 animate-pulse shrink-0 self-stretch shadow-md shadow-indigo-500/30 transition-all" />
           )}
@@ -837,6 +1008,45 @@ export default function App() {
         </div>
       </main>
 
+      {/* Pop-up creazione nuova bacheca */}
+      {isAddingBoard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <h3 className="text-sm font-bold text-slate-900 mb-1">Crea nuova bacheca</h3>
+            <p className="text-xs text-slate-500 mb-4">Inserisci il nome della nuova bacheca di progetto.</p>
+            <input
+              type="text"
+              placeholder="Es. Marketing, Task Casa, Progetto App..."
+              value={newBoardTitle}
+              onChange={(e) => setNewBoardTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreateBoard();
+                if (e.key === 'Escape') setIsAddingBoard(false);
+              }}
+              autoFocus
+              className="w-full text-xs font-medium px-3 py-2 border border-slate-300 rounded-lg outline-none focus:border-indigo-500 text-slate-900 mb-4"
+            />
+            <div className="flex items-center justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setIsAddingBoard(false)}
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100"
+              >
+                Annulla
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateBoard}
+                className="rounded-lg bg-indigo-600 hover:bg-indigo-700 px-3.5 py-1.5 text-xs font-medium text-white shadow-2xs"
+              >
+                Crea bacheca
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pop-up di conferma eliminazione */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-lg">
@@ -846,10 +1056,13 @@ export default function App() {
               </div>
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-slate-900">
-                  {confirmDelete.type === 'column' ? 'Elimina colonna' : 'Elimina scheda'}
+                  {confirmDelete.type === 'board' && 'Elimina bacheca'}
+                  {confirmDelete.type === 'column' && 'Elimina colonna'}
+                  {confirmDelete.type === 'card' && 'Elimina scheda'}
                 </h3>
                 <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
                   Sei sicuro di voler eliminare <span className="font-semibold text-slate-900">"{confirmDelete.name}"</span>?
+                  {confirmDelete.type === 'board' && ' Verranno eliminate anche tutte le colonne e le schede contenute.'}
                 </p>
               </div>
             </div>
