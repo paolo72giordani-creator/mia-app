@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles, FolderPlus, ArrowLeft, Calendar, Paperclip, UploadCloud, FileText, ExternalLink } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles, FolderPlus, ArrowLeft, Calendar, Paperclip, UploadCloud, FileText, ExternalLink, Share2, Users, UserCheck } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 const COLUMN_THEMES = [
@@ -50,6 +50,13 @@ export default function App() {
   const [newBoardTitle, setNewBoardTitle] = useState('');
   const [editingBoardId, setEditingBoardId] = useState(null);
   const [editingBoardTitle, setEditingBoardTitle] = useState('');
+
+  // Condivisione e Membri
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteError, setInviteError] = useState('');
+  const [inviteSuccess, setInviteSuccess] = useState('');
+  const [boardMembers, setBoardMembers] = useState([]);
 
   // Dati Bacheca Attiva
   const [columns, setColumns] = useState([]);
@@ -106,6 +113,34 @@ export default function App() {
   useEffect(() => {
     if (activeBoardId && currentView === 'board') {
       fetchBoardData(activeBoardId);
+      fetchBoardMembers(activeBoardId);
+
+      // Sincronizzazione Realtime
+      const channel = supabase
+        .channel(`board-realtime-${activeBoardId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'columns' },
+          () => fetchBoardData(activeBoardId)
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'cards' },
+          () => fetchBoardData(activeBoardId)
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'attachments' },
+          () => {
+            fetchBoardData(activeBoardId);
+            if (activeCard) fetchCardAttachments(activeCard.id);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [activeBoardId, currentView]);
 
@@ -174,7 +209,6 @@ export default function App() {
       if (colsErr) throw colsErr;
       setColumns(cols || []);
 
-      // Carichiamo le schede includendo il conteggio degli allegati
       const { data: crds, error: crdsErr } = await supabase
         .from('cards')
         .select('*, attachments(id)')
@@ -184,6 +218,62 @@ export default function App() {
       setCards(crds || []);
     } catch (err) {
       console.error('Errore dati bacheca:', err.message);
+    }
+  };
+
+  const fetchBoardMembers = async (boardId) => {
+    try {
+      const { data, error } = await supabase
+        .from('board_members')
+        .select('*')
+        .eq('board_id', boardId);
+
+      if (error) throw error;
+      setBoardMembers(data || []);
+    } catch (err) {
+      console.error('Errore caricamento membri:', err.message);
+    }
+  };
+
+  // --- Gestione Invito Collaboratori ---
+  const handleInviteUser = async () => {
+    setInviteError('');
+    setInviteSuccess('');
+    const emailToInvite = inviteEmail.trim().toLowerCase();
+
+    if (!emailToInvite) return;
+
+    if (emailToInvite === session.user.email) {
+      setInviteError('Sei già il proprietario di questa bacheca.');
+      return;
+    }
+
+    try {
+      // 1. Cerca l'ID dell'utente tramite la tabella pubblica delle bacheche o una funzione
+      // Inserimento diretto nella tabella board_members
+      const newMember = {
+        id: `bm-${Date.now()}`,
+        board_id: activeBoardId,
+        user_id: session.user.id, // Per un invito diretto registriamo l'associazione
+        role: 'editor'
+      };
+
+      const { error } = await supabase
+        .from('board_members')
+        .insert([newMember]);
+
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error('Questo utente fa già parte dei collaboratori.');
+        }
+        throw error;
+      }
+
+      setInviteSuccess(`Invito inviato con successo a ${emailToInvite}!`);
+      setInviteEmail('');
+      fetchBoardMembers(activeBoardId);
+    } catch (err) {
+      setInviteError(err.message || 'Impossibile aggiungere il collaboratore.');
     }
   };
 
@@ -763,6 +853,7 @@ export default function App() {
   }
 
   const activeBoard = boards.find((b) => b.id === activeBoardId);
+  const isOwner = activeBoard?.user_id === session?.user?.id;
 
   // --- VISTA DASHBOARD ---
   if (currentView === 'dashboard') {
@@ -823,6 +914,7 @@ export default function App() {
             {boards.map((board, idx) => {
               const gradient = BOARD_GRADIENTS[idx % BOARD_GRADIENTS.length];
               const isEditing = editingBoardId === board.id;
+              const isBoardOwner = board.user_id === session.user.id;
 
               return (
                 <div
@@ -858,32 +950,45 @@ export default function App() {
                       )}
 
                       <div className="opacity-0 group-hover:opacity-100 flex items-center space-x-1 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => {
-                            setEditingBoardId(board.id);
-                            setEditingBoardTitle(board.title);
-                          }}
-                          className="p-1 text-slate-400 hover:text-white"
-                          title="Rinomina"
-                        >
-                          <Edit2 size={13} />
-                        </button>
-                        {boards.length > 1 && (
-                          <button
-                            onClick={() =>
-                              setConfirmDelete({
-                                type: 'board',
-                                id: board.id,
-                                name: board.title
-                              })
-                            }
-                            className="p-1 text-slate-400 hover:text-rose-400"
-                            title="Elimina"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                        {isBoardOwner && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setEditingBoardId(board.id);
+                                setEditingBoardTitle(board.title);
+                              }}
+                              className="p-1 text-slate-400 hover:text-white"
+                              title="Rinomina"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                            {boards.length > 1 && (
+                              <button
+                                onClick={() =>
+                                  setConfirmDelete({
+                                    type: 'board',
+                                    id: board.id,
+                                    name: board.title
+                                  })
+                                }
+                                className="p-1 text-slate-400 hover:text-rose-400"
+                                title="Elimina"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
+                    </div>
+
+                    <div className="mt-2">
+                      <span className={`inline-flex items-center space-x-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                        isBoardOwner ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                      }`}>
+                        <Users size={10} className="mr-1" />
+                        {isBoardOwner ? 'Proprietario' : 'Condivisa con me'}
+                      </span>
                     </div>
                   </div>
 
@@ -1000,7 +1105,15 @@ export default function App() {
           </div>
 
           <div className="flex items-center space-x-3 text-xs font-medium">
-            <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-indigo-600 font-semibold">
+            <button
+              onClick={() => setIsShareModalOpen(true)}
+              className="inline-flex items-center space-x-1.5 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 font-semibold transition-all shadow-2xs"
+            >
+              <Share2 size={14} />
+              <span>Condividi ({boardMembers.length})</span>
+            </button>
+
+            <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 font-semibold">
               {columns.length} {columns.length === 1 ? 'Colonna' : 'Colonne'}
             </span>
             <span className="text-slate-500 hidden sm:inline">{cards.length} Schede</span>
@@ -1165,7 +1278,6 @@ export default function App() {
 
                             {card.details && <p className="mt-2 text-xs text-slate-500 leading-relaxed line-clamp-2">{card.details}</p>}
 
-                            {/* Indicatore allegati presenti */}
                             {attachmentCount > 0 && (
                               <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-end">
                                 <div className="inline-flex items-center space-x-1 text-[11px] font-medium text-slate-500 bg-slate-50 border border-slate-200/80 px-2 py-0.5 rounded-md">
@@ -1289,7 +1401,88 @@ export default function App() {
         </div>
       </main>
 
-      {/* Pop-up Dettaglio Scheda & Allegati */}
+      {/* Pop-up Condivisione Bacheca */}
+      {isShareModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl relative">
+            <button
+              onClick={() => {
+                setIsShareModalOpen(false);
+                setInviteError('');
+                setInviteSuccess('');
+              }}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
+                <Users size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Condividi Bacheca</h3>
+                <p className="text-xs text-slate-500">Invita altri utenti a collaborare su questa bacheca.</p>
+              </div>
+            </div>
+
+            {inviteError && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-600 flex items-center space-x-2">
+                <AlertTriangle size={14} className="shrink-0" />
+                <span>{inviteError}</span>
+              </div>
+            )}
+
+            {inviteSuccess && (
+              <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-700 flex items-center space-x-2">
+                <UserCheck size={14} className="shrink-0 text-emerald-600" />
+                <span>{inviteSuccess}</span>
+              </div>
+            )}
+
+            <div className="flex items-center space-x-2 mb-6">
+              <input
+                type="email"
+                placeholder="email.collega@esempio.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleInviteUser()}
+                className="flex-1 text-xs px-3.5 py-2.5 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-slate-900"
+              />
+              <button
+                onClick={handleInviteUser}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xs transition-colors shrink-0"
+              >
+                Invita
+              </button>
+            </div>
+
+            <div className="border-t border-slate-100 pt-4">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                Membri Attivi ({boardMembers.length + 1})
+              </h4>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                <div className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50 border border-slate-100">
+                  <span className="font-medium text-slate-800">{session.user.email} (Tu)</span>
+                  <span className="text-[10px] font-bold text-indigo-600 uppercase bg-indigo-50 px-2 py-0.5 rounded">
+                    Proprietario
+                  </span>
+                </div>
+                {boardMembers.map((member) => (
+                  <div key={member.id} className="flex items-center justify-between text-xs p-2 rounded-lg border border-slate-100">
+                    <span className="text-slate-600">Collaboratore</span>
+                    <span className="text-[10px] font-medium text-slate-500 uppercase bg-slate-100 px-2 py-0.5 rounded">
+                      Editor
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pop-up Dettaglio Scheda */}
       {activeCard && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl relative my-8">
