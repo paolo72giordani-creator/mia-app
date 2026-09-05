@@ -347,28 +347,23 @@ export default function App() {
     }
 
     try {
-      const newMember = {
-        id: `bm-${Date.now()}`,
-        board_id: activeBoardId,
-        user_id: session.user.id,
-        role: inviteRole
-      };
-
-      const { error } = await supabase
-        .from('board_members')
-        .insert([newMember]);
+      // Associa l'ID del destinatario tramite la funzione SQL RPC
+      const { error } = await supabase.rpc('invite_user_to_board', {
+        p_board_id: activeBoardId,
+        p_email: emailToInvite,
+        p_role: inviteRole
+      });
 
       if (error) {
-        if (error.code === '23505') {
+        if (error.message.includes('unique') || error.code === '23505') {
           throw new Error('Questo utente fa già parte dei collaboratori.');
         }
         throw error;
       }
 
-      const roleLabel = inviteRole === 'editor' ? 'Editor (Modifica)' : 'Visualizzatore (Sola Lettura)';
+      const roleLabel = inviteRole === 'editor' ? 'Editor (Modifica)' : 'Visualizzatore (Solo Lettura)';
       const activeBoardObj = boards.find((b) => b.id === activeBoardId);
       
-      // Invia la mail di notifica
       sendEmailNotification(emailToInvite, activeBoardObj?.title || 'Kanban Board', roleLabel);
 
       setInviteSuccess(`Invito e notifica email inviati con successo a ${emailToInvite}!`);
