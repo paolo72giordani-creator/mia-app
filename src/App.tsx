@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles, FolderPlus, ArrowLeft, Layers, Columns, Calendar } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, GripVertical, AlertTriangle, LogOut, Mail, Lock, UserPlus, LogIn, LayoutDashboard, Sparkles, FolderPlus, ArrowLeft, Calendar, Paperclip, UploadCloud, FileText, Image as ImageIcon, Download, ExternalLink } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
 const COLUMN_THEMES = [
@@ -55,6 +55,13 @@ export default function App() {
   const [columns, setColumns] = useState([]);
   const [cards, setCards] = useState([]);
 
+  // Dettaglio Scheda & Allegati
+  const [activeCard, setActiveCard] = useState(null);
+  const [cardAttachments, setCardAttachments] = useState([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [editingCardTitle, setEditingCardTitle] = useState('');
+  const [editingCardDetails, setEditingCardDetails] = useState('');
+
   // Stati UI ed editing colonne/schede
   const [editingColumnId, setEditingColumnId] = useState(null);
   const [editingColumnName, setEditingColumnName] = useState('');
@@ -103,6 +110,17 @@ export default function App() {
       fetchBoardData(activeBoardId);
     }
   }, [activeBoardId, currentView]);
+
+  // Carica allegati della scheda attiva
+  useEffect(() => {
+    if (activeCard) {
+      fetchCardAttachments(activeCard.id);
+      setEditingCardTitle(activeCard.title);
+      setEditingCardDetails(activeCard.details || '');
+    } else {
+      setCardAttachments([]);
+    }
+  }, [activeCard]);
 
   const fetchBoards = async () => {
     setLoading(true);
@@ -169,6 +187,107 @@ export default function App() {
     } catch (err) {
       console.error('Errore dati bacheca:', err.message);
     }
+  };
+
+  const fetchCardAttachments = async (cardId) => {
+    try {
+      const { data, error } = await supabase
+        .from('attachments')
+        .select('*')
+        .eq('card_id', cardId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setCardAttachments(data || []);
+    } catch (err) {
+      console.error('Errore caricamento allegati:', err.message);
+    }
+  };
+
+  // --- Gestione Caricamento File ---
+  const handleFileUpload = async (files) => {
+    if (!files || files.length === 0 || !activeCard) return;
+
+    setUploadingFile(true);
+    try {
+      for (const file of files) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+        const filePath = `${session.user.id}/${activeCard.id}/${fileName}`;
+
+        // 1. Carica il file nello Storage di Supabase
+        const { error: uploadErr } = await supabase.storage
+          .from('card-attachments')
+          .upload(filePath, file);
+
+        if (uploadErr) throw uploadErr;
+
+        // 2. Ottieni l'URL pubblico del file
+        const { data: urlData } = supabase.storage
+          .from('card-attachments')
+          .getPublicUrl(filePath);
+
+        // 3. Salva i dettagli del file nel database
+        const newAttachment = {
+          id: `att-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+          card_id: activeCard.id,
+          user_id: session.user.id,
+          file_name: file.name,
+          file_url: urlData.publicUrl,
+          file_type: file.type,
+          file_size: file.size
+        };
+
+        const { error: dbErr } = await supabase
+          .from('attachments')
+          .insert([newAttachment]);
+
+        if (dbErr) throw dbErr;
+      }
+
+      fetchCardAttachments(activeCard.id);
+    } catch (err) {
+      alert('Errore durante il caricamento del file: ' + err.message);
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (attachment) => {
+    try {
+      setCardAttachments((prev) => prev.filter((a) => a.id !== attachment.id));
+
+      // Rimuovi dal DB
+      await supabase.from('attachments').delete().eq('id', attachment.id);
+
+      // Estrai il percorso per rimuoverlo dallo Storage
+      const urlParts = attachment.file_url.split('/card-attachments/');
+      if (urlParts[1]) {
+        await supabase.storage.from('card-attachments').remove([urlParts[1]]);
+      }
+    } catch (err) {
+      console.error('Errore eliminazione allegato:', err.message);
+    }
+  };
+
+  const handleSaveCardDetails = async () => {
+    if (!activeCard) return;
+
+    const updatedTitle = editingCardTitle.trim();
+    if (!updatedTitle) return;
+
+    setCards((prev) =>
+      prev.map((c) =>
+        c.id === activeCard.id ? { ...c, title: updatedTitle, details: editingCardDetails.trim() } : c
+      )
+    );
+
+    await supabase
+      .from('cards')
+      .update({ title: updatedTitle, details: editingCardDetails.trim() })
+      .eq('id', activeCard.id);
+
+    setActiveCard(null);
   };
 
   // --- Gestione Bacheche ---
@@ -652,7 +771,7 @@ export default function App() {
 
   const activeBoard = boards.find((b) => b.id === activeBoardId);
 
-  // --- VISTA DASHBOARD (Stile NotebookLM) ---
+  // --- VISTA DASHBOARD ---
   if (currentView === 'dashboard') {
     return (
       <div className="min-h-screen flex flex-col bg-slate-900 text-slate-100 antialiased selection:bg-indigo-500 selection:text-white">
@@ -697,7 +816,6 @@ export default function App() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {/* Card per creare nuova bacheca */}
             <button
               onClick={() => setIsAddingBoard(true)}
               className="group h-48 rounded-2xl border-2 border-dashed border-slate-800 hover:border-indigo-500/50 bg-slate-900/40 hover:bg-slate-800/40 flex flex-col items-center justify-center p-6 transition-all duration-200 text-center"
@@ -709,7 +827,6 @@ export default function App() {
               <span className="text-[11px] text-slate-500 mt-1">Organizza un nuovo progetto</span>
             </button>
 
-            {/* Elenco bacheche esistenti */}
             {boards.map((board, idx) => {
               const gradient = BOARD_GRADIENTS[idx % BOARD_GRADIENTS.length];
               const isEditing = editingBoardId === board.id;
@@ -792,7 +909,6 @@ export default function App() {
           </div>
         </main>
 
-        {/* Modal Nuova Bacheca */}
         {isAddingBoard && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
             <div className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
@@ -830,7 +946,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Modal Conferma Eliminazione */}
         {confirmDelete && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
             <div className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
@@ -874,7 +989,6 @@ export default function App() {
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur-md shadow-xs">
         <div className="max-w-[1600px] mx-auto px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            {/* Tasto per tornare alla Dashboard */}
             <button
               onClick={() => setCurrentView('dashboard')}
               className="inline-flex items-center space-x-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600 bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg px-2.5 py-1.5 transition-all"
@@ -1028,7 +1142,8 @@ export default function App() {
                             onDragStart={(e) => handleDragStart(e, card.id)}
                             onDragEnd={handleDragEnd}
                             onDragOver={(e) => handleCardDragOver(e, col.id, idx)}
-                            className={`group relative flex flex-col rounded-lg border border-slate-200 bg-white p-3.5 shadow-xs transition-all duration-150 cursor-grab active:cursor-grabbing hover:shadow-sm overflow-hidden ${
+                            onClick={() => setActiveCard(card)}
+                            className={`group relative flex flex-col rounded-lg border border-slate-200 bg-white p-3.5 shadow-xs transition-all duration-150 cursor-pointer hover:shadow-md hover:border-indigo-300 overflow-hidden ${
                               draggedCardId === card.id ? 'opacity-30 border-dashed border-orange-400' : ''
                             }`}
                           >
@@ -1040,20 +1155,21 @@ export default function App() {
                                 <h4 className="text-xs font-semibold text-slate-900 truncate leading-tight">{card.title}</h4>
                               </div>
                               <button
-                                onClick={() =>
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setConfirmDelete({
                                     type: 'card',
                                     id: card.id,
                                     name: card.title
-                                  })
-                                }
+                                  });
+                                }}
                                 className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 transition-opacity p-0.5"
                               >
                                 <Trash2 size={13} />
                               </button>
                             </div>
 
-                            {card.details && <p className="mt-2 text-xs text-slate-500 leading-relaxed line-clamp-3">{card.details}</p>}
+                            {card.details && <p className="mt-2 text-xs text-slate-500 leading-relaxed line-clamp-2">{card.details}</p>}
                           </div>
                         </React.Fragment>
                       );
@@ -1169,7 +1285,133 @@ export default function App() {
         </div>
       </main>
 
-      {/* Modal Conferma Eliminazione in vista Board */}
+      {/* Pop-up Dettaglio Scheda & Allegati */}
+      {activeCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl relative my-8">
+            <button
+              onClick={() => setActiveCard(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1 rounded-lg"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="mb-6">
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Titolo Scheda</label>
+              <input
+                type="text"
+                value={editingCardTitle}
+                onChange={(e) => setEditingCardTitle(e.target.value)}
+                className="w-full text-base font-bold text-slate-900 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-500"
+              />
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Descrizione Dettagliata</label>
+              <textarea
+                rows={3}
+                placeholder="Aggiungi una descrizione dettagliata per questa scheda..."
+                value={editingCardDetails}
+                onChange={(e) => setEditingCardDetails(e.target.value)}
+                className="w-full text-xs text-slate-700 border border-slate-200 rounded-lg p-3 outline-none focus:border-indigo-500 resize-none"
+              />
+            </div>
+
+            {/* Sezione Allegati */}
+            <div className="mb-6 border-t border-slate-100 pt-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <Paperclip size={16} className="text-indigo-600" />
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Allegati ({cardAttachments.length})</h3>
+                </div>
+              </div>
+
+              {/* Area di Caricamento File */}
+              <label className="group relative flex flex-col items-center justify-center border-2 border-dashed border-slate-200 hover:border-indigo-500 rounded-xl p-4 bg-slate-50 hover:bg-indigo-50/30 cursor-pointer transition-colors mb-4">
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => handleFileUpload(e.target.files)}
+                  className="hidden"
+                />
+                <UploadCloud size={24} className="text-slate-400 group-hover:text-indigo-600 mb-1 transition-colors" />
+                <span className="text-xs font-medium text-slate-600 group-hover:text-indigo-600">
+                  {uploadingFile ? 'Caricamento in corso...' : 'Trascina qui i file o fai clic per caricare'}
+                </span>
+                <span className="text-[10px] text-slate-400 mt-0.5">Immagini, PDF, Documenti Word, Excel...</span>
+              </label>
+
+              {/* Lista degli Allegati */}
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {cardAttachments.map((att) => {
+                  const isImage = att.file_type?.startsWith('image/');
+
+                  return (
+                    <div
+                      key={att.id}
+                      className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 bg-white hover:border-slate-300 transition-colors"
+                    >
+                      <div className="flex items-center space-x-3 min-w-0 flex-1">
+                        {isImage ? (
+                          <img src={att.file_url} alt={att.file_name} className="w-9 h-9 rounded object-cover shrink-0 border" />
+                        ) : (
+                          <div className="w-9 h-9 rounded bg-slate-100 flex items-center justify-center shrink-0 text-slate-500">
+                            <FileText size={18} />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-slate-800 truncate">{att.file_name}</p>
+                          <p className="text-[10px] text-slate-400">
+                            {(att.file_size / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-1 shrink-0">
+                        <a
+                          href={att.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors"
+                          title="Apri / Scarica"
+                        >
+                          <ExternalLink size={14} />
+                        </a>
+                        <button
+                          onClick={() => handleDeleteAttachment(att)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors"
+                          title="Elimina"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 border-t border-slate-100 pt-4">
+              <button
+                type="button"
+                onClick={() => setActiveCard(null)}
+                className="rounded-lg px-3.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100"
+              >
+                Annulla
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCardDetails}
+                className="rounded-lg bg-indigo-600 hover:bg-indigo-700 px-4 py-1.5 text-xs font-semibold text-white shadow-2xs"
+              >
+                Salva Modifiche
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Conferma Eliminazione */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-lg">
