@@ -297,10 +297,13 @@ export default function App() {
 
     setUploadingFile(true);
     try {
+      // Verifica che la scheda esista nel nostro array locale
+      const currentCard = cards.find((c) => c.id === activeCard.id) || activeCard;
+
       for (const file of files) {
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-        const filePath = `${session.user.id}/${activeCard.id}/${fileName}`;
+        const filePath = `${session.user.id}/${currentCard.id}/${fileName}`;
 
         const { error: uploadErr } = await supabase.storage
           .from('card-attachments')
@@ -314,7 +317,7 @@ export default function App() {
 
         const newAttachment = {
           id: `att-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
-          card_id: activeCard.id,
+          card_id: currentCard.id,
           user_id: session.user.id,
           file_name: file.name,
           file_url: urlData.publicUrl,
@@ -329,7 +332,7 @@ export default function App() {
         if (dbErr) throw dbErr;
       }
 
-      await fetchCardAttachments(activeCard.id);
+      await fetchCardAttachments(currentCard.id);
       fetchBoardData(activeBoardId);
     } catch (err) {
       alert('Errore caricamento file: ' + err.message);
