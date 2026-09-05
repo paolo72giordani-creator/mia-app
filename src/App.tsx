@@ -260,9 +260,9 @@ export default function App() {
         body: JSON.stringify({
           // 1. Mittente Qualificato fisso (l'indirizzo verificato sul tuo account Brevo)
           sender: { 
-            name: `${senderUserEmail} via Kanban App`, 
-            email: "paolo.giordani@gmail.com" // <-- Sostituisci se il tuo account Brevo è registrato con un'altra email verificata
-          },
+			name: `${senderUserEmail} via Kanban App`, 
+			email: "paolo72.giordani@gmail.com" // <-- Assicurati che questa sia l'email esatta del tuo account Brevo
+			},
           
           // 2. Reply-To dinamico: se il destinatario risponde alla mail, risponde all'utente che lo ha invitato!
           replyTo: { 
