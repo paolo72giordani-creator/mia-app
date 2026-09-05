@@ -238,11 +238,15 @@ export default function App() {
   };
 
   // --- Funzione Invio Email tramite Brevo API ---
+  // --- Funzione Invio Email tramite Brevo API ---
   const sendEmailNotification = async (recipientEmail, boardTitle, roleName) => {
-    if (!BREVO_API_KEY || BREVO_API_KEY.includes('INSERISCI_QUI')) return;
+    if (!BREVO_API_KEY) {
+      console.warn('Chiave API Brevo mancante. Notifica email ignorata.');
+      return;
+    }
 
     try {
-      await fetch('https://api.brevo.com/v3/smtp/email', {
+      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
         headers: {
           'accept': 'application/json',
@@ -250,19 +254,25 @@ export default function App() {
           'content-type': 'application/json'
         },
         body: JSON.stringify({
-          sender: { name: "Kanban Web App", email: session.user.email },
+          // Inserisci qui l'indirizzo email con cui ti sei registrato su Brevo per evitare blocchi del mittente
+          sender: { name: "Kanban Web App", email: "paolo.giordani@gmail.com" },
           to: [{ email: recipientEmail }],
           subject: `Sei stato invitato a collaborare sulla bacheca "${boardTitle}"`,
           htmlContent: `
             <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
               <h2>Sei stato invitato a una bacheca!</h2>
               <p>Ciao,</p>
-              <p><strong>${session.user.email}</strong> ti ha invitato a collaborare sulla bacheca Kanban <strong>"${boardTitle}"</strong> con il ruolo di <strong>${roleName}</strong>.</p>
-              <p>Accedi subito alla web app per visualizzare il tuo nuovo spazio di lavoro condiviso.</p>
+              <p>Sei stato invitato a collaborare sulla bacheca Kanban <strong>"${boardTitle}"</strong> con il ruolo di <strong>${roleName}</strong>.</p>
+              <p>Accedi alla web app per iniziare a lavorare!</p>
             </div>
           `
         })
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Errore risposta Brevo API:', errorData);
+      }
     } catch (err) {
       console.error('Errore invio notifica email:', err);
     }
