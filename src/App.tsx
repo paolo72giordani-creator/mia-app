@@ -159,14 +159,43 @@ export default function App() {
   const fetchBoards = async () => {
     setLoading(true);
     try {
-      let { data: userBoards, error } = await supabase
+      // 1. Recupera le bacheche di cui l'utente è proprietario
+      const { data: ownedBoards, error: ownedErr } = await supabase
         .from('boards')
         .select('*')
-        .order('created_at', { ascending: false });
+        .eq('user_id', session.user.id);
 
-      if (error) throw error;
+      if (ownedErr) throw ownedErr;
 
-      if (!userBoards || userBoards.length === 0) {
+      // 2. Recupera le bacheche a cui l'utente è stato invitato come collaboratore
+      const { data: memberEntries, error: memberErr } = await supabase
+        .from('board_members')
+        .select('board_id, role')
+        .eq('user_id', session.user.id);
+
+      if (memberErr) throw memberErr;
+
+      let sharedBoardsList = [];
+      if (memberEntries && memberEntries.length > 0) {
+        const sharedBoardIds = memberEntries.map((m) => m.board_id);
+        const { data: shared, error: sharedErr } = await supabase
+          .from('boards')
+          .select('*')
+          .in('id', sharedBoardIds);
+
+        if (sharedErr) throw sharedErr;
+        sharedBoardsList = shared || [];
+      }
+
+      // Unisci i due elenchi evitando duplicati
+      const allBoardsMap = new Map();
+      (ownedBoards || []).forEach((b) => allBoardsMap.set(b.id, b));
+      sharedBoardsList.forEach((b) => allBoardsMap.set(b.id, b));
+
+      let combinedBoards = Array.from(allBoardsMap.values());
+
+      // Se l'utente non ha bacheche, creiamo la sua bacheca principale di default
+      if (combinedBoards.length === 0) {
         const defaultBoard = {
           id: `board-${Date.now()}`,
           user_id: session.user.id,
@@ -179,7 +208,7 @@ export default function App() {
           .select();
 
         if (insertErr) throw insertErr;
-        userBoards = inserted;
+        combinedBoards = inserted;
 
         const initialCols = DEFAULT_COLUMNS.map((col) => ({
           id: `col-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -192,7 +221,7 @@ export default function App() {
         await supabase.from('columns').insert(initialCols);
       }
 
-      setBoards(userBoards || []);
+      setBoards(combinedBoards);
     } catch (err) {
       console.error('Errore caricamento bacheche:', err.message);
     } finally {
