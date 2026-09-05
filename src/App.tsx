@@ -339,37 +339,60 @@ export default function App() {
     setInviteSuccess('');
     const emailToInvite = inviteEmail.trim().toLowerCase();
 
-    if (!emailToInvite) return;
+    if (!emailToInvite) {
+      setInviteError('Inserisci un indirizzo email valido.');
+      return;
+    }
 
-    if (emailToInvite === session.user.email) {
+    if (emailToInvite === session?.user?.email?.toLowerCase()) {
       setInviteError('Sei già il proprietario di questa bacheca.');
       return;
     }
 
+    if (!activeBoardId) {
+      setInviteError('Nessuna bacheca attiva selezionata.');
+      return;
+    }
+
     try {
-      // Associa l'ID del destinatario tramite la funzione SQL RPC
-      const { error } = await supabase.rpc('invite_user_to_board', {
+      console.log('Parametri inviati alla RPC:', {
         p_board_id: activeBoardId,
         p_email: emailToInvite,
         p_role: inviteRole
       });
 
+      // Chiamata RPC a Supabase con nomi parametri rigorosamente allineati al SQL
+      const { data, error } = await supabase.rpc('invite_user_to_board', {
+        p_board_id: String(activeBoardId),
+        p_email: emailToInvite,
+        p_role: inviteRole || 'editor'
+      });
+
       if (error) {
+        console.error('Errore dettagliato da Supabase RPC:', error);
         if (error.message.includes('unique') || error.code === '23505') {
           throw new Error('Questo utente fa già parte dei collaboratori.');
         }
-        throw error;
+        throw new Error(error.message || 'Errore durante l\'aggiunta del collaboratore.');
       }
+
+      console.log('Risposta RPC invio successo:', data);
 
       const roleLabel = inviteRole === 'editor' ? 'Editor (Modifica)' : 'Visualizzatore (Solo Lettura)';
       const activeBoardObj = boards.find((b) => b.id === activeBoardId);
       
-      sendEmailNotification(emailToInvite, activeBoardObj?.title || 'Kanban Board', roleLabel);
+      // Invia la notifica email tramite Brevo
+      sendEmailNotification(emailToInvite, activeBoardObj?.title || 'Bacheca Kanban', roleLabel);
 
       setInviteSuccess(`Invito e notifica email inviati con successo a ${emailToInvite}!`);
       setInviteEmail('');
-      fetchBoardMembers(activeBoardId);
+      
+      // Ricarica la lista dei membri della bacheca attiva
+      if (typeof fetchBoardMembers === 'function') {
+        fetchBoardMembers(activeBoardId);
+      }
     } catch (err) {
+      console.error('Errore blocco catch:', err);
       setInviteError(err.message || 'Impossibile aggiungere il collaboratore.');
     }
   };
