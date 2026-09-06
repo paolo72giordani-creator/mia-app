@@ -13,10 +13,11 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   const [modalColId, setModalColId] = useState(null);
   const [activeColorPickerColId, setActiveColorPickerColId] = useState(null);
 
-  // Drag & Drop States per schede e colonne
+  // Drag & Drop States avanzati
   const [draggedCard, setDraggedCard] = useState(null);
   const [draggedColIndex, setDraggedColIndex] = useState(null);
   const [dragOverCardColId, setDragOverCardColId] = useState(null);
+  const [dragOverCardId, setDragOverCardId] = useState(null);
 
   const availableColors = [
     { label: 'Blu', value: 'bg-blue-600' },
@@ -137,7 +138,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // HANDLERS DRAG & DROP SCHEDE
+  // DRAG & DROP SCHEDE (ANCHE INTERNA ALLA COLONNA)
   const handleCardDragStart = (e, card) => {
     if (isViewer) return;
     e.stopPropagation();
@@ -145,30 +146,45 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     setDraggedColIndex(null);
   };
 
-  const handleCardDragOverCol = (e, columnId) => {
+  const handleCardDragOverCard = (e, targetCard) => {
     if (isViewer || !draggedCard) return;
     e.preventDefault();
     e.stopPropagation();
-    setDragOverCardColId(columnId);
+    setDragOverCardColId(targetCard.column_id);
+    setDragOverCardId(targetCard.id);
   };
 
   const handleCardDrop = async (e, targetColumnId) => {
     if (isViewer || !draggedCard) return;
     e.preventDefault();
     e.stopPropagation();
-    setDragOverCardColId(null);
 
     const sourceColId = draggedCard.column_id;
-    if (String(sourceColId) === String(targetColumnId)) {
-      setDraggedCard(null);
-      return;
+    let targetCards = cards.filter((c) => String(c.column_id) === String(targetColumnId));
+
+    // Se spostiamo tra colonne diverse
+    if (String(sourceColId) !== String(targetColumnId)) {
+      targetCards = [...targetCards, { ...draggedCard, column_id: String(targetColumnId) }];
     }
 
-    // Aggiornamento ottimistico dello stato locale
-    const updatedCards = cards.map((c) =>
-      c.id === draggedCard.id ? { ...c, column_id: String(targetColumnId) } : c
-    );
-    setCards(updatedCards);
+    // Se stiamo rilasciando sopra una scheda specifica, la posizioniamo lì
+    let reordered = cards.filter((c) => c.id !== draggedCard.id);
+    const updatedDraggedCard = { ...draggedCard, column_id: String(targetColumnId) };
+
+    if (dragOverCardId) {
+      const dropIndex = reordered.findIndex((c) => c.id === dragOverCardId);
+      if (dropIndex !== -1) {
+        reordered.splice(dropIndex, 0, updatedDraggedCard);
+      } else {
+        reordered.push(updatedDraggedCard);
+      }
+    } else {
+      reordered.push(updatedDraggedCard);
+    }
+
+    setCards(reordered);
+    setDragOverCardColId(null);
+    setDragOverCardId(null);
 
     try {
       await supabase
@@ -177,13 +193,13 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         .eq('id', draggedCard.id);
     } catch (err) {
       console.error('Errore spostamento scheda:', err);
-      fetchBoardData(); // Rollback
+      fetchBoardData();
     } finally {
       setDraggedCard(null);
     }
   };
 
-  // HANDLERS DRAG & DROP COLONNE
+  // DRAG & DROP COLONNE
   const handleColDragStart = (e, index) => {
     if (isViewer) return;
     setDraggedColIndex(index);
@@ -264,15 +280,12 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
               draggable={!isViewer && !draggedCard}
               onDragStart={(e) => handleColDragStart(e, colIdx)}
               onDragOver={(e) => {
+                e.preventDefault();
                 if (draggedCard) {
-                  handleCardDragOverCol(e, col.id);
+                  setDragOverCardColId(col.id);
                 } else {
                   handleColDragOver(e, colIdx);
                 }
-              }}
-              onDragLeave={(e) => {
-                if (draggedCard && e.currentTarget.contains(e.relatedTarget)) return;
-                setDragOverCardColId(null);
               }}
               onDrop={(e) => {
                 if (draggedCard) handleCardDrop(e, col.id);
@@ -344,56 +357,66 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   {colCards.map((card) => {
                     const cardDetails = card.description || card.details;
                     const isBeingDragged = draggedCard?.id === card.id;
+                    const isDragOverThisCard = dragOverCardId === card.id && draggedCard?.id !== card.id;
 
                     return (
-                      <div
-                        key={card.id}
-                        draggable={!isViewer}
-                        onDragStart={(e) => handleCardDragStart(e, card)}
-                        onClick={() => {
-                          setModalCard(card);
-                          setModalColId(col.id);
-                        }}
-                        className={`bg-white border border-slate-200 rounded-lg p-3.5 shadow-sm hover:border-blue-400 hover:shadow-md transition cursor-pointer relative ${
-                          isBeingDragged ? 'opacity-25 border-dashed border-blue-500 scale-95' : ''
-                        }`}
-                      >
-                        <div className="flex justify-between items-start gap-2 mb-2">
-                          <h4 className="font-bold text-slate-900 text-base leading-snug flex-1">
-                            {card.title}
-                          </h4>
-                          {!isViewer && (
-                            <button
-                              onClick={(e) => handleDeleteCard(card.id, e)}
-                              title="Elimina scheda"
-                              className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-sm font-bold"
-                            >
-                              🗑️
-                            </button>
-                          )}
-                        </div>
-
-                        {cardDetails && (
-                          <p className="text-sm text-slate-600 line-clamp-3 mb-2 leading-relaxed">
-                            {cardDetails}
-                          </p>
-                        )}
-
-                        {card.attachments && card.attachments.length > 0 && (
-                          <div className="flex justify-end pt-1.5 border-t border-slate-100">
-                            <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200 font-medium">
-                              📎 {card.attachments.length}
-                            </span>
+                      <React.Fragment key={card.id}>
+                        {/* SEGNAPOSTO DEDICATO PRIMA DELLA SCHEDA TARGET */}
+                        {isDragOverThisCard && (
+                          <div className="border-2 border-dashed border-blue-500 bg-blue-50/90 rounded-lg p-3 text-center text-blue-700 text-xs font-bold shadow-inner">
+                            📍 Rilascia qui
                           </div>
                         )}
-                      </div>
+
+                        <div
+                          draggable={!isViewer}
+                          onDragStart={(e) => handleCardDragStart(e, card)}
+                          onDragOver={(e) => handleCardDragOverCard(e, card)}
+                          onClick={() => {
+                            setModalCard(card);
+                            setModalColId(col.id);
+                          }}
+                          className={`bg-white border border-slate-200 rounded-lg p-3.5 shadow-sm hover:border-blue-400 hover:shadow-md transition cursor-pointer relative ${
+                            isBeingDragged ? 'opacity-25 border-dashed border-blue-500 scale-95' : ''
+                          }`}
+                        >
+                          <div className="flex justify-between items-start gap-2 mb-2">
+                            <h4 className="font-bold text-slate-900 text-base leading-snug flex-1">
+                              {card.title}
+                            </h4>
+                            {!isViewer && (
+                              <button
+                                onClick={(e) => handleDeleteCard(card.id, e)}
+                                title="Elimina scheda"
+                                className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-sm font-bold"
+                              >
+                                🗑️
+                              </button>
+                            )}
+                          </div>
+
+                          {cardDetails && (
+                            <p className="text-sm text-slate-600 line-clamp-3 mb-2 leading-relaxed">
+                              {cardDetails}
+                            </p>
+                          )}
+
+                          {card.attachments && card.attachments.length > 0 && (
+                            <div className="flex justify-end pt-1.5 border-t border-slate-100">
+                              <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200 font-medium">
+                                📎 {card.attachments.length}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </React.Fragment>
                     );
                   })}
 
-                  {/* SEGNAPOSTO VISIVO (PLACEHOLDER) DURANTE IL DRAG */}
-                  {isTargetCardCol && draggedCard && String(draggedCard.column_id) !== String(col.id) && (
-                    <div className="border-2 border-dashed border-blue-500 bg-blue-50/90 rounded-lg p-4 text-center text-blue-700 text-xs font-bold transition-all duration-200 shadow-inner flex items-center justify-center gap-2">
-                      <span className="text-base">📍</span> Rilascia qui per spostare
+                  {/* SEGNAPOSTO IN FONDO ALLA COLONNA VUOTA O QUANDO SI TRASCINA IN BASSO */}
+                  {isTargetCardCol && draggedCard && !dragOverCardId && (
+                    <div className="border-2 border-dashed border-blue-500 bg-blue-50/90 rounded-lg p-3 text-center text-blue-700 text-xs font-bold shadow-inner">
+                      📍 Rilascia qui in fondo
                     </div>
                   )}
                 </div>
