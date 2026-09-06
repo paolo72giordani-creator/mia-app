@@ -7,7 +7,9 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [copied, setCopied] = useState(false);
+  
+  // Traccia se ci sono modifiche ai ruoli da salvare
+  const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     if (activeBoard) fetchMembers();
@@ -22,11 +24,13 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
 
       if (error) throw error;
       setMembers(data || []);
+      setHasChanges(false);
     } catch (err) {
       console.error('Errore recupero membri:', err.message);
     }
   };
 
+  // INVITO DIRETTO
   const handleInvite = async () => {
     if (!emailToInvite.trim()) return;
     const targetEmail = emailToInvite.trim().toLowerCase();
@@ -58,7 +62,7 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
       if (data && data.length > 0) {
         setMembers((prev) => [...prev, data[0]]);
         setEmailToInvite('');
-        alert(`Invito registrato per ${targetEmail}! Invia il link al collaboratore per farlo accedere.`);
+        alert(`Invito inviato con successo a ${targetEmail}!`);
       }
     } catch (err) {
       alert('Errore invito: ' + err.message);
@@ -67,10 +71,12 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
     }
   };
 
+  // MODIFICA LOCALE RUOLO (MOSTRA IL TASTO SALVA)
   const handleLocalRoleChange = (memberId, newRole) => {
     setMembers((prev) =>
       prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m))
     );
+    setHasChanges(true);
   };
 
   const handleRemoveMember = async (memberId) => {
@@ -89,6 +95,7 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
     }
   };
 
+  // SALVATAGGIO DEI CAMBIAMENTI AI RUOLI
   const handleSaveChanges = async () => {
     setSaving(true);
     try {
@@ -99,6 +106,7 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
           .eq('id', m.id);
       }
       alert('Privilegi aggiornati con successo!');
+      setHasChanges(false);
       onClose();
       window.location.reload();
     } catch (err) {
@@ -106,12 +114,6 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.origin);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
   };
 
   return (
@@ -123,19 +125,6 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
           </h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-sm">
             ✕
-          </button>
-        </div>
-
-        {/* COPY LINK RAPIDO */}
-        <div className="mb-4 bg-slate-50 border p-2.5 rounded-lg flex justify-between items-center">
-          <span className="text-[11px] text-slate-600 font-medium truncate">
-            {window.location.origin}
-          </span>
-          <button
-            onClick={handleCopyLink}
-            className="bg-slate-800 hover:bg-slate-900 text-white font-bold px-2.5 py-1 rounded text-[10px] transition"
-          >
-            {copied ? 'Copaito! ✓' : 'Copia Link App'}
           </button>
         </div>
 
@@ -208,18 +197,20 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
           </div>
         </div>
 
-        {/* AZIONI SALVATAGGIO */}
+        {/* AZIONI (IL BOTTONE SALVA COMPARISCE SOLO SE CI SONO MODIFICHE AI PRIVILEGI) */}
         <div className="flex justify-end gap-2 pt-3 border-t">
           <button onClick={onClose} className="border px-3.5 py-1.5 rounded-lg text-slate-600 font-medium">
-            Annulla
+            {hasChanges ? 'Annulla' : 'Chiudi'}
           </button>
-          <button
-            onClick={handleSaveChanges}
-            disabled={saving}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg font-bold shadow-sm transition"
-          >
-            {saving ? 'Salvataggio...' : 'Salva Modifiche'}
-          </button>
+          {hasChanges && (
+            <button
+              onClick={handleSaveChanges}
+              disabled={saving}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg font-bold shadow-sm transition"
+            >
+              {saving ? 'Salvataggio...' : 'Salva Modifiche'}
+            </button>
+          )}
         </div>
       </div>
     </div>
