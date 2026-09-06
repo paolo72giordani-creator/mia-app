@@ -1,144 +1,183 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { sendEmailNotification } from '../services/brevoApi';
 
 export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('editor');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [emailToInvite, setEmailToInvite] = useState('');
+  const [selectedRole, setSelectedRole] = useState('editor');
   const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (activeBoard) fetchBoardMembers();
+    if (activeBoard) fetchMembers();
   }, [activeBoard]);
 
-  const fetchBoardMembers = async () => {
+  const fetchMembers = async () => {
     try {
-      const { data, error } = await supabase.rpc('get_board_members_with_emails', {
-        p_board_id: activeBoard.id
-      });
+      // Recupera i membri dalla tabella board_members legati al loro email se disponibile
+      const { data, error } = await supabase
+        .from('board_members')
+        .select('*')
+        .eq('board_id', activeBoard.id);
+
       if (error) throw error;
       setMembers(data || []);
     } catch (err) {
-      console.error(err);
+      console.error('Errore recupero membri:', err.message);
     }
   };
 
+  // INVITARE UN NUOVO COLLABORATORE
   const handleInvite = async () => {
-    setError('');
-    setSuccess('');
-    const targetEmail = inviteEmail.trim().toLowerCase();
-    if (!targetEmail) return setError('Inserisci un email valida.');
+    if (!emailToInvite.trim()) return;
+    if (emailToInvite.trim().toLowerCase() === currentUserEmail.toLowerCase()) {
+      alert('Non puoi invitare te stesso.');
+      return;
+    }
 
+    setLoading(true);
     try {
-      const { error } = await supabase.rpc('invite_user_to_board', {
-        p_board_id: String(activeBoard.id),
-        p_email: targetEmail,
-        p_role: inviteRole
-      });
+      // 1. Cerca l'user_id dell'utente invitato tramite la vista/tabella degli utenti o inserisci l'invito
+      const newMember = {
+        id: `bm-${Date.now()}`,
+        board_id: activeBoard.id,
+        invited_email: emailToInvite.trim().toLowerCase(),
+        role: selectedRole
+      };
+
+      const { data, error } = await supabase
+        .from('board_members')
+        .insert([newMember])
+        .select();
+
       if (error) throw error;
 
-      await sendEmailNotification(targetEmail, activeBoard.title, inviteRole, currentUserEmail);
-      setSuccess(`Invito inviato a ${targetEmail}!`);
-      setInviteEmail('');
-      fetchBoardMembers();
+      setMembers((prev) => [...prev, data[0]]);
+      setEmailToInvite('');
+      alert('Collaboratore aggiunto con successo!');
     } catch (err) {
-      setError(err.message || 'Impossibile inviare invito.');
+      alert('Errore invito: ' + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleUpdateRole = async (targetUserId, newRole) => {
+  // CAMBIARE PRIVILEGIO (EDITOR / VIEWER) IN TEMPO REALE
+  const handleRoleChange = async (memberId, newRole) => {
     try {
+      // Aggiornamento ottimistico locale
+      setMembers((prev) =>
+        prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m))
+      );
+
       const { error } = await supabase
         .from('board_members')
         .update({ role: newRole })
-        .eq('board_id', activeBoard.id)
-        .eq('user_id', targetUserId);
+        .eq('id', memberId);
 
       if (error) throw error;
-      fetchBoardMembers();
     } catch (err) {
-      alert('Errore aggiornamento ruolo.');
+      alert('Errore aggiornamento ruolo: ' + err.message);
+      fetchMembers(); // Rollback in caso di errore
     }
   };
 
-  const handleRemoveMember = async (targetUserId) => {
-    if (!window.confirm('Rimuovere questo collaboratore?')) return;
+  // RIMUOVERE COLLABORATORE
+  const handleRemoveMember = async (memberId) => {
+    if (!window.confirm('Sei sicuro di voler rimuovere questo collaboratore?')) return;
+
     try {
-      const { error } = await supabase.rpc('remove_board_member', {
-        p_board_id: activeBoard.id,
-        p_target_user_id: targetUserId
-      });
+      const { error } = await supabase
+        .from('board_members')
+        .delete()
+        .eq('id', memberId);
+
       if (error) throw error;
-      fetchBoardMembers();
+      setMembers((prev) => prev.filter((m) => m.id !== memberId));
     } catch (err) {
-      alert('Errore durante la rimozione.');
+      alert('Errore rimozione: ' + err.message);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/30 flex items-center justify-center p-3 z-50 text-xs">
-      <div className="bg-white border rounded-xl w-full max-w-md p-4 shadow-xl">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="font-bold text-sm text-slate-800">Condividi su Doceo Kanban</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+    <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-3 z-50 text-xs">
+      <div className="bg-white border rounded-xl w-full max-w-lg p-5 shadow-2xl">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="font-bold text-sm text-slate-800">
+            Condividi su {activeBoard?.title}
+          </h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-sm">
+            ✕
+          </button>
         </div>
 
-        <div className="flex gap-1.5 mb-3">
+        {/* FORM DI INVITO */}
+        <div className="flex gap-2 mb-5">
           <input
             type="email"
             placeholder="email@collega.com"
-            value={inviteEmail}
-            onChange={(e) => setInviteEmail(e.target.value)}
-            className="border rounded px-2 py-1 text-xs flex-1 focus:outline-none focus:border-blue-500"
+            value={emailToInvite}
+            onChange={(e) => setEmailToInvite(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
+            className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
           />
-          <select 
-            value={inviteRole} 
-            onChange={(e) => setInviteRole(e.target.value)}
-            className="border rounded px-1.5 py-1 text-xs bg-white"
+          <select
+            value={selectedRole}
+            onChange={(e) => setSelectedRole(e.target.value)}
+            className="border border-slate-300 rounded-lg px-2.5 py-2 text-xs bg-white focus:outline-none focus:border-blue-500"
           >
             <option value="editor">Editor</option>
             <option value="viewer">Viewer</option>
           </select>
-          <button onClick={handleInvite} className="bg-blue-600 text-white px-3 py-1 rounded font-medium">
-            Invita
+          <button
+            onClick={handleInvite}
+            disabled={loading}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-lg transition"
+          >
+            {loading ? '...' : 'Invita'}
           </button>
         </div>
 
-        {error && <p className="text-red-500 text-[10px] mb-2">{error}</p>}
-        {success && <p className="text-green-600 text-[10px] mb-2">{success}</p>}
+        {/* LISTA COLLABORATORI ATTIVI */}
+        <div>
+          <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+            Collaboratori Attivi ({members.length})
+          </h4>
 
-        <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 mt-4">
-          Collaboratori Attivi ({members.length})
-        </h4>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {members.length === 0 ? (
+              <p className="text-slate-400 italic text-xs py-2">Nessun collaboratore condiviso.</p>
+            ) : (
+              members.map((member) => (
+                <div
+                  key={member.id}
+                  className="flex justify-between items-center bg-slate-50 border border-slate-200 p-2.5 rounded-lg"
+                >
+                  <span className="font-medium text-slate-700 text-xs truncate max-w-[200px]">
+                    {member.invited_email || member.user_email || 'Utente'}
+                  </span>
 
-        <div className="space-y-1.5 max-h-36 overflow-y-auto">
-          {members.length === 0 ? (
-            <p className="text-[10px] text-slate-400 italic">Nessun collaboratore.</p>
-          ) : (
-            members.map((member) => (
-              <div key={member.member_id} className="flex justify-between items-center bg-slate-50 p-2 rounded border">
-                <span className="text-slate-700 font-medium">{member.email}</span>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={member.role}
-                    onChange={(e) => handleUpdateRole(member.user_id, e.target.value)}
-                    className="border rounded px-1 py-0.5 text-[10px] bg-white"
-                  >
-                    <option value="editor">Editor</option>
-                    <option value="viewer">Viewer</option>
-                  </select>
-                  <button 
-                    onClick={() => handleRemoveMember(member.user_id)}
-                    className="text-red-500 hover:text-red-700 font-medium text-[10px]"
-                  >
-                    Rimuovi
-                  </button>
+                  <div className="flex items-center gap-3">
+                    {/* SELETTORE RUOLO IN TEMPO REALE */}
+                    <select
+                      value={member.role || 'viewer'}
+                      onChange={(e) => handleRoleChange(member.id, e.target.value)}
+                      className="border border-slate-300 rounded px-2 py-1 text-xs bg-white font-semibold text-slate-700 focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="editor">Editor</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+
+                    <button
+                      onClick={() => handleRemoveMember(member.id)}
+                      className="text-red-500 hover:text-red-700 font-medium text-xs hover:underline"
+                    >
+                      Rimuovi
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>
