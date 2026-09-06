@@ -79,7 +79,9 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   };
 
   const handleUpdateCard = (updatedCard) => {
-    setCards(cards.map((c) => (c.id === updatedCard.id ? updatedCard : c)));
+    setCards((prevCards) =>
+      prevCards.map((c) => (c.id === updatedCard.id ? updatedCard : c))
+    );
   };
 
   const handleDeleteCard = async (cardId) => {
@@ -185,5 +187,23 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         />
       )}
     </div>
+	{/* LISTA SCHEDE CLICCABILI */}
+  <div className="space-y-1.5 mb-2 min-h-[30px]">
+    {colCards.map((card) => (
+      <div
+        key={card.id}
+        onClick={() => setSelectedCard(card)}
+        className="bg-white border rounded p-2 shadow-sm text-xs text-slate-800 font-medium cursor-pointer hover:border-blue-400 hover:shadow transition flex justify-between items-center"
+      >
+        <span className="truncate">{card.title}</span>
+        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-normal">
+          {card.description && <span title="Ha una descrizione">📝</span>}
+          {card.attachments && card.attachments.length > 0 && (
+            <span>📎 {card.attachments.length}</span>
+          )}
+        </div>
+      </div>
+    ))}
+  </div>
   );
 }

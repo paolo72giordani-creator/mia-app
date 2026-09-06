@@ -31,7 +31,14 @@ export default function CardDetailModal({ card, onClose, onUpdateCard, onDeleteC
         .eq('id', card.id);
 
       if (error) throw error;
-      onUpdateCard({ ...card, title, description, attachments });
+
+      // Passiamo l'oggetto aggiornato con la nuova descrizione
+      onUpdateCard({
+        ...card,
+        title,
+        description,
+        attachments
+      });
       onClose();
     } catch (err) {
       alert('Errore salvataggio: ' + err.message);
