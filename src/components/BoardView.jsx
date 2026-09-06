@@ -13,6 +13,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   const [modalColId, setModalColId] = useState(null);
   const [activeColorPickerColId, setActiveColorPickerColId] = useState(null);
 
+  // Drag & Drop States per schede e colonne
   const [draggedCard, setDraggedCard] = useState(null);
   const [draggedColIndex, setDraggedColIndex] = useState(null);
   const [dragOverCardColId, setDragOverCardColId] = useState(null);
@@ -136,6 +137,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
+  // HANDLERS DRAG & DROP SCHEDE
   const handleCardDragStart = (e, card) => {
     if (isViewer) return;
     e.stopPropagation();
@@ -143,17 +145,26 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     setDraggedColIndex(null);
   };
 
+  const handleCardDragOverCol = (e, columnId) => {
+    if (isViewer || !draggedCard) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverCardColId(columnId);
+  };
+
   const handleCardDrop = async (e, targetColumnId) => {
-    if (isViewer) return;
+    if (isViewer || !draggedCard) return;
     e.preventDefault();
     e.stopPropagation();
     setDragOverCardColId(null);
 
-    if (!draggedCard) return;
-
     const sourceColId = draggedCard.column_id;
-    if (String(sourceColId) === String(targetColumnId)) return;
+    if (String(sourceColId) === String(targetColumnId)) {
+      setDraggedCard(null);
+      return;
+    }
 
+    // Aggiornamento ottimistico dello stato locale
     const updatedCards = cards.map((c) =>
       c.id === draggedCard.id ? { ...c, column_id: String(targetColumnId) } : c
     );
@@ -166,12 +177,13 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         .eq('id', draggedCard.id);
     } catch (err) {
       console.error('Errore spostamento scheda:', err);
-      fetchBoardData();
+      fetchBoardData(); // Rollback
     } finally {
       setDraggedCard(null);
     }
   };
 
+  // HANDLERS DRAG & DROP COLONNE
   const handleColDragStart = (e, index) => {
     if (isViewer) return;
     setDraggedColIndex(index);
@@ -179,9 +191,9 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   };
 
   const handleColDragOver = (e, index) => {
-    if (isViewer) return;
+    if (isViewer || draggedCard) return;
     e.preventDefault();
-    if (draggedColIndex === null || draggedColIndex === index || draggedCard !== null) return;
+    if (draggedColIndex === null || draggedColIndex === index) return;
 
     const reordered = [...columns];
     const [movedCol] = reordered.splice(draggedColIndex, 1);
@@ -209,7 +221,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
   return (
     <div>
-      {/* UNICO HEADER PRINCIPALE IN ALTO */}
+      {/* HEADER BACHECA */}
       <div className="flex justify-between items-center mb-5 bg-white p-3 rounded-xl border shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-sm shadow-sm">
@@ -249,31 +261,32 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           return (
             <div
               key={col.id}
-              draggable={!isViewer}
+              draggable={!isViewer && !draggedCard}
               onDragStart={(e) => handleColDragStart(e, colIdx)}
               onDragOver={(e) => {
-                if (isViewer) return;
-                e.preventDefault();
                 if (draggedCard) {
-                  setDragOverCardColId(col.id);
+                  handleCardDragOverCol(e, col.id);
                 } else {
                   handleColDragOver(e, colIdx);
                 }
               }}
-              onDragLeave={() => setDragOverCardColId(null)}
+              onDragLeave={(e) => {
+                if (draggedCard && e.currentTarget.contains(e.relatedTarget)) return;
+                setDragOverCardColId(null);
+              }}
               onDrop={(e) => {
-                if (draggedCard && !isViewer) handleCardDrop(e, col.id);
+                if (draggedCard) handleCardDrop(e, col.id);
               }}
               onDragEnd={handleColDragEnd}
               className={`w-72 border rounded-xl overflow-hidden flex-shrink-0 shadow-sm transition-all duration-200 bg-slate-200/70 border-slate-300/70 ${
                 isColumnBeingDragged
                   ? 'border-2 border-dashed border-blue-500 opacity-60 scale-95'
                   : isTargetCardCol
-                  ? 'bg-blue-50/80 border-blue-400 ring-2 ring-blue-300'
+                  ? 'bg-blue-100/80 border-blue-500 ring-2 ring-blue-300'
                   : ''
               }`}
             >
-              {/* HEADER SPECIFICO DELLA COLONNA */}
+              {/* HEADER COLONNA */}
               <div className={`p-3 flex justify-between items-center text-white relative ${colBgColor} ${!isViewer ? 'cursor-grab active:cursor-grabbing' : ''}`}>
                 <h3 className="font-bold text-base flex items-center gap-1.5 truncate">
                   {!isViewer && <span className="opacity-60 text-sm flex-shrink-0">⋮⋮</span>}
@@ -326,59 +339,64 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
               </div>
 
               {/* SCHEDE DELLA COLONNA */}
-              <div className="p-2.5">
-                {colCards.length > 0 && (
-                  <div className="space-y-2.5 mb-2">
-                    {colCards.map((card) => {
-                      const cardDetails = card.description || card.details;
-                      const isBeingDragged = draggedCard?.id === card.id;
+              <div className="p-2.5 min-h-[100px]">
+                <div className="space-y-2.5 mb-2">
+                  {colCards.map((card) => {
+                    const cardDetails = card.description || card.details;
+                    const isBeingDragged = draggedCard?.id === card.id;
 
-                      return (
-                        <div
-                          key={card.id}
-                          draggable={!isViewer}
-                          onDragStart={(e) => handleCardDragStart(e, card)}
-                          onClick={() => {
-                            setModalCard(card);
-                            setModalColId(col.id);
-                          }}
-                          className={`bg-white border border-slate-200 rounded-lg p-3.5 shadow-sm hover:border-blue-400 hover:shadow-md transition cursor-pointer relative ${
-                            isBeingDragged ? 'opacity-30 border-dashed border-blue-500' : ''
-                          }`}
-                        >
-                          <div className="flex justify-between items-start gap-2 mb-2">
-                            <h4 className="font-bold text-slate-900 text-base leading-snug flex-1">
-                              {card.title}
-                            </h4>
-                            {!isViewer && (
-                              <button
-                                onClick={(e) => handleDeleteCard(card.id, e)}
-                                title="Elimina scheda"
-                                className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-sm font-bold"
-                              >
-                                🗑️
-                              </button>
-                            )}
-                          </div>
-
-                          {cardDetails && (
-                            <p className="text-sm text-slate-600 line-clamp-3 mb-2 leading-relaxed">
-                              {cardDetails}
-                            </p>
-                          )}
-
-                          {card.attachments && card.attachments.length > 0 && (
-                            <div className="flex justify-end pt-1.5 border-t border-slate-100">
-                              <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200 font-medium">
-                                📎 {card.attachments.length}
-                              </span>
-                            </div>
+                    return (
+                      <div
+                        key={card.id}
+                        draggable={!isViewer}
+                        onDragStart={(e) => handleCardDragStart(e, card)}
+                        onClick={() => {
+                          setModalCard(card);
+                          setModalColId(col.id);
+                        }}
+                        className={`bg-white border border-slate-200 rounded-lg p-3.5 shadow-sm hover:border-blue-400 hover:shadow-md transition cursor-pointer relative ${
+                          isBeingDragged ? 'opacity-25 border-dashed border-blue-500 scale-95' : ''
+                        }`}
+                      >
+                        <div className="flex justify-between items-start gap-2 mb-2">
+                          <h4 className="font-bold text-slate-900 text-base leading-snug flex-1">
+                            {card.title}
+                          </h4>
+                          {!isViewer && (
+                            <button
+                              onClick={(e) => handleDeleteCard(card.id, e)}
+                              title="Elimina scheda"
+                              className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-sm font-bold"
+                            >
+                              🗑️
+                            </button>
                           )}
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+
+                        {cardDetails && (
+                          <p className="text-sm text-slate-600 line-clamp-3 mb-2 leading-relaxed">
+                            {cardDetails}
+                          </p>
+                        )}
+
+                        {card.attachments && card.attachments.length > 0 && (
+                          <div className="flex justify-end pt-1.5 border-t border-slate-100">
+                            <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200 font-medium">
+                              📎 {card.attachments.length}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* SEGNAPOSTO VISIVO (PLACEHOLDER) DURANTE IL DRAG */}
+                  {isTargetCardCol && draggedCard && String(draggedCard.column_id) !== String(col.id) && (
+                    <div className="border-2 border-dashed border-blue-500 bg-blue-50/90 rounded-lg p-4 text-center text-blue-700 text-xs font-bold transition-all duration-200 shadow-inner flex items-center justify-center gap-2">
+                      <span className="text-base">📍</span> Rilascia qui per spostare
+                    </div>
+                  )}
+                </div>
 
                 {!isViewer && (
                   <button
@@ -386,7 +404,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                       setModalCard(null);
                       setModalColId(col.id);
                     }}
-                    className="w-full py-2 px-3 rounded-lg border border-dashed border-slate-300 bg-white hover:border-blue-400 text-slate-600 hover:text-blue-600 font-semibold text-xs transition flex items-center justify-center gap-1.5 shadow-sm"
+                    className="w-full py-2 px-3 rounded-lg border border-dashed border-slate-300 bg-white hover:border-blue-400 text-slate-600 hover:text-blue-600 font-semibold text-xs transition flex items-center justify-center gap-1.5 shadow-sm mt-2"
                   >
                     <span>+</span> Aggiungi scheda
                   </button>
@@ -396,7 +414,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           );
         })}
 
-        {/* BOX CREAZIONE NUOVA COLONNA */}
+        {/* BOX NUOVA COLONNA */}
         {!isViewer && (
           <div className="w-72 bg-white border-2 border-dashed border-slate-300 rounded-xl p-3 flex-shrink-0">
             <input
