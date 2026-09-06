@@ -51,8 +51,10 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
 
       if (error) throw error;
 
-      setMembers((prev) => [...prev, data[0]]);
-      setEmailToInvite('');
+      if (data && data.length > 0) {
+        setMembers((prev) => [...prev, data[0]]);
+        setEmailToInvite('');
+      }
     } catch (err) {
       alert('Errore invito: ' + err.message);
     } finally {
@@ -82,7 +84,6 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
     }
   };
 
-  // SALVATAGGIO ESPLICITO DEI RUOLI SU DB
   const handleSaveChanges = async () => {
     setSaving(true);
     try {
@@ -94,6 +95,7 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
       }
       alert('Privilegi aggiornati con successo!');
       onClose();
+      window.location.reload();
     } catch (err) {
       alert('Errore salvataggio ruoli: ' + err.message);
     } finally {
@@ -155,8 +157,8 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
                   key={member.id}
                   className="flex justify-between items-center bg-slate-50 border border-slate-200 p-2.5 rounded-lg"
                 >
-                  <span className="font-medium text-slate-700 text-xs truncate max-w-[200px]">
-                    {member.invited_email || member.user_email || 'Collaboratore'}
+                  <span className="font-semibold text-slate-800 text-xs truncate max-w-[200px]">
+                    {member.invited_email || 'Collaboratore'}
                   </span>
 
                   <div className="flex items-center gap-3">
