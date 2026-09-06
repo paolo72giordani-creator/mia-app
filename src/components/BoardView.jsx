@@ -6,7 +6,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   const [columns, setColumns] = useState([]);
   const [cards, setCards] = useState([]);
   const [newColumnName, setNewColumnName] = useState('');
-  
+
   // Stato per la modale (modifica o creazione)
   const [modalCard, setModalCard] = useState(null);
   const [modalColId, setModalColId] = useState(null);
@@ -76,6 +76,27 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
+  // ELIMINAZIONE COLONNA
+  const handleDeleteColumn = async (columnId, colName, e) => {
+    e.stopPropagation();
+    if (!window.confirm(`Sei sicuro di voler eliminare la colonna "${colName}" e tutte le sue schede?`)) return;
+
+    try {
+      // 1. Elimina le schede della colonna dal DB
+      await supabase.from('cards').delete().eq('column_id', String(columnId));
+
+      // 2. Elimina la colonna
+      const { error } = await supabase.from('columns').delete().eq('id', columnId);
+      if (error) throw error;
+
+      // 3. Aggiorna stato locale
+      setColumns((prev) => prev.filter((c) => c.id !== columnId));
+      setCards((prev) => prev.filter((c) => String(c.column_id) !== String(columnId)));
+    } catch (err) {
+      alert('Errore eliminazione colonna: ' + err.message);
+    }
+  };
+
   // Salva o aggiorna scheda gestito dalla modale
   const handleSaveCardFromModal = (savedCard, isNew) => {
     if (isNew) {
@@ -98,7 +119,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // Drag & Drop
+  // Drag & Drop Handlers
   const handleCardDragStart = (e, card) => {
     e.stopPropagation();
     setDraggedCard(card);
@@ -220,14 +241,25 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   : ''
               }`}
             >
-              {/* HEADER COLONNA COLORATO */}
+              {/* HEADER COLONNA COLORATO CON PULSANTE ELIMINA */}
               <div className={`p-3 flex justify-between items-center cursor-grab active:cursor-grabbing ${headerColorStyle}`}>
-                <h3 className="font-bold text-base flex items-center gap-1.5">
-                  <span className="opacity-60 text-sm">⋮⋮</span> {col.name}
+                <h3 className="font-bold text-base flex items-center gap-1.5 truncate">
+                  <span className="opacity-60 text-sm flex-shrink-0">⋮⋮</span>
+                  <span className="truncate">{col.name}</span>
                 </h3>
-                <span className="text-xs bg-white/20 text-white font-bold px-2.5 py-0.5 rounded-full border border-white/20">
-                  {colCards.length}
-                </span>
+                
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs bg-white/20 text-white font-bold px-2 py-0.5 rounded-full border border-white/20">
+                    {colCards.length}
+                  </span>
+                  <button
+                    onClick={(e) => handleDeleteColumn(col.id, col.name, e)}
+                    title="Elimina colonna"
+                    className="text-white/70 hover:text-white hover:bg-white/20 transition p-1 rounded font-bold text-xs"
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
 
               {/* CONTENUTO COLONNA */}
@@ -289,10 +321,10 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   </div>
                 )}
 
-                {/* BOTTONE AGGIUNGI SCHEDA DIRECTO IN MODALE */}
+                {/* BOTTONE AGGIUNGI SCHEDA */}
                 <button
                   onClick={() => {
-                    setModalCard(null); // Scheda nuova
+                    setModalCard(null);
                     setModalColId(col.id);
                   }}
                   className="w-full py-2 px-3 rounded-lg border border-dashed border-slate-300 bg-white hover:border-blue-400 text-slate-600 hover:text-blue-600 font-semibold text-xs transition flex items-center justify-center gap-1.5 shadow-sm"
@@ -323,7 +355,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         </div>
       </div>
 
-      {/* POP-UP UNICO DETTAGLI / NUOVA SCHEDA */}
+      {/* MODALE SCHEDA */}
       {(modalCard !== null || modalColId !== null) && (
         <CardDetailModal
           card={modalCard}
