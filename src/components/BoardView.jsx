@@ -15,7 +15,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
   const fetchBoardData = async () => {
     try {
-      // 1. Carica le colonne della bacheca
       const { data: cols, error: colErr } = await supabase
         .from('columns')
         .select('*')
@@ -27,8 +26,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
       if (cols && cols.length > 0) {
         const colIds = cols.map((c) => String(c.id));
-
-        // 2. Carica tutte le schede che appartengono a queste colonne
         const { data: crds, error: cardErr } = await supabase
           .from('cards')
           .select('*, attachments(*)')
@@ -110,67 +107,87 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   return (
     <div>
       {/* BARRA SUPERIORE VISTA BACHECA */}
-      <div className="flex justify-between items-center mb-4 bg-white p-2.5 rounded-lg border shadow-sm">
+      <div className="flex justify-between items-center mb-5 bg-white p-3 rounded-xl border shadow-sm">
         <div className="flex items-center gap-3">
           <button onClick={onBack} className="text-blue-600 hover:underline font-medium text-xs">
             ← Dashboard
           </button>
-          <h2 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+          <h2 className="font-bold text-base text-slate-800 flex items-center gap-2">
             {activeBoard?.title}
-            <span className="text-[10px] font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded border">
+            <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border">
               Proprietario: {activeBoard?.ownerEmail}
             </span>
           </h2>
         </div>
-        <button onClick={onOpenShare} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded font-medium text-xs">
+        <button onClick={onOpenShare} className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-medium text-xs shadow-sm">
           Condividi
         </button>
       </div>
 
-      {/* AREA COLONNE KANBAN */}
-      <div className="flex gap-3 overflow-x-auto pb-4 items-start">
+      {/* AREA COLONNE KANBAN (LARGHEZZA AUMENTATA) */}
+      <div className="flex gap-4 overflow-x-auto pb-6 items-start">
         {columns.map((col) => {
           const colCards = cards.filter((c) => String(c.column_id) === String(col.id));
 
           return (
-            <div key={col.id} className="w-60 bg-slate-200/60 border rounded-lg p-2.5 flex-shrink-0">
-              <div className="flex justify-between items-center mb-2">
-                <h3 className="font-bold text-slate-700 text-xs">{col.name}</h3>
-                <span className="text-[10px] bg-slate-300 text-slate-600 font-bold px-1.5 py-0.2 rounded-full">
+            <div key={col.id} className="w-72 bg-slate-200/70 border border-slate-300/70 rounded-xl p-3 flex-shrink-0 shadow-sm">
+              {/* HEADER COLONNA */}
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="font-bold text-slate-800 text-sm">{col.name}</h3>
+                <span className="text-xs bg-slate-300/80 text-slate-700 font-bold px-2 py-0.5 rounded-full">
                   {colCards.length}
                 </span>
               </div>
 
-              {/* LISTA SCHEDE CLICCABILI */}
-              <div className="space-y-1.5 mb-2 min-h-[30px]">
-                {colCards.map((card) => (
-                  <div
-                    key={card.id}
-                    onClick={() => setSelectedCard(card)}
-                    className="bg-white border rounded p-2 shadow-sm text-xs text-slate-800 font-medium cursor-pointer hover:border-blue-400 hover:shadow transition flex justify-between items-center"
-                  >
-                    <span className="truncate">{card.title}</span>
-                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-normal">
-                      {card.description && <span title="Ha una descrizione">📝</span>}
-                      {card.attachments && card.attachments.length > 0 && (
-                        <span>📎 {card.attachments.length}</span>
+              {/* LISTA SCHEDE PIÙ GRANDI */}
+              <div className="space-y-2.5 mb-3 min-h-[40px]">
+                {colCards.map((card) => {
+                  const cardDetails = card.description || card.details;
+
+                  return (
+                    <div
+                      key={card.id}
+                      onClick={() => setSelectedCard(card)}
+                      className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm hover:border-blue-400 hover:shadow transition cursor-pointer"
+                    >
+                      {/* TITOLO SCHEDA */}
+                      <h4 className="font-bold text-slate-800 text-xs mb-1 leading-snug">{card.title}</h4>
+
+                      {/* ESTRATTO DETTAGLI/DESCRIZIONE */}
+                      {cardDetails && (
+                        <p className="text-[11px] text-slate-500 line-clamp-2 mb-2 leading-relaxed">
+                          {cardDetails}
+                        </p>
                       )}
+
+                      {/* FOOTER SCHEDA: ICONA DETTAGLI + SIMBOLO E CONTEGGIO ALLEGATI */}
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium pt-1 border-t border-slate-100">
+                        <span>{cardDetails ? '📝 Con note' : ''}</span>
+                        {card.attachments && card.attachments.length > 0 && (
+                          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 border border-slate-200">
+                            📎 {card.attachments.length}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
-              {/* FORM NUOVA SCHEDA */}
-              <div className="flex gap-1 pt-1.5 border-t border-slate-300/60">
+              {/* FORM NUOVA SCHEDA INGRANDITO */}
+              <div className="flex gap-1.5 pt-2 border-t border-slate-300/70">
                 <input
                   type="text"
                   placeholder="Nuova scheda..."
                   value={newCardTitles[col.id] || ''}
                   onChange={(e) => setNewCardTitles({ ...newCardTitles, [col.id]: e.target.value })}
                   onKeyDown={(e) => e.key === 'Enter' && handleAddCard(col.id)}
-                  className="w-full bg-white border rounded px-2 py-1 text-xs focus:outline-none focus:border-blue-500"
+                  className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 shadow-inner"
                 />
-                <button onClick={() => handleAddCard(col.id)} className="bg-blue-600 text-white px-2 py-1 rounded font-bold">
+                <button
+                  onClick={() => handleAddCard(col.id)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm transition"
+                >
                   +
                 </button>
               </div>
@@ -178,18 +195,21 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           );
         })}
 
-        {/* AGGIUNGI NUOVA COLONNA */}
-        <div className="w-60 bg-white border-2 border-dashed rounded-lg p-2.5 flex-shrink-0">
+        {/* FORM NUOVA COLONNA INGRANDITO */}
+        <div className="w-72 bg-white border-2 border-dashed border-slate-300 rounded-xl p-3 flex-shrink-0">
           <input
             type="text"
-            placeholder="Nuova colonna..."
+            placeholder="Nome nuova colonna..."
             value={newColumnName}
             onChange={(e) => setNewColumnName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAddColumn()}
-            className="w-full border rounded px-2 py-1 text-xs mb-1.5 focus:outline-none focus:border-blue-500"
+            className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs mb-2 text-slate-800 focus:outline-none focus:border-blue-500"
           />
-          <button onClick={handleAddColumn} className="w-full bg-slate-800 text-white font-medium py-1 rounded text-xs">
-            + Colonna
+          <button
+            onClick={handleAddColumn}
+            className="w-full bg-slate-800 hover:bg-slate-900 text-white font-medium py-1.5 rounded-lg text-xs transition"
+          >
+            + Aggiungi Colonna
           </button>
         </div>
       </div>
