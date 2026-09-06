@@ -7,7 +7,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   const [cards, setCards] = useState([]);
   const [newColumnName, setNewColumnName] = useState('');
 
-  // Determina se l'utente corrente è un semplice spettatore
   const isViewer = activeBoard?.role === 'viewer';
 
   const [modalCard, setModalCard] = useState(null);
@@ -137,7 +136,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // Drag & Drop limitati a non-viewer
   const handleCardDragStart = (e, card) => {
     if (isViewer) return;
     e.stopPropagation();
@@ -211,10 +209,13 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
   return (
     <div>
-      {/* BARRA SUPERIORE */}
+      {/* UNICO HEADER PRINCIPALE IN ALTO */}
       <div className="flex justify-between items-center mb-5 bg-white p-3 rounded-xl border shadow-sm">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="text-blue-600 hover:underline font-medium text-xs">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-sm shadow-sm">
+            D
+          </div>
+          <button onClick={onBack} className="text-blue-600 hover:underline font-bold text-xs">
             ← Dashboard
           </button>
           <h2 className="font-bold text-base text-slate-800 flex items-center gap-2">
@@ -272,36 +273,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   : ''
               }`}
             >
-			
-			{/* BARRA SUPERIORE CON BRAND LOGO */}
-      <div className="flex justify-between items-center mb-5 bg-white p-3 rounded-xl border shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-xs shadow-sm">
-            D
-          </div>
-          <button onClick={onBack} className="text-blue-600 hover:underline font-bold text-xs mr-2">
-            ← Dashboard
-          </button>
-          <h2 className="font-bold text-base text-slate-800 flex items-center gap-2">
-            {activeBoard?.title}
-            <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border">
-              Proprietario: {activeBoard?.ownerEmail}
-            </span>
-            {isViewer && (
-              <span className="text-xs bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-300 font-semibold">
-                👁️ Sola Lettura
-              </span>
-            )}
-          </h2>
-        </div>
-        {!isViewer && (
-          <button onClick={onOpenShare} className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-medium text-xs shadow-sm">
-            Condividi
-          </button>
-        )}
-      </div>
-			
-              {/* HEADER COLONNA */}
+              {/* HEADER SPECIFICO DELLA COLONNA */}
               <div className={`p-3 flex justify-between items-center text-white relative ${colBgColor} ${!isViewer ? 'cursor-grab active:cursor-grabbing' : ''}`}>
                 <h3 className="font-bold text-base flex items-center gap-1.5 truncate">
                   {!isViewer && <span className="opacity-60 text-sm flex-shrink-0">⋮⋮</span>}
@@ -353,7 +325,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                 )}
               </div>
 
-              {/* CONTENUTO COLONNA */}
+              {/* SCHEDE DELLA COLONNA */}
               <div className="p-2.5">
                 {colCards.length > 0 && (
                   <div className="space-y-2.5 mb-2">
@@ -408,7 +380,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   </div>
                 )}
 
-                {/* BOTTONE AGGIUNGI SCHEDA (SOLO SE NON VIEWER) */}
                 {!isViewer && (
                   <button
                     onClick={() => {
@@ -425,7 +396,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           );
         })}
 
-        {/* BOX AGGIUNGI COLONNA (SOLO SE NON VIEWER) */}
+        {/* BOX CREAZIONE NUOVA COLONNA */}
         {!isViewer && (
           <div className="w-72 bg-white border-2 border-dashed border-slate-300 rounded-xl p-3 flex-shrink-0">
             <input
@@ -446,8 +417,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         )}
       </div>
 
-      {/* MODALE SCHEDA */}
-      {(modalCard !== null || modalColId !== null) && (
+      {modalCard !== null || modalColId !== null ? (
         <CardDetailModal
           card={modalCard}
           columnId={modalColId}
@@ -459,7 +429,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           onSaveCard={handleSaveCardFromModal}
           onDeleteCard={(id) => handleDeleteCard(id)}
         />
-      )}
+      ) : null}
     </div>
   );
 }
