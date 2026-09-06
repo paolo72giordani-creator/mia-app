@@ -7,6 +7,7 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (activeBoard) fetchMembers();
@@ -42,7 +43,7 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
       const newMember = {
         id: `bm-${Date.now()}`,
         board_id: activeBoard.id,
-        user_id: session?.user?.id || null, // Include l'ID utente che crea l'invito
+        user_id: session?.user?.id || null,
         invited_email: targetEmail,
         role: selectedRole
       };
@@ -57,6 +58,7 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
       if (data && data.length > 0) {
         setMembers((prev) => [...prev, data[0]]);
         setEmailToInvite('');
+        alert(`Invito registrato per ${targetEmail}! Invia il link al collaboratore per farlo accedere.`);
       }
     } catch (err) {
       alert('Errore invito: ' + err.message);
@@ -106,6 +108,12 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
     }
   };
 
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.origin);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-3 z-50 text-xs">
       <div className="bg-white border rounded-xl w-full max-w-lg p-5 shadow-2xl">
@@ -115,6 +123,19 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
           </h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-sm">
             ✕
+          </button>
+        </div>
+
+        {/* COPY LINK RAPIDO */}
+        <div className="mb-4 bg-slate-50 border p-2.5 rounded-lg flex justify-between items-center">
+          <span className="text-[11px] text-slate-600 font-medium truncate">
+            {window.location.origin}
+          </span>
+          <button
+            onClick={handleCopyLink}
+            className="bg-slate-800 hover:bg-slate-900 text-white font-bold px-2.5 py-1 rounded text-[10px] transition"
+          >
+            {copied ? 'Copaito! ✓' : 'Copia Link App'}
           </button>
         </div>
 
