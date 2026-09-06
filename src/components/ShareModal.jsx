@@ -37,9 +37,12 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
 
     setLoading(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+
       const newMember = {
         id: `bm-${Date.now()}`,
         board_id: activeBoard.id,
+        user_id: session?.user?.id || null, // Include l'ID utente che crea l'invito
         invited_email: targetEmail,
         role: selectedRole
       };
