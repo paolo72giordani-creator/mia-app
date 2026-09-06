@@ -146,7 +146,6 @@ export default function App() {
           {/* HEADER DASHBOARD CON LOGO E TITOLO BRAND */}
           <div className="bg-white p-4 rounded-xl border shadow-sm mb-6 flex justify-between items-center">
             <div className="flex items-center gap-3">
-              {/* BRAND LOGO */}
               <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/20">
                 D
               </div>
@@ -172,10 +171,10 @@ export default function App() {
               {!isCreatingBoard ? (
                 <button
                   onClick={() => setIsCreatingBoard(true)}
-                  className="w-full h-full flex flex-col items-center justify-center text-blue-600 hover:text-blue-700 font-bold text-xs gap-1"
+                  className="w-full h-full flex flex-col items-center justify-center text-blue-600 hover:text-blue-700 font-bold text-sm gap-1"
                 >
-                  <span className="text-2xl">+</span>
-                  <span>Nuova Bacheca</span>
+                  <span className="text-3xl">+</span>
+                  <span className="font-extrabold text-sm">Nuova Bacheca</span>
                 </button>
               ) : (
                 <div className="w-full h-full flex flex-col justify-center space-y-2">
@@ -186,7 +185,7 @@ export default function App() {
                     onChange={(e) => setNewBoardTitle(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleCreateBoard()}
                     autoFocus
-                    className="w-full border rounded-lg px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500"
+                    className="w-full border rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500"
                   />
                   <div className="flex gap-1 justify-center">
                     <button
@@ -206,7 +205,7 @@ export default function App() {
               )}
             </div>
 
-            {/* CARD BACHECHE SALVATE QUADRATE */}
+            {/* CARD BACHECHE SALVATE CON TITOLO PIÙ GRANDE */}
             {boards.map((board) => (
               <div
                 key={board.id}
@@ -214,14 +213,14 @@ export default function App() {
                 className="aspect-square bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition cursor-pointer relative flex flex-col justify-between"
               >
                 <div className="flex justify-between items-start gap-1">
-                  <h3 className="font-bold text-sm text-slate-800 leading-snug line-clamp-3">
+                  <h3 className="font-extrabold text-lg text-slate-900 leading-snug line-clamp-3">
                     {board.title}
                   </h3>
                   {board.isOwner && (
                     <button
                       onClick={(e) => handleDeleteBoard(board.id, board.title, e)}
                       title="Elimina bacheca"
-                      className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-xs font-bold flex-shrink-0"
+                      className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-base font-bold flex-shrink-0"
                     >
                       🗑️
                     </button>
