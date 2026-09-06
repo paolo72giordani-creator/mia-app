@@ -15,21 +15,33 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
   const fetchBoardData = async () => {
     try {
-      const { data: cols } = await supabase
+      // 1. Carica le colonne della bacheca
+      const { data: cols, error: colErr } = await supabase
         .from('columns')
         .select('*')
         .eq('board_id', activeBoard.id)
         .order('position', { ascending: true });
+
+      if (colErr) throw colErr;
       setColumns(cols || []);
 
-      const { data: crds } = await supabase
-        .from('cards')
-        .select('*, attachments(*)')
-        .eq('board_id', activeBoard.id)
-        .order('position', { ascending: true });
-      setCards(crds || []);
+      if (cols && cols.length > 0) {
+        const colIds = cols.map((c) => String(c.id));
+
+        // 2. Carica tutte le schede che appartengono a queste colonne
+        const { data: crds, error: cardErr } = await supabase
+          .from('cards')
+          .select('*, attachments(*)')
+          .in('column_id', colIds)
+          .order('position', { ascending: true });
+
+        if (cardErr) throw cardErr;
+        setCards(crds || []);
+      } else {
+        setCards([]);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Errore recupero dati bacheca:', err.message);
     }
   };
 
@@ -61,7 +73,8 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
       const newCard = {
         id: `card-${Date.now()}`,
         user_id: currentUser.id,
-        column_id: columnId,
+        column_id: String(columnId),
+        board_id: String(activeBoard.id),
         title: title,
         position: colCards.length
       };
@@ -70,12 +83,11 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
       if (error) throw error;
 
       if (data && data.length > 0) {
-        // Forza l'aggiornamento dello stato aggiungendo l'oggetto restituito da Supabase
-        setCards((prevCards) => [...prevCards, { ...data[0], attachments: [] }]);
+        setCards((prev) => [...prev, { ...data[0], attachments: [] }]);
         setNewCardTitles((prev) => ({ ...prev, [columnId]: '' }));
       }
     } catch (err) {
-      alert('Errore creazione scheda: ' + err.message);
+      alert('Errore scheda: ' + err.message);
     }
   };
 
@@ -118,8 +130,8 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
       {/* AREA COLONNE KANBAN */}
       <div className="flex gap-3 overflow-x-auto pb-4 items-start">
         {columns.map((col) => {
-          
-const colCards = cards.filter((c) => String(c.column_id) === String(col.id));
+          const colCards = cards.filter((c) => String(c.column_id) === String(col.id));
+
           return (
             <div key={col.id} className="w-60 bg-slate-200/60 border rounded-lg p-2.5 flex-shrink-0">
               <div className="flex justify-between items-center mb-2">
