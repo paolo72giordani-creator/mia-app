@@ -6,6 +6,7 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
   const [selectedRole, setSelectedRole] = useState('editor');
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (activeBoard) fetchMembers();
@@ -13,7 +14,6 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
 
   const fetchMembers = async () => {
     try {
-      // Recupera i membri dalla tabella board_members legati al loro email se disponibile
       const { data, error } = await supabase
         .from('board_members')
         .select('*')
@@ -26,21 +26,21 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
     }
   };
 
-  // INVITARE UN NUOVO COLLABORATORE
   const handleInvite = async () => {
     if (!emailToInvite.trim()) return;
-    if (emailToInvite.trim().toLowerCase() === currentUserEmail.toLowerCase()) {
+    const targetEmail = emailToInvite.trim().toLowerCase();
+
+    if (targetEmail === currentUserEmail.toLowerCase()) {
       alert('Non puoi invitare te stesso.');
       return;
     }
 
     setLoading(true);
     try {
-      // 1. Cerca l'user_id dell'utente invitato tramite la vista/tabella degli utenti o inserisci l'invito
       const newMember = {
         id: `bm-${Date.now()}`,
         board_id: activeBoard.id,
-        invited_email: emailToInvite.trim().toLowerCase(),
+        invited_email: targetEmail,
         role: selectedRole
       };
 
@@ -53,7 +53,6 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
 
       setMembers((prev) => [...prev, data[0]]);
       setEmailToInvite('');
-      alert('Collaboratore aggiunto con successo!');
     } catch (err) {
       alert('Errore invito: ' + err.message);
     } finally {
@@ -61,27 +60,12 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
     }
   };
 
-  // CAMBIARE PRIVILEGIO (EDITOR / VIEWER) IN TEMPO REALE
-  const handleRoleChange = async (memberId, newRole) => {
-    try {
-      // Aggiornamento ottimistico locale
-      setMembers((prev) =>
-        prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m))
-      );
-
-      const { error } = await supabase
-        .from('board_members')
-        .update({ role: newRole })
-        .eq('id', memberId);
-
-      if (error) throw error;
-    } catch (err) {
-      alert('Errore aggiornamento ruolo: ' + err.message);
-      fetchMembers(); // Rollback in caso di errore
-    }
+  const handleLocalRoleChange = (memberId, newRole) => {
+    setMembers((prev) =>
+      prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m))
+    );
   };
 
-  // RIMUOVERE COLLABORATORE
   const handleRemoveMember = async (memberId) => {
     if (!window.confirm('Sei sicuro di voler rimuovere questo collaboratore?')) return;
 
@@ -98,6 +82,25 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
     }
   };
 
+  // SALVATAGGIO ESPLICITO DEI RUOLI SU DB
+  const handleSaveChanges = async () => {
+    setSaving(true);
+    try {
+      for (const m of members) {
+        await supabase
+          .from('board_members')
+          .update({ role: m.role })
+          .eq('id', m.id);
+      }
+      alert('Privilegi aggiornati con successo!');
+      onClose();
+    } catch (err) {
+      alert('Errore salvataggio ruoli: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-3 z-50 text-xs">
       <div className="bg-white border rounded-xl w-full max-w-lg p-5 shadow-2xl">
@@ -110,7 +113,7 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
           </button>
         </div>
 
-        {/* FORM DI INVITO */}
+        {/* FORM INVITO */}
         <div className="flex gap-2 mb-5">
           <input
             type="email"
@@ -137,8 +140,8 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
           </button>
         </div>
 
-        {/* LISTA COLLABORATORI ATTIVI */}
-        <div>
+        {/* LISTA COLLABORATORI */}
+        <div className="mb-5">
           <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">
             Collaboratori Attivi ({members.length})
           </h4>
@@ -153,14 +156,13 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
                   className="flex justify-between items-center bg-slate-50 border border-slate-200 p-2.5 rounded-lg"
                 >
                   <span className="font-medium text-slate-700 text-xs truncate max-w-[200px]">
-                    {member.invited_email || member.user_email || 'Utente'}
+                    {member.invited_email || member.user_email || 'Collaboratore'}
                   </span>
 
                   <div className="flex items-center gap-3">
-                    {/* SELETTORE RUOLO IN TEMPO REALE */}
                     <select
                       value={member.role || 'viewer'}
-                      onChange={(e) => handleRoleChange(member.id, e.target.value)}
+                      onChange={(e) => handleLocalRoleChange(member.id, e.target.value)}
                       className="border border-slate-300 rounded px-2 py-1 text-xs bg-white font-semibold text-slate-700 focus:outline-none focus:border-blue-500"
                     >
                       <option value="editor">Editor</option>
@@ -178,6 +180,20 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
               ))
             )}
           </div>
+        </div>
+
+        {/* AZIONI SALVATAGGIO */}
+        <div className="flex justify-end gap-2 pt-3 border-t">
+          <button onClick={onClose} className="border px-3.5 py-1.5 rounded-lg text-slate-600 font-medium">
+            Annulla
+          </button>
+          <button
+            onClick={handleSaveChanges}
+            disabled={saving}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg font-bold shadow-sm transition"
+          >
+            {saving ? 'Salvataggio...' : 'Salva Modifiche'}
+          </button>
         </div>
       </div>
     </div>

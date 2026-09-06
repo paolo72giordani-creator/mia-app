@@ -39,10 +39,11 @@ export default function App() {
       if (ownedErr) throw ownedErr;
 
       // 2. Bacheche condivise con il rispettivo ruolo
+      // 2. Cerca le bacheche condivise per il mio user_id OPPURE per la mia email
       const { data: memberEntries, error: memberErr } = await supabase
         .from('board_members')
-        .select('board_id, role')
-        .eq('user_id', session.user.id);
+        .select('board_id, role, invited_email')
+        .or(`user_id.eq.${session.user.id},invited_email.eq.${session.user.email.toLowerCase()}`);
 
       if (memberErr) throw memberErr;
 
@@ -60,7 +61,7 @@ export default function App() {
             const memberInfo = memberEntries.find((m) => String(m.board_id) === String(board.id));
             return {
               ...board,
-              role: memberInfo?.role || 'viewer' // Fallback a viewer se non specificato
+              role: memberInfo?.role || 'viewer'
             };
           });
         }
