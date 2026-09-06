@@ -48,7 +48,6 @@ export default function App() {
     }
   };
 
-  // Creazione Nuova Bacheca
   const handleCreateBoard = async () => {
     if (!newBoardTitle.trim() || !session?.user) return;
     try {
@@ -63,7 +62,7 @@ export default function App() {
 
       if (data && data.length > 0) {
         const created = { ...data[0], isOwner: true, ownerEmail: session.user.email };
-        setBoards((prev) => [...prev, created]);
+        setBoards((prev) => [created, ...prev]);
         setNewBoardTitle('');
         setIsCreatingBoard(false);
       }
@@ -72,7 +71,6 @@ export default function App() {
     }
   };
 
-  // Drag & Drop Dashboard
   const handleDragStart = (e, index) => { setDraggedBoardIndex(index); e.dataTransfer.effectAllowed = 'move'; };
   const handleDragOver = (e, index) => {
     e.preventDefault();
@@ -95,19 +93,53 @@ export default function App() {
       <main className="p-6 max-w-6xl mx-auto">
         {!activeBoardId ? (
           <div>
-            {/* INTESTAZIONE DASHBOARD */}
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-base font-bold text-slate-800">Le Mie Bacheche</h2>
-              <button
-                onClick={() => setIsCreatingBoard(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-medium text-xs shadow-sm transition"
-              >
-                + Nuova Bacheca
-              </button>
+              <h2 className="text-lg font-bold text-slate-900">Le Mie Bacheche</h2>
             </div>
 
-            {/* GRIGLIA BACHECHE CON CARD PIÙ GRANDI */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {/* GRIGLIA BACHECHE CON CARD QUADRATE */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {/* BOX AGGIUNGI BACHECA COME PRIMO ELEMENTO */}
+              {isCreatingBoard ? (
+                <div className="rounded-2xl p-6 border-2 border-blue-500 bg-white shadow-md flex flex-col justify-between aspect-square">
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-base mb-2">Nuova Bacheca</h3>
+                    <input
+                      type="text"
+                      placeholder="Titolo bacheca..."
+                      value={newBoardTitle}
+                      onChange={(e) => setNewBoardTitle(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleCreateBoard()}
+                      autoFocus
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs mb-3 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setIsCreatingBoard(false); setNewBoardTitle(''); }}
+                      className="flex-1 py-2 border rounded-lg text-slate-600 hover:bg-slate-50 transition text-xs font-semibold"
+                    >
+                      Annulla
+                    </button>
+                    <button
+                      onClick={handleCreateBoard}
+                      className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-sm transition text-xs"
+                    >
+                      Crea
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  onClick={() => setIsCreatingBoard(true)}
+                  className="cursor-pointer rounded-2xl p-6 border-2 border-dashed border-slate-300 bg-white/70 hover:bg-white hover:border-blue-500 hover:shadow-lg transition flex flex-col items-center justify-center aspect-square text-slate-500 hover:text-blue-600"
+                >
+                  <span className="text-4xl font-light mb-2 text-blue-600">+</span>
+                  <span className="font-bold text-sm">Crea Nuova Bacheca</span>
+                </div>
+              )}
+
+              {/* LISTA BACHECHE ESISTENTI */}
               {boards.map((board, index) => (
                 <BoardCard
                   key={board.id}
@@ -119,44 +151,6 @@ export default function App() {
                   onDragEnd={() => setDraggedBoardIndex(null)}
                 />
               ))}
-
-              {/* CARD CREAZIONE NUOVA BACHECA */}
-              {isCreatingBoard ? (
-                <div className="rounded-xl p-4 border-2 border-blue-400 bg-white shadow-md flex flex-col justify-between">
-                  <h3 className="font-bold text-slate-800 text-sm mb-3">Crea Bacheca</h3>
-                  <input
-                    type="text"
-                    placeholder="Nome della bacheca..."
-                    value={newBoardTitle}
-                    onChange={(e) => setNewBoardTitle(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateBoard()}
-                    autoFocus
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs mb-3 focus:outline-none focus:border-blue-500"
-                  />
-                  <div className="flex justify-end gap-2">
-                    <button
-                      onClick={() => { setIsCreatingBoard(false); setNewBoardTitle(''); }}
-                      className="px-3 py-1.5 border rounded-lg text-slate-600 hover:bg-slate-50 transition"
-                    >
-                      Annulla
-                    </button>
-                    <button
-                      onClick={handleCreateBoard}
-                      className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition"
-                    >
-                      Crea
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  onClick={() => setIsCreatingBoard(true)}
-                  className="cursor-pointer rounded-xl p-5 border-2 border-dashed border-slate-300 bg-white/60 hover:bg-white hover:border-blue-400 hover:shadow-md transition flex flex-col items-center justify-center min-h-[130px] text-slate-500 hover:text-blue-600"
-                >
-                  <span className="text-2xl font-light mb-1">+</span>
-                  <span className="font-semibold text-xs">Aggiungi Bacheca</span>
-                </div>
-              )}
             </div>
           </div>
         ) : (
