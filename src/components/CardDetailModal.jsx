@@ -25,6 +25,7 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
     }
   };
 
+  // CARICAMENTO ALLEGATI
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -71,6 +72,24 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
         setUploading(false);
       }
     }
+  };
+
+  // ELIMINAZIONE ALLEGATO SALVATO SU DB
+  const handleDeleteAttachment = async (attId) => {
+    if (!window.confirm('Vuoi rimuovere questo allegato?')) return;
+
+    try {
+      const { error } = await supabase.from('attachments').delete().eq('id', attId);
+      if (error) throw error;
+      setAttachments((prev) => prev.filter((a) => a.id !== attId));
+    } catch (err) {
+      alert('Errore eliminazione allegato: ' + err.message);
+    }
+  };
+
+  // RIMOZIONE FILE IN ATTESA (NUOVA SCHEDA)
+  const handleRemovePendingFile = (index) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSave = async () => {
@@ -199,20 +218,40 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
         {/* ALLEGATI */}
         <div className="mb-4">
           <label className="block text-[10px] font-semibold text-slate-500 mb-1">Allegati</label>
-          <div className="space-y-1 mb-2 max-h-24 overflow-y-auto">
+          <div className="space-y-1.5 mb-2 max-h-28 overflow-y-auto">
+            {/* ALLEGATI GIÀ SALVATI */}
             {attachments.map((att) => (
               <div key={att.id} className="flex justify-between items-center bg-slate-50 p-1.5 rounded border text-[11px]">
-                <span className="truncate max-w-[200px] font-medium text-slate-700">{att.file_name}</span>
-                <a href={att.file_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-medium">
-                  Apri ↗
-                </a>
+                <span className="truncate max-w-[180px] font-medium text-slate-700">📎 {att.file_name}</span>
+                <div className="flex items-center gap-2">
+                  <a href={att.file_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-medium">
+                    Apri ↗
+                  </a>
+                  <button
+                    onClick={() => handleDeleteAttachment(att.id)}
+                    title="Elimina allegato"
+                    className="text-slate-400 hover:text-red-600 transition p-0.5 rounded"
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
             ))}
 
+            {/* ALLEGATI IN ATTESA (PER NUOVE SCHEDE) */}
             {pendingFiles.map((f, idx) => (
               <div key={idx} className="flex justify-between items-center bg-blue-50/60 p-1.5 rounded border border-blue-200 text-[11px]">
-                <span className="truncate max-w-[200px] font-medium text-slate-700">📎 {f.name}</span>
-                <span className="text-[10px] text-blue-600 font-semibold">(In attesa)</span>
+                <span className="truncate max-w-[180px] font-medium text-slate-700">📎 {f.name}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-blue-600 font-semibold">(In attesa)</span>
+                  <button
+                    onClick={() => handleRemovePendingFile(idx)}
+                    title="Rimuovi"
+                    className="text-slate-400 hover:text-red-600 font-bold transition px-1"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             ))}
 
@@ -236,7 +275,7 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
               }}
               className="text-red-500 hover:underline text-[11px] font-medium"
             >
-              Elimina
+              Elimina Scheda
             </button>
           ) : <div />}
 
