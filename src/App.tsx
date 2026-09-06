@@ -30,7 +30,7 @@ export default function App() {
   const fetchBoards = async () => {
     if (!session?.user) return;
     try {
-      // 1. Recupera le bacheche di cui sono proprietario (dalla Vista Dinamica)
+      // 1. Bacheche di mia proprietà
       const { data: owned, error: ownedErr } = await supabase
         .from('boards_with_owners')
         .select('*')
@@ -38,10 +38,10 @@ export default function App() {
 
       if (ownedErr) throw ownedErr;
 
-      // 2. Recupera gli ID delle bacheche condivise con me
+      // 2. Bacheche condivise con il rispettivo ruolo
       const { data: memberEntries, error: memberErr } = await supabase
         .from('board_members')
-        .select('board_id')
+        .select('board_id, role')
         .eq('user_id', session.user.id);
 
       if (memberErr) throw memberErr;
@@ -50,30 +50,37 @@ export default function App() {
       if (memberEntries && memberEntries.length > 0) {
         const boardIds = memberEntries.map((m) => m.board_id);
 
-        // 3. Recupera le bacheche condivise (dalla Vista Dinamica con l'email reale del creatore)
         const { data: shared, error: sharedErr } = await supabase
           .from('boards_with_owners')
           .select('*')
           .in('id', boardIds);
 
-        if (!sharedErr) sharedList = shared || [];
+        if (!sharedErr && shared) {
+          sharedList = shared.map((board) => {
+            const memberInfo = memberEntries.find((m) => String(m.board_id) === String(board.id));
+            return {
+              ...board,
+              role: memberInfo?.role || 'viewer' // Fallback a viewer se non specificato
+            };
+          });
+        }
       }
 
-      // Mappatura totalmente dinamica
       setBoards([
         ...(owned || []).map((b) => ({
           ...b,
           isOwner: true,
-          ownerEmail: b.owner_email // Lettura dinamica dal DB
+          role: 'owner',
+          ownerEmail: b.owner_email
         })),
         ...(sharedList || []).map((b) => ({
           ...b,
           isOwner: false,
-          ownerEmail: b.owner_email // Lettura dinamica dell'email del proprietario originale
+          ownerEmail: b.owner_email
         }))
       ]);
     } catch (err) {
-      console.error('Errore recupero bacheche dinamiche:', err.message);
+      console.error('Errore recupero bacheche:', err.message);
     }
   };
 

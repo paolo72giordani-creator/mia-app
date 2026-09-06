@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
-export default function CardDetailModal({ card, columnId, onClose, onSaveCard, onDeleteCard }) {
+export default function CardDetailModal({ card, columnId, isViewer = false, onClose, onSaveCard, onDeleteCard }) {
   const isNew = !card?.id;
   const [title, setTitle] = useState(card?.title || '');
   const [description, setDescription] = useState(card?.description || '');

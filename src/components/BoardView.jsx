@@ -7,19 +7,17 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   const [cards, setCards] = useState([]);
   const [newColumnName, setNewColumnName] = useState('');
 
-  // Stato per la modale scheda
+  // Determina se l'utente corrente è un semplice spettatore
+  const isViewer = activeBoard?.role === 'viewer';
+
   const [modalCard, setModalCard] = useState(null);
   const [modalColId, setModalColId] = useState(null);
-
-  // Stato per il menu della tavolozza colori colonna
   const [activeColorPickerColId, setActiveColorPickerColId] = useState(null);
 
-  // Drag & Drop States
   const [draggedCard, setDraggedCard] = useState(null);
   const [draggedColIndex, setDraggedColIndex] = useState(null);
   const [dragOverCardColId, setDragOverCardColId] = useState(null);
 
-  // Palette di colori disponibili per le colonne
   const availableColors = [
     { label: 'Blu', value: 'bg-blue-600' },
     { label: 'Grigio', value: 'bg-slate-800' },
@@ -63,9 +61,8 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // AGGIUNTA COLONNA (DEFAULT BLU)
   const handleAddColumn = async () => {
-    if (!newColumnName.trim()) return;
+    if (isViewer || !newColumnName.trim()) return;
     try {
       const newCol = {
         id: `col-${Date.now()}`,
@@ -73,7 +70,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         board_id: activeBoard.id,
         name: newColumnName.trim(),
         position: columns.length,
-        color: 'bg-blue-600' // Default Blu
+        color: 'bg-blue-600'
       };
       const { data, error } = await supabase.from('columns').insert([newCol]).select();
       if (error) throw error;
@@ -84,8 +81,8 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // CAMBIO COLORE COLONNA
   const handleChangeColumnColor = async (columnId, newColor) => {
+    if (isViewer) return;
     try {
       setColumns((prev) =>
         prev.map((c) => (c.id === columnId ? { ...c, color: newColor } : c))
@@ -101,9 +98,9 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // ELIMINAZIONE COLONNA
   const handleDeleteColumn = async (columnId, colName, e) => {
     e.stopPropagation();
+    if (isViewer) return;
     if (!window.confirm(`Sei sicuro di voler eliminare la colonna "${colName}" e tutte le sue schede?`)) return;
 
     try {
@@ -118,7 +115,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // SALVATAGGIO / AGGIORNAMENTO SCHEDA
   const handleSaveCardFromModal = (savedCard, isNew) => {
     if (isNew) {
       setCards((prev) => [...prev, savedCard]);
@@ -129,6 +125,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
   const handleDeleteCard = async (cardId, e) => {
     if (e) e.stopPropagation();
+    if (isViewer) return;
     if (!window.confirm('Sei sicuro di voler eliminare questa scheda?')) return;
 
     try {
@@ -140,14 +137,16 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // DRAG & DROP HANDLERS
+  // Drag & Drop limitati a non-viewer
   const handleCardDragStart = (e, card) => {
+    if (isViewer) return;
     e.stopPropagation();
     setDraggedCard(card);
     setDraggedColIndex(null);
   };
 
   const handleCardDrop = async (e, targetColumnId) => {
+    if (isViewer) return;
     e.preventDefault();
     e.stopPropagation();
     setDragOverCardColId(null);
@@ -176,11 +175,13 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   };
 
   const handleColDragStart = (e, index) => {
+    if (isViewer) return;
     setDraggedColIndex(index);
     setDraggedCard(null);
   };
 
   const handleColDragOver = (e, index) => {
+    if (isViewer) return;
     e.preventDefault();
     if (draggedColIndex === null || draggedColIndex === index || draggedCard !== null) return;
 
@@ -193,7 +194,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   };
 
   const handleColDragEnd = async () => {
-    if (draggedColIndex === null) return;
+    if (isViewer || draggedColIndex === null) return;
     setDraggedColIndex(null);
 
     try {
@@ -221,11 +222,18 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
             <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border">
               Proprietario: {activeBoard?.ownerEmail}
             </span>
+            {isViewer && (
+              <span className="text-xs bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-300 font-semibold">
+                👁️ Sola Lettura
+              </span>
+            )}
           </h2>
         </div>
-        <button onClick={onOpenShare} className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-medium text-xs shadow-sm">
-          Condividi
-        </button>
+        {!isViewer && (
+          <button onClick={onOpenShare} className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-medium text-xs shadow-sm">
+            Condividi
+          </button>
+        )}
       </div>
 
       {/* AREA COLONNE KANBAN */}
@@ -234,15 +242,16 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           const colCards = cards.filter((c) => String(c.column_id) === String(col.id));
           const isTargetCardCol = dragOverCardColId === col.id;
           const isColumnBeingDragged = draggedColIndex === colIdx;
-          const colBgColor = col.color || 'bg-blue-600'; // Default Blu
+          const colBgColor = col.color || 'bg-blue-600';
           const isPickerOpen = activeColorPickerColId === col.id;
 
           return (
             <div
               key={col.id}
-              draggable
+              draggable={!isViewer}
               onDragStart={(e) => handleColDragStart(e, colIdx)}
               onDragOver={(e) => {
+                if (isViewer) return;
                 e.preventDefault();
                 if (draggedCard) {
                   setDragOverCardColId(col.id);
@@ -252,7 +261,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
               }}
               onDragLeave={() => setDragOverCardColId(null)}
               onDrop={(e) => {
-                if (draggedCard) handleCardDrop(e, col.id);
+                if (draggedCard && !isViewer) handleCardDrop(e, col.id);
               }}
               onDragEnd={handleColDragEnd}
               className={`w-72 border rounded-xl overflow-hidden flex-shrink-0 shadow-sm transition-all duration-200 bg-slate-200/70 border-slate-300/70 ${
@@ -263,10 +272,10 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   : ''
               }`}
             >
-              {/* HEADER COLONNA CON SELETTORE COLORE */}
-              <div className={`p-3 flex justify-between items-center cursor-grab active:cursor-grabbing text-white relative ${colBgColor}`}>
+              {/* HEADER COLONNA */}
+              <div className={`p-3 flex justify-between items-center text-white relative ${colBgColor} ${!isViewer ? 'cursor-grab active:cursor-grabbing' : ''}`}>
                 <h3 className="font-bold text-base flex items-center gap-1.5 truncate">
-                  <span className="opacity-60 text-sm flex-shrink-0">⋮⋮</span>
+                  {!isViewer && <span className="opacity-60 text-sm flex-shrink-0">⋮⋮</span>}
                   <span className="truncate">{col.name}</span>
                 </h3>
 
@@ -275,30 +284,30 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                     {colCards.length}
                   </span>
 
-                  {/* TAVOLOZZA CAMBIO COLORE */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveColorPickerColId(isPickerOpen ? null : col.id);
-                    }}
-                    title="Cambia colore colonna"
-                    className="text-white/80 hover:text-white hover:bg-white/20 transition p-1 rounded text-xs"
-                  >
-                    🎨
-                  </button>
-
-                  {/* BOTTONE ELIMINA */}
-                  <button
-                    onClick={(e) => handleDeleteColumn(col.id, col.name, e)}
-                    title="Elimina colonna"
-                    className="text-white/80 hover:text-white hover:bg-white/20 transition p-1 rounded font-bold text-xs"
-                  >
-                    🗑️
-                  </button>
+                  {!isViewer && (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveColorPickerColId(isPickerOpen ? null : col.id);
+                        }}
+                        title="Cambia colore colonna"
+                        className="text-white/80 hover:text-white hover:bg-white/20 transition p-1 rounded text-xs"
+                      >
+                        🎨
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteColumn(col.id, col.name, e)}
+                        title="Elimina colonna"
+                        className="text-white/80 hover:text-white hover:bg-white/20 transition p-1 rounded font-bold text-xs"
+                      >
+                        🗑️
+                      </button>
+                    </>
+                  )}
                 </div>
 
-                {/* DROPDOWN SELEZIONE COLORE */}
-                {isPickerOpen && (
+                {isPickerOpen && !isViewer && (
                   <div className="absolute right-3 top-11 bg-white border border-slate-200 rounded-xl p-2 shadow-xl z-20 flex gap-1.5">
                     {availableColors.map((c) => (
                       <button
@@ -326,7 +335,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                       return (
                         <div
                           key={card.id}
-                          draggable
+                          draggable={!isViewer}
                           onDragStart={(e) => handleCardDragStart(e, card)}
                           onClick={() => {
                             setModalCard(card);
@@ -340,13 +349,15 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                             <h4 className="font-bold text-slate-900 text-base leading-snug flex-1">
                               {card.title}
                             </h4>
-                            <button
-                              onClick={(e) => handleDeleteCard(card.id, e)}
-                              title="Elimina scheda"
-                              className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-sm font-bold"
-                            >
-                              🗑️
-                            </button>
+                            {!isViewer && (
+                              <button
+                                onClick={(e) => handleDeleteCard(card.id, e)}
+                                title="Elimina scheda"
+                                className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-sm font-bold"
+                              >
+                                🗑️
+                              </button>
+                            )}
                           </div>
 
                           {cardDetails && (
@@ -368,44 +379,42 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   </div>
                 )}
 
-                {isTargetCardCol && draggedCard && String(draggedCard.column_id) !== String(col.id) && (
-                  <div className="border-2 border-dashed border-blue-400 bg-blue-100/50 rounded-lg p-3 text-center text-blue-600 text-xs font-medium mb-2">
-                    Rilascia qui la scheda
-                  </div>
+                {/* BOTTONE AGGIUNGI SCHEDA (SOLO SE NON VIEWER) */}
+                {!isViewer && (
+                  <button
+                    onClick={() => {
+                      setModalCard(null);
+                      setModalColId(col.id);
+                    }}
+                    className="w-full py-2 px-3 rounded-lg border border-dashed border-slate-300 bg-white hover:border-blue-400 text-slate-600 hover:text-blue-600 font-semibold text-xs transition flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <span>+</span> Aggiungi scheda
+                  </button>
                 )}
-
-                {/* BOTTONE AGGIUNGI SCHEDA */}
-                <button
-                  onClick={() => {
-                    setModalCard(null);
-                    setModalColId(col.id);
-                  }}
-                  className="w-full py-2 px-3 rounded-lg border border-dashed border-slate-300 bg-white hover:border-blue-400 text-slate-600 hover:text-blue-600 font-semibold text-xs transition flex items-center justify-center gap-1.5 shadow-sm"
-                >
-                  <span>+</span> Aggiungi scheda
-                </button>
               </div>
             </div>
           );
         })}
 
-        {/* BOX AGGIUNGI COLONNA */}
-        <div className="w-72 bg-white border-2 border-dashed border-slate-300 rounded-xl p-3 flex-shrink-0">
-          <input
-            type="text"
-            placeholder="Nome nuova colonna..."
-            value={newColumnName}
-            onChange={(e) => setNewColumnName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAddColumn()}
-            className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs mb-2 text-slate-800 focus:outline-none focus:border-blue-500"
-          />
-          <button
-            onClick={handleAddColumn}
-            className="w-full bg-slate-800 hover:bg-slate-900 text-white font-medium py-1.5 rounded-lg text-xs transition"
-          >
-            + Aggiungi Colonna
-          </button>
-        </div>
+        {/* BOX AGGIUNGI COLONNA (SOLO SE NON VIEWER) */}
+        {!isViewer && (
+          <div className="w-72 bg-white border-2 border-dashed border-slate-300 rounded-xl p-3 flex-shrink-0">
+            <input
+              type="text"
+              placeholder="Nome nuova colonna..."
+              value={newColumnName}
+              onChange={(e) => setNewColumnName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAddColumn()}
+              className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs mb-2 text-slate-800 focus:outline-none focus:border-blue-500"
+            />
+            <button
+              onClick={handleAddColumn}
+              className="w-full bg-slate-800 hover:bg-slate-900 text-white font-medium py-1.5 rounded-lg text-xs transition"
+            >
+              + Aggiungi Colonna
+            </button>
+          </div>
+        )}
       </div>
 
       {/* MODALE SCHEDA */}
@@ -413,6 +422,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         <CardDetailModal
           card={modalCard}
           columnId={modalColId}
+          isViewer={isViewer}
           onClose={() => {
             setModalCard(null);
             setModalColId(null);
