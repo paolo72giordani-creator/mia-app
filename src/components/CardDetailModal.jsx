@@ -80,7 +80,7 @@ export default function CardDetailModal({ card, onClose, onUpdateCard, onDeleteC
       setAttachments((prev) => [...prev, data[0]]);
     } catch (err) {
       alert('Errore caricamento allegato: ' + err.message);
-    } font-medium {
+    } finally {
       setUploading(false);
     }
   };
@@ -128,7 +128,7 @@ export default function CardDetailModal({ card, onClose, onUpdateCard, onDeleteC
               attachments.map((att) => (
                 <div key={att.id} className="flex justify-between items-center bg-slate-50 p-1.5 rounded border text-[11px]">
                   <span className="truncate max-w-[200px] font-medium text-slate-700">{att.file_name}</span>
-                  <a href={att.file_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                  <a href={att.file_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-medium">
                     Apri ↗
                   </a>
                 </div>
