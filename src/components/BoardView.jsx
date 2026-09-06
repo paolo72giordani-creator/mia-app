@@ -56,10 +56,11 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
     try {
       const colCards = cards.filter((c) => c.column_id === columnId);
+      
+      // Rimosso board_id dal payload per allinearsi allo schema Supabase
       const newCard = {
         id: `card-${Date.now()}`,
         user_id: currentUser.id,
-        board_id: activeBoard.id,
         column_id: columnId,
         title: title,
         position: colCards.length
