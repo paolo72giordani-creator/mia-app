@@ -7,21 +7,27 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   const [cards, setCards] = useState([]);
   const [newColumnName, setNewColumnName] = useState('');
 
-  // Stato per la modale (modifica o creazione)
+  // Stato per la modale scheda
   const [modalCard, setModalCard] = useState(null);
   const [modalColId, setModalColId] = useState(null);
+
+  // Stato per il menu della tavolozza colori colonna
+  const [activeColorPickerColId, setActiveColorPickerColId] = useState(null);
 
   // Drag & Drop States
   const [draggedCard, setDraggedCard] = useState(null);
   const [draggedColIndex, setDraggedColIndex] = useState(null);
   const [dragOverCardColId, setDragOverCardColId] = useState(null);
 
-  const columnHeaderColors = [
-    'bg-slate-800 text-white',
-    'bg-blue-600 text-white',
-    'bg-indigo-600 text-white',
-    'bg-emerald-600 text-white',
-    'bg-amber-600 text-white'
+  // Palette di colori disponibili per le colonne
+  const availableColors = [
+    { label: 'Blu', value: 'bg-blue-600' },
+    { label: 'Grigio', value: 'bg-slate-800' },
+    { label: 'Indaco', value: 'bg-indigo-600' },
+    { label: 'Smeraldo', value: 'bg-emerald-600' },
+    { label: 'Ambra', value: 'bg-amber-600' },
+    { label: 'Rosso', value: 'bg-rose-600' },
+    { label: 'Viola', value: 'bg-purple-600' }
   ];
 
   useEffect(() => {
@@ -57,6 +63,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
+  // AGGIUNTA COLONNA (DEFAULT BLU)
   const handleAddColumn = async () => {
     if (!newColumnName.trim()) return;
     try {
@@ -65,7 +72,8 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         user_id: currentUser.id,
         board_id: activeBoard.id,
         name: newColumnName.trim(),
-        position: columns.length
+        position: columns.length,
+        color: 'bg-blue-600' // Default Blu
       };
       const { data, error } = await supabase.from('columns').insert([newCol]).select();
       if (error) throw error;
@@ -76,20 +84,33 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
+  // CAMBIO COLORE COLONNA
+  const handleChangeColumnColor = async (columnId, newColor) => {
+    try {
+      setColumns((prev) =>
+        prev.map((c) => (c.id === columnId ? { ...c, color: newColor } : c))
+      );
+      setActiveColorPickerColId(null);
+
+      await supabase
+        .from('columns')
+        .update({ color: newColor })
+        .eq('id', columnId);
+    } catch (err) {
+      console.error('Errore aggiornamento colore:', err);
+    }
+  };
+
   // ELIMINAZIONE COLONNA
   const handleDeleteColumn = async (columnId, colName, e) => {
     e.stopPropagation();
     if (!window.confirm(`Sei sicuro di voler eliminare la colonna "${colName}" e tutte le sue schede?`)) return;
 
     try {
-      // 1. Elimina le schede della colonna dal DB
       await supabase.from('cards').delete().eq('column_id', String(columnId));
-
-      // 2. Elimina la colonna
       const { error } = await supabase.from('columns').delete().eq('id', columnId);
       if (error) throw error;
 
-      // 3. Aggiorna stato locale
       setColumns((prev) => prev.filter((c) => c.id !== columnId));
       setCards((prev) => prev.filter((c) => String(c.column_id) !== String(columnId)));
     } catch (err) {
@@ -97,7 +118,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // Salva o aggiorna scheda gestito dalla modale
+  // SALVATAGGIO / AGGIORNAMENTO SCHEDA
   const handleSaveCardFromModal = (savedCard, isNew) => {
     if (isNew) {
       setCards((prev) => [...prev, savedCard]);
@@ -119,7 +140,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // Drag & Drop Handlers
+  // DRAG & DROP HANDLERS
   const handleCardDragStart = (e, card) => {
     e.stopPropagation();
     setDraggedCard(card);
@@ -213,7 +234,8 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           const colCards = cards.filter((c) => String(c.column_id) === String(col.id));
           const isTargetCardCol = dragOverCardColId === col.id;
           const isColumnBeingDragged = draggedColIndex === colIdx;
-          const headerColorStyle = columnHeaderColors[colIdx % columnHeaderColors.length];
+          const colBgColor = col.color || 'bg-blue-600'; // Default Blu
+          const isPickerOpen = activeColorPickerColId === col.id;
 
           return (
             <div
@@ -241,25 +263,56 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   : ''
               }`}
             >
-              {/* HEADER COLONNA COLORATO CON PULSANTE ELIMINA */}
-              <div className={`p-3 flex justify-between items-center cursor-grab active:cursor-grabbing ${headerColorStyle}`}>
+              {/* HEADER COLONNA CON SELETTORE COLORE */}
+              <div className={`p-3 flex justify-between items-center cursor-grab active:cursor-grabbing text-white relative ${colBgColor}`}>
                 <h3 className="font-bold text-base flex items-center gap-1.5 truncate">
                   <span className="opacity-60 text-sm flex-shrink-0">⋮⋮</span>
                   <span className="truncate">{col.name}</span>
                 </h3>
-                
-                <div className="flex items-center gap-2 flex-shrink-0">
+
+                <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span className="text-xs bg-white/20 text-white font-bold px-2 py-0.5 rounded-full border border-white/20">
                     {colCards.length}
                   </span>
+
+                  {/* TAVOLOZZA CAMBIO COLORE */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveColorPickerColId(isPickerOpen ? null : col.id);
+                    }}
+                    title="Cambia colore colonna"
+                    className="text-white/80 hover:text-white hover:bg-white/20 transition p-1 rounded text-xs"
+                  >
+                    🎨
+                  </button>
+
+                  {/* BOTTONE ELIMINA */}
                   <button
                     onClick={(e) => handleDeleteColumn(col.id, col.name, e)}
                     title="Elimina colonna"
-                    className="text-white/70 hover:text-white hover:bg-white/20 transition p-1 rounded font-bold text-xs"
+                    className="text-white/80 hover:text-white hover:bg-white/20 transition p-1 rounded font-bold text-xs"
                   >
                     🗑️
                   </button>
                 </div>
+
+                {/* DROPDOWN SELEZIONE COLORE */}
+                {isPickerOpen && (
+                  <div className="absolute right-3 top-11 bg-white border border-slate-200 rounded-xl p-2 shadow-xl z-20 flex gap-1.5">
+                    {availableColors.map((c) => (
+                      <button
+                        key={c.value}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleChangeColumnColor(col.id, c.value);
+                        }}
+                        className={`w-6 h-6 rounded-full border border-black/10 transition hover:scale-110 ${c.value}`}
+                        title={c.label}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* CONTENUTO COLONNA */}
