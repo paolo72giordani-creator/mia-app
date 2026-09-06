@@ -8,8 +8,8 @@ export default function CardDetailModal({ card, onClose, onUpdateCard, onDeleteC
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-    fetchAttachments();
-  }, [card.id]);
+    if (card?.id) fetchAttachments();
+  }, [card?.id]);
 
   const fetchAttachments = async () => {
     try {
@@ -47,19 +47,25 @@ export default function CardDetailModal({ card, onClose, onUpdateCard, onDeleteC
       const fileExt = file.name.split('.').pop();
       const filePath = `${card.id}/${Date.now()}.${fileExt}`;
 
+      // Caricamento su Storage Bucket
       const { error: uploadErr } = await supabase.storage
         .from('card-attachments')
         .upload(filePath, file);
 
       if (uploadErr) throw uploadErr;
 
+      // Recupero URL pubblico
       const { data: publicUrlData } = supabase.storage
         .from('card-attachments')
         .getPublicUrl(filePath);
 
+      // Recupero sessione per user_id corretto
+      const { data: { session } } = await supabase.auth.getSession();
+
       const newAttachment = {
         id: `att-${Date.now()}`,
         card_id: card.id,
+        user_id: session?.user?.id || null,
         file_name: file.name,
         file_url: publicUrlData.publicUrl
       };
@@ -71,32 +77,26 @@ export default function CardDetailModal({ card, onClose, onUpdateCard, onDeleteC
 
       if (attErr) throw attErr;
 
-      setAttachments([...attachments, data[0]]);
+      setAttachments((prev) => [...prev, data[0]]);
     } catch (err) {
       alert('Errore caricamento allegato: ' + err.message);
-    } finally {
+    } font-medium {
       setUploading(false);
     }
   };
-  
-  const newAttachment = {
-        id: `att-${Date.now()}`,
-        card_id: card.id,
-        user_id: supabase.auth.getUser()?.id, // Traccia l'utente proprietario
-        file_name: file.name,
-        file_url: publicUrlData.publicUrl
-      };
+
+  if (!card) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-3 z-50 text-xs">
-      <div className="bg-white border rounded-xl w-full max-w-lg p-4 shadow-xl">
+    <div className="fixed inset-0 bg-slate-900/30 flex items-center justify-center p-3 z-50 text-xs">
+      <div className="bg-white border rounded-xl w-full max-w-md p-4 shadow-xl">
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-bold text-sm text-slate-800">Dettagli Scheda</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
         </div>
 
-        {/* NOME SCHEDA */}
-        <div className="mb-3">
+        {/* TITOLO */}
+        <div className="mb-2.5">
           <label className="block text-[10px] font-semibold text-slate-500 mb-1">Titolo</label>
           <input
             type="text"
@@ -113,7 +113,7 @@ export default function CardDetailModal({ card, onClose, onUpdateCard, onDeleteC
             rows="3"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Aggiungi una descrizione più dettagliata..."
+            placeholder="Aggiungi dettagli..."
             className="w-full border rounded p-2 text-xs focus:outline-none focus:border-blue-500"
           />
         </div>
@@ -121,19 +121,23 @@ export default function CardDetailModal({ card, onClose, onUpdateCard, onDeleteC
         {/* ALLEGATI */}
         <div className="mb-4">
           <label className="block text-[10px] font-semibold text-slate-500 mb-1">Allegati</label>
-          <div className="space-y-1 mb-2">
-            {attachments.map((att) => (
-              <div key={att.id} className="flex justify-between items-center bg-slate-50 p-1.5 rounded border text-[11px]">
-                <span className="truncate max-w-[200px] font-medium text-slate-700">{att.file_name}</span>
-                <a href={att.file_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
-                  Apri ↗
-                </a>
-              </div>
-            ))}
+          <div className="space-y-1 mb-2 max-h-24 overflow-y-auto">
+            {attachments.length === 0 ? (
+              <p className="text-[10px] text-slate-400 italic">Nessun allegato presente.</p>
+            ) : (
+              attachments.map((att) => (
+                <div key={att.id} className="flex justify-between items-center bg-slate-50 p-1.5 rounded border text-[11px]">
+                  <span className="truncate max-w-[200px] font-medium text-slate-700">{att.file_name}</span>
+                  <a href={att.file_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                    Apri ↗
+                  </a>
+                </div>
+              ))
+            )}
           </div>
 
-          <label className="inline-block bg-slate-100 hover:bg-slate-200 border text-slate-700 px-2.5 py-1 rounded cursor-pointer font-medium text-[11px]">
-            {uploading ? 'Caricamento...' : '+ Aggiungi Allegato'}
+          <label className="inline-block bg-slate-100 hover:bg-slate-200 border text-slate-700 px-2.5 py-1 rounded cursor-pointer font-medium text-[10px]">
+            {uploading ? 'Caricamento...' : '+ Carica File'}
             <input type="file" onChange={handleFileUpload} className="hidden" disabled={uploading} />
           </label>
         </div>
@@ -144,9 +148,9 @@ export default function CardDetailModal({ card, onClose, onUpdateCard, onDeleteC
             onClick={() => {
               if (window.confirm('Cancellare questa scheda?')) onDeleteCard(card.id);
             }}
-            className="text-red-600 hover:underline text-[11px] font-medium"
+            className="text-red-500 hover:underline text-[11px] font-medium"
           >
-            Elimina Scheda
+            Elimina
           </button>
           <div className="flex gap-1.5">
             <button onClick={onClose} className="border px-3 py-1 rounded text-slate-600">Annulla</button>
