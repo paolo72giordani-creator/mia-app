@@ -272,6 +272,35 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   : ''
               }`}
             >
+			
+			{/* BARRA SUPERIORE CON BRAND LOGO */}
+      <div className="flex justify-between items-center mb-5 bg-white p-3 rounded-xl border shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-xs shadow-sm">
+            D
+          </div>
+          <button onClick={onBack} className="text-blue-600 hover:underline font-bold text-xs mr-2">
+            ← Dashboard
+          </button>
+          <h2 className="font-bold text-base text-slate-800 flex items-center gap-2">
+            {activeBoard?.title}
+            <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border">
+              Proprietario: {activeBoard?.ownerEmail}
+            </span>
+            {isViewer && (
+              <span className="text-xs bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-300 font-semibold">
+                👁️ Sola Lettura
+              </span>
+            )}
+          </h2>
+        </div>
+        {!isViewer && (
+          <button onClick={onOpenShare} className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-medium text-xs shadow-sm">
+            Condividi
+          </button>
+        )}
+      </div>
+			
               {/* HEADER COLONNA */}
               <div className={`p-3 flex justify-between items-center text-white relative ${colBgColor} ${!isViewer ? 'cursor-grab active:cursor-grabbing' : ''}`}>
                 <h3 className="font-bold text-base flex items-center gap-1.5 truncate">

@@ -32,7 +32,6 @@ export default function App() {
     try {
       const userEmail = session.user.email.toLowerCase();
 
-      // 1. Bacheche proprietarie
       const { data: owned, error: ownedErr } = await supabase
         .from('boards_with_owners')
         .select('*')
@@ -40,7 +39,6 @@ export default function App() {
 
       if (ownedErr) throw ownedErr;
 
-      // 2. Inviti per user_id o email
       const { data: memberEntries, error: memberErr } = await supabase
         .from('board_members')
         .select('board_id, role, invited_email');
@@ -145,12 +143,26 @@ export default function App() {
         />
       ) : (
         <div className="max-w-6xl mx-auto">
-          {/* HEADER DASHBOARD */}
+          {/* HEADER DASHBOARD CON LOGO E TITOLO BRAND */}
           <div className="bg-white p-4 rounded-xl border shadow-sm mb-6 flex justify-between items-center">
-            <div>
-              <h1 className="text-xl font-bold text-slate-800">Le Tue Bacheche</h1>
-              <p className="text-xs text-slate-500">Utente: {session.user.email}</p>
+            <div className="flex items-center gap-3">
+              {/* BRAND LOGO */}
+              <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/20">
+                D
+              </div>
+              <div>
+                <h1 className="text-lg font-extrabold text-slate-900 leading-tight">
+                  Doceo <span className="text-blue-600">Kanban</span>
+                </h1>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Utente: {session.user.email}
+                </p>
+              </div>
             </div>
+
+            <span className="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-semibold border">
+              Dashboard
+            </span>
           </div>
 
           {/* GRIGLIA BACHECHE QUADRATE */}
