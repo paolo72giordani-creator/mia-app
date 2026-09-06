@@ -82,7 +82,20 @@ export default function App() {
         title: newBoardTitle.trim(),
         owner_email: session.user.email
       };
-      // ... resto della funzione
+
+      const { data, error } = await supabase.from('boards').insert([newBoard]).select();
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const created = { ...data[0], isOwner: true, ownerEmail: session.user.email };
+        setBoards((prev) => [created, ...prev]);
+        setNewBoardTitle('');
+        setIsCreatingBoard(false);
+      }
+    } catch (err) {
+      alert('Errore creazione bacheca: ' + err.message);
+    }
+  };
 
   const handleDragStart = (e, index) => { setDraggedBoardIndex(index); e.dataTransfer.effectAllowed = 'move'; };
   const handleDragOver = (e, index) => {
