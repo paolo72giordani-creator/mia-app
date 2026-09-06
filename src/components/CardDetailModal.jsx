@@ -6,6 +6,7 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
   const [title, setTitle] = useState(card?.title || '');
   const [description, setDescription] = useState(card?.description || '');
   const [attachments, setAttachments] = useState(card?.attachments || []);
+  const [pendingFiles, setPendingFiles] = useState([]); // File in attesa per nuova scheda
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
@@ -24,15 +25,66 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
     }
   };
 
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (isNew) {
+      // Se è una nuova scheda, accodiamo il file localmente
+      setPendingFiles((prev) => [...prev, file]);
+    } else {
+      // Se la scheda esiste già, carichiamo subito su Supabase
+      setUploading(true);
+      try {
+        const fileExt = file.name.split('.').pop();
+        const filePath = `${card.id}/${Date.now()}.${fileExt}`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from('card-attachments')
+          .upload(filePath, file);
+
+        if (uploadErr) throw uploadErr;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('card-attachments')
+          .getPublicUrl(filePath);
+
+        const { data: { session } } = await supabase.auth.getSession();
+
+        const newAttachment = {
+          id: `att-${Date.now()}`,
+          card_id: card.id,
+          user_id: session?.user?.id || null,
+          file_name: file.name,
+          file_url: publicUrlData.publicUrl
+        };
+
+        const { data, error: attErr } = await supabase
+          .from('attachments')
+          .insert([newAttachment])
+          .select();
+
+        if (attErr) throw attErr;
+
+        setAttachments((prev) => [...prev, data[0]]);
+      } catch (err) {
+        alert('Errore caricamento allegato: ' + err.message);
+      } finally {
+        setUploading(false);
+      }
+    }
+  };
+
   const handleSave = async () => {
     if (!title.trim()) {
       alert('Inserisci un titolo per la scheda.');
       return;
     }
 
+    setUploading(true);
     try {
       if (isNew) {
-        // CREAZIONE NUOVA SCHEDA
+        // 1. Creazione nuova scheda
         const newCardPayload = {
           id: `card-${Date.now()}`,
           column_id: String(columnId),
@@ -41,12 +93,53 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
           position: 0
         };
 
-        const { data, error } = await supabase.from('cards').insert([newCardPayload]).select();
-        if (error) throw error;
+        const { data: createdCard, error } = await supabase
+          .from('cards')
+          .insert([newCardPayload])
+          .select();
 
-        onSaveCard({ ...data[0], attachments: [] }, true);
+        if (error) throw error;
+        const newCard = createdCard[0];
+
+        // 2. Caricamento di eventuali file accodati
+        const uploadedAttachments = [];
+        if (pendingFiles.length > 0) {
+          const { data: { session } } = await supabase.auth.getSession();
+
+          for (const file of pendingFiles) {
+            const fileExt = file.name.split('.').pop();
+            const filePath = `${newCard.id}/${Date.now()}_${file.name}`;
+
+            const { error: uploadErr } = await supabase.storage
+              .from('card-attachments')
+              .upload(filePath, file);
+
+            if (!uploadErr) {
+              const { data: publicUrlData } = supabase.storage
+                .from('card-attachments')
+                .getPublicUrl(filePath);
+
+              const newAttachment = {
+                id: `att-${Date.now()}-${Math.random()}`,
+                card_id: newCard.id,
+                user_id: session?.user?.id || null,
+                file_name: file.name,
+                file_url: publicUrlData.publicUrl
+              };
+
+              const { data: attData } = await supabase
+                .from('attachments')
+                .insert([newAttachment])
+                .select();
+
+              if (attData) uploadedAttachments.push(attData[0]);
+            }
+          }
+        }
+
+        onSaveCard({ ...newCard, attachments: uploadedAttachments }, true);
       } else {
-        // AGGIORNAMENTO SCHEDA ESISTENTE
+        // Aggiornamento scheda esistente
         const { error } = await supabase
           .from('cards')
           .update({ title, description })
@@ -58,48 +151,6 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
       onClose();
     } catch (err) {
       alert('Errore salvataggio: ' + err.message);
-    }
-  };
-
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file || isNew) return; // Allegati abilitati dopo il primo salvataggio
-
-    setUploading(true);
-    try {
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${card.id}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadErr } = await supabase.storage
-        .from('card-attachments')
-        .upload(filePath, file);
-
-      if (uploadErr) throw uploadErr;
-
-      const { data: publicUrlData } = supabase.storage
-        .from('card-attachments')
-        .getPublicUrl(filePath);
-
-      const { data: { session } } = await supabase.auth.getSession();
-
-      const newAttachment = {
-        id: `att-${Date.now()}`,
-        card_id: card.id,
-        user_id: session?.user?.id || null,
-        file_name: file.name,
-        file_url: publicUrlData.publicUrl
-      };
-
-      const { data, error: attErr } = await supabase
-        .from('attachments')
-        .insert([newAttachment])
-        .select();
-
-      if (attErr) throw attErr;
-
-      setAttachments((prev) => [...prev, data[0]]);
-    } catch (err) {
-      alert('Errore caricamento allegato: ' + err.message);
     } finally {
       setUploading(false);
     }
@@ -132,7 +183,7 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
         <div className="mb-3">
           <label className="block text-[10px] font-semibold text-slate-500 mb-1">Descrizione / Note</label>
           <textarea
-            rows="4"
+            rows="3"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Aggiungi dettagli, note o istruzioni..."
@@ -140,31 +191,38 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
           />
         </div>
 
-        {/* ALLEGATI (solo se scheda già salvata) */}
-        {!isNew && (
-          <div className="mb-4">
-            <label className="block text-[10px] font-semibold text-slate-500 mb-1">Allegati</label>
-            <div className="space-y-1 mb-2 max-h-24 overflow-y-auto">
-              {attachments.length === 0 ? (
-                <p className="text-[10px] text-slate-400 italic">Nessun allegato presente.</p>
-              ) : (
-                attachments.map((att) => (
-                  <div key={att.id} className="flex justify-between items-center bg-slate-50 p-1.5 rounded border text-[11px]">
-                    <span className="truncate max-w-[200px] font-medium text-slate-700">{att.file_name}</span>
-                    <a href={att.file_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-medium">
-                      Apri ↗
-                    </a>
-                  </div>
-                ))
-              )}
-            </div>
+        {/* ALLEGATI (Sempre Visibili) */}
+        <div className="mb-4">
+          <label className="block text-[10px] font-semibold text-slate-500 mb-1">Allegati</label>
+          <div className="space-y-1 mb-2 max-h-24 overflow-y-auto">
+            {/* Allegati salvati su DB */}
+            {attachments.map((att) => (
+              <div key={att.id} className="flex justify-between items-center bg-slate-50 p-1.5 rounded border text-[11px]">
+                <span className="truncate max-w-[200px] font-medium text-slate-700">{att.file_name}</span>
+                <a href={att.file_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-medium">
+                  Apri ↗
+                </a>
+              </div>
+            ))}
 
-            <label className="inline-block bg-slate-100 hover:bg-slate-200 border text-slate-700 px-2.5 py-1 rounded cursor-pointer font-medium text-[10px]">
-              {uploading ? 'Caricamento...' : '+ Carica File'}
-              <input type="file" onChange={handleFileUpload} className="hidden" disabled={uploading} />
-            </label>
+            {/* File in attesa di caricamento (nuova scheda) */}
+            {pendingFiles.map((f, idx) => (
+              <div key={idx} className="flex justify-between items-center bg-blue-50/60 p-1.5 rounded border border-blue-200 text-[11px]">
+                <span className="truncate max-w-[200px] font-medium text-slate-700">📎 {f.name}</span>
+                <span className="text-[10px] text-blue-600 font-semibold">(In attesa)</span>
+              </div>
+            ))}
+
+            {attachments.length === 0 && pendingFiles.length === 0 && (
+              <p className="text-[10px] text-slate-400 italic">Nessun allegato presente.</p>
+            )}
           </div>
-        )}
+
+          <label className="inline-block bg-slate-100 hover:bg-slate-200 border text-slate-700 px-2.5 py-1 rounded cursor-pointer font-medium text-[10px]">
+            {uploading ? 'Elaborazione...' : '+ Carica File'}
+            <input type="file" onChange={handleFileUpload} className="hidden" disabled={uploading} />
+          </label>
+        </div>
 
         {/* AZIONI */}
         <div className="flex justify-between items-center pt-3 border-t">
@@ -181,8 +239,8 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
 
           <div className="flex gap-2">
             <button onClick={onClose} className="border px-3 py-1.5 rounded text-slate-600 font-medium">Annulla</button>
-            <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded font-bold">
-              {isNew ? 'Crea Scheda' : 'Salva'}
+            <button onClick={handleSave} disabled={uploading} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded font-bold">
+              {uploading ? 'Salvataggio...' : isNew ? 'Crea Scheda' : 'Salva'}
             </button>
           </div>
         </div>
