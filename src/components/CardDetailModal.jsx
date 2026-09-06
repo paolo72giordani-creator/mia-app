@@ -6,7 +6,7 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
   const [title, setTitle] = useState(card?.title || '');
   const [description, setDescription] = useState(card?.description || '');
   const [attachments, setAttachments] = useState(card?.attachments || []);
-  const [pendingFiles, setPendingFiles] = useState([]); // File in attesa per nuova scheda
+  const [pendingFiles, setPendingFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
@@ -30,10 +30,8 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
     if (!file) return;
 
     if (isNew) {
-      // Se è una nuova scheda, accodiamo il file localmente
       setPendingFiles((prev) => [...prev, file]);
     } else {
-      // Se la scheda esiste già, carichiamo subito su Supabase
       setUploading(true);
       try {
         const fileExt = file.name.split('.').pop();
@@ -69,7 +67,7 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
         setAttachments((prev) => [...prev, data[0]]);
       } catch (err) {
         alert('Errore caricamento allegato: ' + err.message);
-      } finally {
+      } font-medium {
         setUploading(false);
       }
     }
@@ -83,10 +81,20 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
 
     setUploading(true);
     try {
+      // Recupera la sessione utente corrente per garantire l'user_id
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUserId = session?.user?.id;
+
+      if (!currentUserId) {
+        alert('Sessione utente non valida. Riapri l\'applicazione.');
+        return;
+      }
+
       if (isNew) {
-        // 1. Creazione nuova scheda
+        // 1. Inserimento nuova scheda con user_id obbligatorio
         const newCardPayload = {
           id: `card-${Date.now()}`,
+          user_id: currentUserId,
           column_id: String(columnId),
           title: title.trim(),
           description: description.trim(),
@@ -101,11 +109,9 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
         if (error) throw error;
         const newCard = createdCard[0];
 
-        // 2. Caricamento di eventuali file accodati
+        // 2. Caricamento file in attesa
         const uploadedAttachments = [];
         if (pendingFiles.length > 0) {
-          const { data: { session } } = await supabase.auth.getSession();
-
           for (const file of pendingFiles) {
             const fileExt = file.name.split('.').pop();
             const filePath = `${newCard.id}/${Date.now()}_${file.name}`;
@@ -122,7 +128,7 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
               const newAttachment = {
                 id: `att-${Date.now()}-${Math.random()}`,
                 card_id: newCard.id,
-                user_id: session?.user?.id || null,
+                user_id: currentUserId,
                 file_name: file.name,
                 file_url: publicUrlData.publicUrl
               };
@@ -191,11 +197,10 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
           />
         </div>
 
-        {/* ALLEGATI (Sempre Visibili) */}
+        {/* ALLEGATI */}
         <div className="mb-4">
           <label className="block text-[10px] font-semibold text-slate-500 mb-1">Allegati</label>
           <div className="space-y-1 mb-2 max-h-24 overflow-y-auto">
-            {/* Allegati salvati su DB */}
             {attachments.map((att) => (
               <div key={att.id} className="flex justify-between items-center bg-slate-50 p-1.5 rounded border text-[11px]">
                 <span className="truncate max-w-[200px] font-medium text-slate-700">{att.file_name}</span>
@@ -205,7 +210,6 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
               </div>
             ))}
 
-            {/* File in attesa di caricamento (nuova scheda) */}
             {pendingFiles.map((f, idx) => (
               <div key={idx} className="flex justify-between items-center bg-blue-50/60 p-1.5 rounded border border-blue-200 text-[11px]">
                 <span className="truncate max-w-[200px] font-medium text-slate-700">📎 {f.name}</span>
