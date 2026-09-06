@@ -30,7 +30,7 @@ export default function App() {
   const fetchBoards = async () => {
     if (!session?.user) return;
     try {
-      // 1. Bacheche di mia proprietà
+      // 1. Le mie bacheche di proprietà
       const { data: owned, error: ownedErr } = await supabase
         .from('boards_with_owners')
         .select('*')
@@ -38,18 +38,25 @@ export default function App() {
 
       if (ownedErr) throw ownedErr;
 
-      // 2. Bacheche condivise con il rispettivo ruolo
-      // 2. Cerca le bacheche condivise per il mio user_id OPPURE per la mia email
-      const { data: memberEntries, error: memberErr } = await supabase
+      // 2. Cerca inviti per user_id oppure per e-mail dell'utente loggato
+      const userEmail = session.user.email.toLowerCase();
+
+      const { data: memberById } = await supabase
         .from('board_members')
-        .select('board_id, role, invited_email')
-        .or(`user_id.eq.${session.user.id},invited_email.eq.${session.user.email.toLowerCase()}`);
+        .select('board_id, role')
+        .eq('user_id', session.user.id);
 
-      if (memberErr) throw memberErr;
+      const { data: memberByEmail } = await supabase
+        .from('board_members')
+        .select('board_id, role')
+        .eq('invited_email', userEmail);
 
+      // Unisci le entrate ed elimina i duplicati
+      const allMembers = [...(memberById || []), ...(memberByEmail || [])];
+      
       let sharedList = [];
-      if (memberEntries && memberEntries.length > 0) {
-        const boardIds = memberEntries.map((m) => m.board_id);
+      if (allMembers.length > 0) {
+        const boardIds = [...new Set(allMembers.map((m) => String(m.board_id)))];
 
         const { data: shared, error: sharedErr } = await supabase
           .from('boards_with_owners')
@@ -58,7 +65,7 @@ export default function App() {
 
         if (!sharedErr && shared) {
           sharedList = shared.map((board) => {
-            const memberInfo = memberEntries.find((m) => String(m.board_id) === String(board.id));
+            const memberInfo = allMembers.find((m) => String(m.board_id) === String(board.id));
             return {
               ...board,
               role: memberInfo?.role || 'viewer'
