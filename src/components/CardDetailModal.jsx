@@ -78,6 +78,14 @@ export default function CardDetailModal({ card, onClose, onUpdateCard, onDeleteC
       setUploading(false);
     }
   };
+  
+  const newAttachment = {
+        id: `att-${Date.now()}`,
+        card_id: card.id,
+        user_id: supabase.auth.getUser()?.id, // Traccia l'utente proprietario
+        file_name: file.name,
+        file_url: publicUrlData.publicUrl
+      };
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center p-3 z-50 text-xs">
