@@ -6,8 +6,11 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   const [columns, setColumns] = useState([]);
   const [cards, setCards] = useState([]);
   const [newColumnName, setNewColumnName] = useState('');
-  const [newCardTitles, setNewCardTitles] = useState({});
   const [selectedCard, setSelectedCard] = useState(null);
+
+  // Stato per tracciare quale colonna ha il form di creazione aperto
+  const [addingCardColId, setAddingCardColId] = useState(null);
+  const [cardTitleInput, setCardTitleInput] = useState('');
 
   // Drag & Drop States
   const [draggedCard, setDraggedCard] = useState(null);
@@ -67,7 +70,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   };
 
   const handleAddCard = async (columnId) => {
-    const title = newCardTitles[columnId]?.trim();
+    const title = cardTitleInput.trim();
     if (!title) return;
 
     try {
@@ -85,7 +88,8 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
       if (data && data.length > 0) {
         setCards((prev) => [...prev, { ...data[0], attachments: [] }]);
-        setNewCardTitles((prev) => ({ ...prev, [columnId]: '' }));
+        setCardTitleInput('');
+        setAddingCardColId(null);
       }
     } catch (err) {
       alert('Errore scheda: ' + err.message);
@@ -146,7 +150,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // --- LOGICA DRAG & DROP COLONNE REATTIVA AL VOLO ---
+  // --- LOGICA DRAG & DROP COLONNE ---
   const handleColDragStart = (e, index) => {
     setDraggedColIndex(index);
     setDraggedCard(null);
@@ -156,7 +160,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     e.preventDefault();
     if (draggedColIndex === null || draggedColIndex === index || draggedCard !== null) return;
 
-    // Scambia le colonne in tempo reale nello stato locale per un feedback immediato
     const reordered = [...columns];
     const [movedCol] = reordered.splice(draggedColIndex, 1);
     reordered.splice(index, 0, movedCol);
@@ -169,7 +172,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     if (draggedColIndex === null) return;
     setDraggedColIndex(null);
 
-    // Salva le nuove posizioni su Supabase
     try {
       for (let i = 0; i < columns.length; i++) {
         await supabase
@@ -208,6 +210,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           const colCards = cards.filter((c) => String(c.column_id) === String(col.id));
           const isTargetCardCol = dragOverCardColId === col.id;
           const isColumnBeingDragged = draggedColIndex === colIdx;
+          const isAddingHere = addingCardColId === col.id;
 
           return (
             <div
@@ -247,7 +250,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                 </div>
 
                 {/* LISTA SCHEDE */}
-                <div className="space-y-2.5 mb-3 min-h-[50px]">
+                <div className="space-y-2.5 mb-3 min-h-[30px]">
                   {colCards.map((card) => {
                     const cardDetails = card.description || card.details;
                     const isBeingDragged = draggedCard?.id === card.id;
@@ -300,22 +303,45 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                 </div>
               </div>
 
-              {/* FORM NUOVA SCHEDA */}
-              <div className="flex gap-1.5 pt-2 border-t border-slate-300/70 mt-auto">
-                <input
-                  type="text"
-                  placeholder="Nuova scheda..."
-                  value={newCardTitles[col.id] || ''}
-                  onChange={(e) => setNewCardTitles({ ...newCardTitles, [col.id]: e.target.value })}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddCard(col.id)}
-                  className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 shadow-inner"
-                />
-                <button
-                  onClick={() => handleAddCard(col.id)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm transition"
-                >
-                  +
-                </button>
+              {/* PULSANTE O FORM NUOVA SCHEDA */}
+              <div className="pt-2 border-t border-slate-300/70 mt-auto">
+                {isAddingHere ? (
+                  <div className="bg-white border border-slate-300 rounded-lg p-2 shadow-sm">
+                    <input
+                      type="text"
+                      placeholder="Titolo scheda..."
+                      value={cardTitleInput}
+                      onChange={(e) => setCardTitleInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddCard(col.id)}
+                      autoFocus
+                      className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 mb-2 focus:outline-none focus:border-blue-500"
+                    />
+                    <div className="flex justify-end gap-1.5">
+                      <button
+                        onClick={() => { setAddingCardColId(null); setCardTitleInput(''); }}
+                        className="px-2.5 py-1 text-slate-500 hover:text-slate-700 text-xs font-medium"
+                      >
+                        Annulla
+                      </button>
+                      <button
+                        onClick={() => handleAddCard(col.id)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded font-bold text-xs transition"
+                      >
+                        Aggiungi
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setAddingCardColId(col.id);
+                      setCardTitleInput('');
+                    }}
+                    className="w-full py-2 px-3 rounded-lg border border-dashed border-slate-300/80 bg-white/50 hover:bg-white hover:border-blue-400 text-slate-600 hover:text-blue-600 font-medium text-xs transition flex items-center justify-center gap-1.5"
+                  >
+                    <span>+</span> Aggiungi scheda
+                  </button>
+                )}
               </div>
             </div>
           );
