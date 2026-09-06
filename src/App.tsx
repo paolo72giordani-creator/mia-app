@@ -30,15 +30,15 @@ export default function App() {
   const fetchBoards = async () => {
     if (!session?.user) return;
     try {
-      // 1. Carica bacheche di mia proprietà
+      // 1. Recupera le bacheche di cui sono proprietario (dalla Vista Dinamica)
       const { data: owned, error: ownedErr } = await supabase
-        .from('boards')
+        .from('boards_with_owners')
         .select('*')
         .eq('user_id', session.user.id);
 
       if (ownedErr) throw ownedErr;
 
-      // 2. Carica le bacheche di cui sono membro condiviso
+      // 2. Recupera gli ID delle bacheche condivise con me
       const { data: memberEntries, error: memberErr } = await supabase
         .from('board_members')
         .select('board_id')
@@ -50,30 +50,30 @@ export default function App() {
       if (memberEntries && memberEntries.length > 0) {
         const boardIds = memberEntries.map((m) => m.board_id);
 
-        // Query diretta senza join complessi per evitare errori di schema
+        // 3. Recupera le bacheche condivise (dalla Vista Dinamica con l'email reale del creatore)
         const { data: shared, error: sharedErr } = await supabase
-          .from('boards')
+          .from('boards_with_owners')
           .select('*')
           .in('id', boardIds);
 
         if (!sharedErr) sharedList = shared || [];
       }
 
-      // 3. Unisci le liste impostando l'email del proprietario
+      // Mappatura totalmente dinamica
       setBoards([
         ...(owned || []).map((b) => ({
           ...b,
           isOwner: true,
-          ownerEmail: session.user.email
+          ownerEmail: b.owner_email // Lettura dinamica dal DB
         })),
         ...(sharedList || []).map((b) => ({
           ...b,
           isOwner: false,
-          ownerEmail: b.owner_email || 'Proprietario'
+          ownerEmail: b.owner_email // Lettura dinamica dell'email del proprietario originale
         }))
       ]);
     } catch (err) {
-      console.error('Errore caricamento bacheche:', err.message);
+      console.error('Errore recupero bacheche dinamiche:', err.message);
     }
   };
 
@@ -83,19 +83,17 @@ export default function App() {
       const newBoard = {
         id: `board-${Date.now()}`,
         user_id: session.user.id,
-        title: newBoardTitle.trim(),
-        owner_email: session.user.email // Salva l'email del creatore
+        title: newBoardTitle.trim()
       };
 
-      const { data, error } = await supabase.from('boards').insert([newBoard]).select();
+      // Inserimento nella tabella base 'boards'
+      const { error } = await supabase.from('boards').insert([newBoard]);
       if (error) throw error;
 
-      if (data && data.length > 0) {
-        const created = { ...data[0], isOwner: true, ownerEmail: session.user.email };
-        setBoards((prev) => [created, ...prev]);
-        setNewBoardTitle('');
-        setIsCreatingBoard(false);
-      }
+      // Ricarica la lista per aggiornare lo stato con la vista SQL
+      await fetchBoards();
+      setNewBoardTitle('');
+      setIsCreatingBoard(false);
     } catch (err) {
       alert('Errore creazione bacheca: ' + err.message);
     }
