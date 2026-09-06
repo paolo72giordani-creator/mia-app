@@ -1,25 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import Header from './components/Header';
-import AuthForm from './components/AuthForm';
-import BoardCard from './components/BoardCard';
 import BoardView from './components/BoardView';
 import ShareModal from './components/ShareModal';
 
 export default function App() {
   const [session, setSession] = useState(null);
   const [boards, setBoards] = useState([]);
-  const [activeBoardId, setActiveBoardId] = useState(null);
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [draggedBoardIndex, setDraggedBoardIndex] = useState(null);
-
-  // Stati per la creazione di una nuova bacheca
+  const [activeBoard, setActiveBoard] = useState(null);
   const [newBoardTitle, setNewBoardTitle] = useState('');
   const [isCreatingBoard, setIsCreatingBoard] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
     return () => subscription.unsubscribe();
   }, []);
 
@@ -30,7 +30,9 @@ export default function App() {
   const fetchBoards = async () => {
     if (!session?.user) return;
     try {
-      // 1. Le mie bacheche di proprietà
+      const userEmail = session.user.email.toLowerCase();
+
+      // 1. Bacheche proprietarie
       const { data: owned, error: ownedErr } = await supabase
         .from('boards_with_owners')
         .select('*')
@@ -38,25 +40,22 @@ export default function App() {
 
       if (ownedErr) throw ownedErr;
 
-      // 2. Cerca inviti per user_id oppure per e-mail dell'utente loggato
-      const userEmail = session.user.email.toLowerCase();
-
-      const { data: memberById } = await supabase
+      // 2. Inviti per user_id o email
+      const { data: memberEntries, error: memberErr } = await supabase
         .from('board_members')
-        .select('board_id, role')
-        .eq('user_id', session.user.id);
+        .select('board_id, role, invited_email');
 
-      const { data: memberByEmail } = await supabase
-        .from('board_members')
-        .select('board_id, role')
-        .eq('invited_email', userEmail);
+      if (memberErr) throw memberErr;
 
-      // Unisci le entrate ed elimina i duplicati
-      const allMembers = [...(memberById || []), ...(memberByEmail || [])];
-      
+      const myMemberEntries = (memberEntries || []).filter(
+        (m) =>
+          (m.invited_email && m.invited_email.toLowerCase() === userEmail) ||
+          m.user_id === session.user.id
+      );
+
       let sharedList = [];
-      if (allMembers.length > 0) {
-        const boardIds = [...new Set(allMembers.map((m) => String(m.board_id)))];
+      if (myMemberEntries.length > 0) {
+        const boardIds = [...new Set(myMemberEntries.map((m) => String(m.board_id)))];
 
         const { data: shared, error: sharedErr } = await supabase
           .from('boards_with_owners')
@@ -65,7 +64,7 @@ export default function App() {
 
         if (!sharedErr && shared) {
           sharedList = shared.map((board) => {
-            const memberInfo = allMembers.find((m) => String(m.board_id) === String(board.id));
+            const memberInfo = myMemberEntries.find((m) => String(m.board_id) === String(board.id));
             return {
               ...board,
               role: memberInfo?.role || 'viewer'
@@ -101,11 +100,9 @@ export default function App() {
         title: newBoardTitle.trim()
       };
 
-      // Inserimento nella tabella base 'boards'
       const { error } = await supabase.from('boards').insert([newBoard]);
       if (error) throw error;
 
-      // Ricarica la lista per aggiornare lo stato con la vista SQL
       await fetchBoards();
       setNewBoardTitle('');
       setIsCreatingBoard(false);
@@ -114,105 +111,117 @@ export default function App() {
     }
   };
 
-  const handleDragStart = (e, index) => { setDraggedBoardIndex(index); e.dataTransfer.effectAllowed = 'move'; };
-  const handleDragOver = (e, index) => {
-    e.preventDefault();
-    if (draggedBoardIndex === null || draggedBoardIndex === index) return;
-    const updated = [...boards];
-    const dragged = updated.splice(draggedBoardIndex, 1)[0];
-    updated.splice(index, 0, dragged);
-    setDraggedBoardIndex(index);
-    setBoards(updated);
+  // FUNZIONE ELIMINAZIONE BACHECA
+  const handleDeleteBoard = async (boardId, boardTitle, e) => {
+    e.stopPropagation();
+    if (!window.confirm(`Sei sicuro di voler eliminare definitivamente la bacheca "${boardTitle}"?`)) return;
+
+    try {
+      const { error } = await supabase.from('boards').delete().eq('id', boardId);
+      if (error) throw error;
+
+      setBoards((prev) => prev.filter((b) => b.id !== boardId));
+      if (activeBoard?.id === boardId) setActiveBoard(null);
+    } catch (err) {
+      alert('Errore eliminazione bacheca: ' + err.message);
+    }
   };
 
-  if (!session) return <AuthForm />;
-
-  const activeBoard = boards.find((b) => b.id === activeBoardId);
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <p className="text-slate-600 font-medium">Inizia effettuando l'accesso con Supabase Auth...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-800 text-xs">
-      <Header userEmail={session.user.email} />
-
-      <main className="p-6 max-w-6xl mx-auto">
-        {!activeBoardId ? (
-          <div>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-bold text-slate-900">Le Mie Bacheche</h2>
+    <div className="min-h-screen bg-slate-100 p-6 text-slate-800">
+      {activeBoard ? (
+        <BoardView
+          activeBoard={activeBoard}
+          currentUser={session.user}
+          onBack={() => setActiveBoard(null)}
+          onOpenShare={() => setIsShareModalOpen(true)}
+        />
+      ) : (
+        <div className="max-w-5xl mx-auto">
+          {/* HEADER DASHBOARD */}
+          <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-xl border shadow-sm">
+            <div>
+              <h1 className="text-xl font-bold text-slate-800">Le Tue Bacheche</h1>
+              <p className="text-xs text-slate-500">Utente: {session.user.email}</p>
             </div>
-
-            {/* GRIGLIA BACHECHE CON CARD QUADRATE */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {/* BOX AGGIUNGI BACHECA COME PRIMO ELEMENTO */}
-              {isCreatingBoard ? (
-                <div className="rounded-2xl p-6 border-2 border-blue-500 bg-white shadow-md flex flex-col justify-between aspect-square">
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-base mb-2">Nuova Bacheca</h3>
-                    <input
-                      type="text"
-                      placeholder="Titolo bacheca..."
-                      value={newBoardTitle}
-                      onChange={(e) => setNewBoardTitle(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleCreateBoard()}
-                      autoFocus
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs mb-3 focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => { setIsCreatingBoard(false); setNewBoardTitle(''); }}
-                      className="flex-1 py-2 border rounded-lg text-slate-600 hover:bg-slate-50 transition text-xs font-semibold"
-                    >
-                      Annulla
-                    </button>
-                    <button
-                      onClick={handleCreateBoard}
-                      className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-sm transition text-xs"
-                    >
-                      Crea
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  onClick={() => setIsCreatingBoard(true)}
-                  className="cursor-pointer rounded-2xl p-6 border-2 border-dashed border-slate-300 bg-white/70 hover:bg-white hover:border-blue-500 hover:shadow-lg transition flex flex-col items-center justify-center aspect-square text-slate-500 hover:text-blue-600"
-                >
-                  <span className="text-4xl font-light mb-2 text-blue-600">+</span>
-                  <span className="font-bold text-sm">Crea Nuova Bacheca</span>
-                </div>
-              )}
-
-              {/* LISTA BACHECHE ESISTENTI */}
-              {boards.map((board, index) => (
-                <BoardCard
-                  key={board.id}
-                  board={board}
-                  index={index}
-                  onSelect={(id) => setActiveBoardId(id)}
-                  onDragStart={handleDragStart}
-                  onDragOver={handleDragOver}
-                  onDragEnd={() => setDraggedBoardIndex(null)}
-                />
-              ))}
-            </div>
+            <button
+              onClick={() => setIsCreatingBoard(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition"
+            >
+              + Nuova Bacheca
+            </button>
           </div>
-        ) : (
-          <BoardView
-            activeBoard={activeBoard}
-            currentUser={session.user}
-            onBack={() => setActiveBoardId(null)}
-            onOpenShare={() => setIsShareModalOpen(true)}
-          />
-        )}
 
-        {isShareModalOpen && activeBoard && (
-          <ShareModal
-            activeBoard={activeBoard}
-            currentUserEmail={session.user.email}
-            onClose={() => setIsShareModalOpen(false)}
-          />
-        )}
-      </main>
+          {/* CREAZIONE BACHECA */}
+          {isCreatingBoard && (
+            <div className="mb-6 bg-white border p-4 rounded-xl shadow-sm flex gap-3 items-center">
+              <input
+                type="text"
+                placeholder="Titolo bacheca..."
+                value={newBoardTitle}
+                onChange={(e) => setNewBoardTitle(e.target.value)}
+                className="border rounded-lg px-3 py-1.5 text-xs flex-1 focus:outline-none focus:border-blue-500"
+              />
+              <button onClick={handleCreateBoard} className="bg-blue-600 text-white font-bold text-xs px-4 py-1.5 rounded-lg">
+                Crea
+              </button>
+              <button onClick={() => setIsCreatingBoard(false)} className="border text-slate-600 text-xs px-3 py-1.5 rounded-lg">
+                Annulla
+              </button>
+            </div>
+          )}
+
+          {/* LISTA BACHECHE CON PULSANTE ELIMINA */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {boards.map((board) => (
+              <div
+                key={board.id}
+                onClick={() => setActiveBoard(board)}
+                className="bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition cursor-pointer relative flex justify-between items-start"
+              >
+                <div>
+                  <h3 className="font-bold text-base text-slate-800 mb-1">{board.title}</h3>
+                  <p className="text-xs text-slate-500">
+                    Proprietario: {board.ownerEmail}
+                  </p>
+                  <span className={`inline-block mt-2 text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                    board.isOwner ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {board.isOwner ? 'Proprietario' : board.role}
+                  </span>
+                </div>
+
+                {/* PULSANTE CESTINO PER ELIMINARE LA BACHECA */}
+                {board.isOwner && (
+                  <button
+                    onClick={(e) => handleDeleteBoard(board.id, board.title, e)}
+                    title="Elimina bacheca"
+                    className="text-slate-400 hover:text-red-600 p-1.5 rounded transition hover:bg-red-50 text-sm font-bold"
+                  >
+                    🗑️
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {isShareModalOpen && activeBoard && (
+        <ShareModal
+          activeBoard={activeBoard}
+          currentUserEmail={session.user.email}
+          onClose={() => setIsShareModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
