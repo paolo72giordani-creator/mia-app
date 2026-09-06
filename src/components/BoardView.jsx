@@ -12,8 +12,8 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   // Drag & Drop States
   const [draggedCard, setDraggedCard] = useState(null);
   const [draggedColIndex, setDraggedColIndex] = useState(null);
-  const [dropColIndex, setDropColIndex] = useState(null);
-  const [dragOverColId, setDragOverColId] = useState(null);
+  const [dropTargetColIndex, setDropTargetColIndex] = useState(null);
+  const [dragOverCardColId, setDragOverCardColId] = useState(null);
 
   useEffect(() => {
     if (activeBoard) fetchBoardData();
@@ -112,17 +112,17 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // --- LOGICA DRAG & DROP SCHEDE ---
+  // --- DRAG SCHEDE ---
   const handleCardDragStart = (e, card) => {
     e.stopPropagation();
     setDraggedCard(card);
-    e.dataTransfer.setData('text/plain', card.id);
+    setDraggedColIndex(null);
   };
 
   const handleCardDrop = async (e, targetColumnId) => {
     e.preventDefault();
     e.stopPropagation();
-    setDragOverColId(null);
+    setDragOverCardColId(null);
 
     if (!draggedCard) return;
 
@@ -147,21 +147,21 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // --- LOGICA DRAG & DROP COLONNE CON BARRA VERTICALE ---
+  // --- DRAG COLONNE ---
   const handleColDragStart = (e, index) => {
     setDraggedColIndex(index);
-    e.dataTransfer.setData('type/col', index.toString());
+    setDraggedCard(null);
   };
 
   const handleColDragOver = (e, index) => {
     e.preventDefault();
     if (draggedColIndex === null || draggedColIndex === index) return;
-    setDropColIndex(index);
+    setDropTargetColIndex(index);
   };
 
   const handleColDrop = async (e, targetIndex) => {
     e.preventDefault();
-    setDropColIndex(null);
+    setDropTargetColIndex(null);
 
     if (draggedColIndex === null || draggedColIndex === targetIndex) return;
 
@@ -172,7 +172,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     setColumns(reordered);
     setDraggedColIndex(null);
 
-    // Aggiornamento posizioni su database
     try {
       for (let i = 0; i < reordered.length; i++) {
         await supabase
@@ -181,7 +180,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           .eq('id', reordered[i].id);
       }
     } catch (err) {
-      console.error('Errore salvataggio posizione colonna:', err);
+      console.error('Errore salvataggio posizioni colonne:', err);
     }
   };
 
@@ -205,19 +204,20 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         </button>
       </div>
 
-      {/* AREA COLONNE KANBAN CON BARRA VERTICALE DI POSIZIONAMENTO */}
-      <div className="flex gap-4 overflow-x-auto pb-6 items-start">
+      {/* AREA COLONNE KANBAN CON INDICATORE BARRA BLUE INSERIMENTO */}
+      <div className="flex gap-3 overflow-x-auto pb-6 items-stretch">
         {columns.map((col, colIdx) => {
           const colCards = cards.filter((c) => String(c.column_id) === String(col.id));
-          const isTargetCardCol = dragOverColId === col.id;
-          const showBarBefore = dropColIndex === colIdx && draggedColIndex > colIdx;
-          const showBarAfter = dropColIndex === colIdx && draggedColIndex < colIdx;
+          const isTargetCardCol = dragOverCardColId === col.id;
+          const isColumnDropTarget = dropTargetColIndex === colIdx && draggedColIndex !== null;
+          const isBarOnLeft = isColumnDropTarget && draggedColIndex > colIdx;
+          const isBarOnRight = isColumnDropTarget && draggedColIndex < colIdx;
 
           return (
             <React.Fragment key={col.id}>
-              {/* BARRA VERTICALE DI ANTEPRIMA INSERIMENTO COLONNA (A SINISTRA) */}
-              {showBarBefore && (
-                <div className="w-1.5 self-stretch bg-blue-500 rounded-full shadow-md shadow-blue-500/50 animate-pulse my-1" />
+              {/* BARRA INDICATORE A SINISTRA */}
+              {isBarOnLeft && (
+                <div className="w-2 bg-blue-600 rounded-full shadow-lg shadow-blue-500/50 self-stretch my-1 transition-all" />
               )}
 
               <div
@@ -226,13 +226,13 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                 onDragOver={(e) => {
                   e.preventDefault();
                   if (draggedCard) {
-                    setDragOverColId(col.id);
+                    setDragOverCardColId(col.id);
                   } else {
                     handleColDragOver(e, colIdx);
                   }
                 }}
                 onDragLeave={() => {
-                  setDragOverColId(null);
+                  setDragOverCardColId(null);
                 }}
                 onDrop={(e) => {
                   if (draggedCard) {
@@ -241,81 +241,85 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                     handleColDrop(e, colIdx);
                   }
                 }}
-                className={`w-72 border rounded-xl p-3 flex-shrink-0 shadow-sm transition-all duration-150 ${
+                onDragEnd={() => {
+                  setDraggedColIndex(null);
+                  setDropTargetColIndex(null);
+                }}
+                className={`w-72 border rounded-xl p-3 flex-shrink-0 shadow-sm transition-all duration-150 flex flex-col justify-between ${
                   isTargetCardCol
-                    ? 'bg-blue-50/80 border-blue-400 ring-2 ring-blue-300 ring-offset-1'
+                    ? 'bg-blue-50/80 border-blue-400 ring-2 ring-blue-300'
                     : draggedColIndex === colIdx
-                    ? 'opacity-40 border-dashed border-blue-400'
+                    ? 'opacity-30 border-dashed border-blue-500 bg-slate-300/50'
                     : 'bg-slate-200/70 border-slate-300/70'
                 }`}
               >
-                {/* HEADER COLONNA */}
-                <div className="flex justify-between items-center mb-3 cursor-grab active:cursor-grabbing">
-                  <h3 className="font-bold text-slate-800 text-sm">{col.name}</h3>
-                  <span className="text-xs bg-slate-300/80 text-slate-700 font-bold px-2 py-0.5 rounded-full">
-                    {colCards.length}
-                  </span>
-                </div>
+                <div>
+                  {/* HEADER COLONNA */}
+                  <div className="flex justify-between items-center mb-3 cursor-grab active:cursor-grabbing">
+                    <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                      <span className="text-slate-400 text-xs">⋮⋮</span> {col.name}
+                    </h3>
+                    <span className="text-xs bg-slate-300/80 text-slate-700 font-bold px-2 py-0.5 rounded-full">
+                      {colCards.length}
+                    </span>
+                  </div>
 
-                {/* LISTA SCHEDE TRASCINABILI */}
-                <div className="space-y-2.5 mb-3 min-h-[50px]">
-                  {colCards.map((card) => {
-                    const cardDetails = card.description || card.details;
-                    const isBeingDragged = draggedCard?.id === card.id;
+                  {/* LISTA SCHEDE */}
+                  <div className="space-y-2.5 mb-3 min-h-[50px]">
+                    {colCards.map((card) => {
+                      const cardDetails = card.description || card.details;
+                      const isBeingDragged = draggedCard?.id === card.id;
 
-                    return (
-                      <div
-                        key={card.id}
-                        draggable
-                        onDragStart={(e) => handleCardDragStart(e, card)}
-                        onClick={() => setSelectedCard(card)}
-                        className={`bg-white border border-slate-200 rounded-lg p-3 shadow-sm hover:border-blue-400 hover:shadow transition cursor-pointer relative group ${
-                          isBeingDragged ? 'opacity-40 border-dashed border-blue-500' : ''
-                        }`}
-                      >
-                        {/* INTESTAZIONE SCHEDA: TITOLO E BOTTONE ELIMINA */}
-                        <div className="flex justify-between items-start gap-2 mb-1.5">
-                          <h4 className="font-semibold text-slate-900 text-sm leading-snug flex-1">
-                            {card.title}
-                          </h4>
-                          <button
-                            onClick={(e) => handleDeleteCard(card.id, e)}
-                            title="Elimina scheda"
-                            className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-xs font-bold"
-                          >
-                            🗑️
-                          </button>
-                        </div>
-
-                        {/* ESTRATTO DETTAGLI/DESCRIZIONE */}
-                        {cardDetails && (
-                          <p className="text-xs text-slate-600 line-clamp-2 mb-2 leading-relaxed">
-                            {cardDetails}
-                          </p>
-                        )}
-
-                        {/* BADGE ALLEGATI */}
-                        {card.attachments && card.attachments.length > 0 && (
-                          <div className="flex justify-end pt-1 border-t border-slate-100">
-                            <span className="text-[11px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200 font-medium">
-                              📎 {card.attachments.length}
-                            </span>
+                      return (
+                        <div
+                          key={card.id}
+                          draggable
+                          onDragStart={(e) => handleCardDragStart(e, card)}
+                          onClick={() => setSelectedCard(card)}
+                          className={`bg-white border border-slate-200 rounded-lg p-3 shadow-sm hover:border-blue-400 hover:shadow transition cursor-pointer relative ${
+                            isBeingDragged ? 'opacity-40 border-dashed border-blue-500' : ''
+                          }`}
+                        >
+                          <div className="flex justify-between items-start gap-2 mb-1.5">
+                            <h4 className="font-semibold text-slate-900 text-sm leading-snug flex-1">
+                              {card.title}
+                            </h4>
+                            <button
+                              onClick={(e) => handleDeleteCard(card.id, e)}
+                              title="Elimina scheda"
+                              className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-xs font-bold"
+                            >
+                              🗑️
+                            </button>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
 
-                  {/* PLACEHOLDER SCHEDA */}
-                  {isTargetCardCol && draggedCard && String(draggedCard.column_id) !== String(col.id) && (
-                    <div className="border-2 border-dashed border-blue-400 bg-blue-100/50 rounded-lg p-3 text-center text-blue-600 text-xs font-medium">
-                      Rilascia qui per spostare
-                    </div>
-                  )}
+                          {cardDetails && (
+                            <p className="text-xs text-slate-600 line-clamp-2 mb-2 leading-relaxed">
+                              {cardDetails}
+                            </p>
+                          )}
+
+                          {card.attachments && card.attachments.length > 0 && (
+                            <div className="flex justify-end pt-1 border-t border-slate-100">
+                              <span className="text-[11px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200 font-medium">
+                                📎 {card.attachments.length}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {isTargetCardCol && draggedCard && String(draggedCard.column_id) !== String(col.id) && (
+                      <div className="border-2 border-dashed border-blue-400 bg-blue-100/50 rounded-lg p-3 text-center text-blue-600 text-xs font-medium">
+                        Rilascia qui la scheda
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* FORM NUOVA SCHEDA */}
-                <div className="flex gap-1.5 pt-2 border-t border-slate-300/70">
+                <div className="flex gap-1.5 pt-2 border-t border-slate-300/70 mt-auto">
                   <input
                     type="text"
                     placeholder="Nuova scheda..."
@@ -333,9 +337,9 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                 </div>
               </div>
 
-              {/* BARRA VERTICALE DI ANTEPRIMA INSERIMENTO COLONNA (A DESTRA) */}
-              {showBarAfter && (
-                <div className="w-1.5 self-stretch bg-blue-500 rounded-full shadow-md shadow-blue-500/50 animate-pulse my-1" />
+              {/* BARRA INDICATORE A DESTRA */}
+              {isBarOnRight && (
+                <div className="w-2 bg-blue-600 rounded-full shadow-lg shadow-blue-500/50 self-stretch my-1 transition-all" />
               )}
             </React.Fragment>
           );
@@ -360,7 +364,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         </div>
       </div>
 
-      {/* POP-UP DETTAGLI SCHEDA */}
+      {/* DETTAGLI SCHEDA */}
       {selectedCard && (
         <CardDetailModal
           card={selectedCard}
