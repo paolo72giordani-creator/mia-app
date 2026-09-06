@@ -145,7 +145,7 @@ export default function App() {
         />
       ) : (
         <div className="max-w-6xl mx-auto">
-          {/* HEADER DASHBOARD SNELLO */}
+          {/* HEADER DASHBOARD */}
           <div className="bg-white p-4 rounded-xl border shadow-sm mb-6 flex justify-between items-center">
             <div>
               <h1 className="text-xl font-bold text-slate-800">Le Tue Bacheche</h1>
@@ -153,20 +153,20 @@ export default function App() {
             </div>
           </div>
 
-          {/* GRIGLIA BACHECHE CON CREAZIONE COME PRIMO CARD */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {/* CARD 1: AGGIUNGI NUOVA BACHECA */}
-            <div className="bg-white border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-4 min-h-[120px] flex flex-col justify-center items-center transition shadow-sm">
+          {/* GRIGLIA BACHECHE QUADRATE */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {/* CARD 1: NUOVA BACHECA QUADRATA */}
+            <div className="aspect-square bg-white border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-4 flex flex-col justify-center items-center transition shadow-sm">
               {!isCreatingBoard ? (
                 <button
                   onClick={() => setIsCreatingBoard(true)}
-                  className="w-full h-full flex flex-col items-center justify-center text-blue-600 hover:text-blue-700 font-bold text-sm gap-1"
+                  className="w-full h-full flex flex-col items-center justify-center text-blue-600 hover:text-blue-700 font-bold text-xs gap-1"
                 >
-                  <span className="text-xl">+</span>
+                  <span className="text-2xl">+</span>
                   <span>Nuova Bacheca</span>
                 </button>
               ) : (
-                <div className="w-full space-y-2">
+                <div className="w-full h-full flex flex-col justify-center space-y-2">
                   <input
                     type="text"
                     placeholder="Titolo bacheca..."
@@ -174,18 +174,18 @@ export default function App() {
                     onChange={(e) => setNewBoardTitle(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleCreateBoard()}
                     autoFocus
-                    className="w-full border rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500"
+                    className="w-full border rounded-lg px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-blue-500"
                   />
-                  <div className="flex gap-1.5 justify-end">
+                  <div className="flex gap-1 justify-center">
                     <button
                       onClick={() => setIsCreatingBoard(false)}
-                      className="border px-2.5 py-1 rounded-md text-[11px] text-slate-600 font-medium"
+                      className="border px-2 py-1 rounded text-[10px] text-slate-600 font-medium"
                     >
                       Annulla
                     </button>
                     <button
                       onClick={handleCreateBoard}
-                      className="bg-blue-600 text-white font-bold text-[11px] px-3 py-1 rounded-md"
+                      className="bg-blue-600 text-white font-bold text-[10px] px-2.5 py-1 rounded"
                     >
                       Crea
                     </button>
@@ -194,34 +194,34 @@ export default function App() {
               )}
             </div>
 
-            {/* LISTA BACHECHE SALVATE */}
+            {/* CARD BACHECHE SALVATE QUADRATE */}
             {boards.map((board) => (
               <div
                 key={board.id}
                 onClick={() => setActiveBoard(board)}
-                className="bg-white border rounded-xl p-4 min-h-[120px] shadow-sm hover:shadow-md transition cursor-pointer relative flex flex-col justify-between"
+                className="aspect-square bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition cursor-pointer relative flex flex-col justify-between"
               >
-                <div className="flex justify-between items-start gap-2">
-                  <h3 className="font-bold text-base text-slate-800 leading-snug line-clamp-2">
+                <div className="flex justify-between items-start gap-1">
+                  <h3 className="font-bold text-sm text-slate-800 leading-snug line-clamp-3">
                     {board.title}
                   </h3>
                   {board.isOwner && (
                     <button
                       onClick={(e) => handleDeleteBoard(board.id, board.title, e)}
                       title="Elimina bacheca"
-                      className="text-slate-300 hover:text-red-600 transition p-1 rounded hover:bg-red-50 text-sm font-bold flex-shrink-0"
+                      className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-xs font-bold flex-shrink-0"
                     >
                       🗑️
                     </button>
                   )}
                 </div>
 
-                <div className="mt-3">
-                  <p className="text-[11px] text-slate-500 truncate mb-1.5">
+                <div>
+                  <p className="text-[10px] text-slate-500 truncate mb-1" title={board.ownerEmail}>
                     Proprietario: {board.ownerEmail}
                   </p>
                   <span
-                    className={`inline-block text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${
+                    className={`inline-block text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
                       board.isOwner ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-800'
                     }`}
                   >
