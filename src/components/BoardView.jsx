@@ -8,7 +8,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   const [newColumnName, setNewColumnName] = useState('');
   const [selectedCard, setSelectedCard] = useState(null);
 
-  // Stato per tracciare quale colonna ha il form di creazione aperto
+  // Stato per il form di creazione scheda per colonna
   const [addingCardColId, setAddingCardColId] = useState(null);
   const [cardTitleInput, setCardTitleInput] = useState('');
 
@@ -16,6 +16,15 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   const [draggedCard, setDraggedCard] = useState(null);
   const [draggedColIndex, setDraggedColIndex] = useState(null);
   const [dragOverCardColId, setDragOverCardColId] = useState(null);
+
+  // Palette di colori ciclica per gli header delle colonne
+  const columnHeaderColors = [
+    'bg-slate-800 text-white',
+    'bg-blue-600 text-white',
+    'bg-indigo-600 text-white',
+    'bg-emerald-600 text-white',
+    'bg-amber-600 text-white'
+  ];
 
   useEffect(() => {
     if (activeBoard) fetchBoardData();
@@ -115,7 +124,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // --- LOGICA DRAG & DROP SCHEDE ---
+  // Drag & Drop Handlers
   const handleCardDragStart = (e, card) => {
     e.stopPropagation();
     setDraggedCard(card);
@@ -150,7 +159,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // --- LOGICA DRAG & DROP COLONNE ---
   const handleColDragStart = (e, index) => {
     setDraggedColIndex(index);
     setDraggedCard(null);
@@ -212,6 +220,9 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           const isColumnBeingDragged = draggedColIndex === colIdx;
           const isAddingHere = addingCardColId === col.id;
 
+          // Assegnazione colore header
+          const headerColorStyle = columnHeaderColors[colIdx % columnHeaderColors.length];
+
           return (
             <div
               key={col.id}
@@ -230,124 +241,126 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                 if (draggedCard) handleCardDrop(e, col.id);
               }}
               onDragEnd={handleColDragEnd}
-              className={`w-72 border rounded-xl p-3 flex-shrink-0 shadow-sm transition-all duration-200 flex flex-col justify-between ${
+              className={`w-72 border rounded-xl overflow-hidden flex-shrink-0 shadow-sm transition-all duration-200 bg-slate-200/70 border-slate-300/70 ${
                 isColumnBeingDragged
-                  ? 'border-2 border-dashed border-blue-500 bg-blue-50/40 opacity-60 scale-95'
+                  ? 'border-2 border-dashed border-blue-500 opacity-60 scale-95'
                   : isTargetCardCol
                   ? 'bg-blue-50/80 border-blue-400 ring-2 ring-blue-300'
-                  : 'bg-slate-200/70 border-slate-300/70'
+                  : ''
               }`}
             >
-              <div>
-                {/* HEADER COLONNA */}
-                <div className="flex justify-between items-center mb-3 cursor-grab active:cursor-grabbing">
-                  <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                    <span className="text-slate-400 text-xs">⋮⋮</span> {col.name}
-                  </h3>
-                  <span className="text-xs bg-slate-300/80 text-slate-700 font-bold px-2 py-0.5 rounded-full">
-                    {colCards.length}
-                  </span>
-                </div>
-
-                {/* LISTA SCHEDE */}
-                <div className="space-y-2.5 mb-3 min-h-[30px]">
-                  {colCards.map((card) => {
-                    const cardDetails = card.description || card.details;
-                    const isBeingDragged = draggedCard?.id === card.id;
-
-                    return (
-                      <div
-                        key={card.id}
-                        draggable
-                        onDragStart={(e) => handleCardDragStart(e, card)}
-                        onClick={() => setSelectedCard(card)}
-                        className={`bg-white border border-slate-200 rounded-lg p-3 shadow-sm hover:border-blue-400 hover:shadow transition cursor-pointer relative ${
-                          isBeingDragged ? 'opacity-30 border-dashed border-blue-500' : ''
-                        }`}
-                      >
-                        <div className="flex justify-between items-start gap-2 mb-1.5">
-                          <h4 className="font-semibold text-slate-900 text-sm leading-snug flex-1">
-                            {card.title}
-                          </h4>
-                          <button
-                            onClick={(e) => handleDeleteCard(card.id, e)}
-                            title="Elimina scheda"
-                            className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-xs font-bold"
-                          >
-                            🗑️
-                          </button>
-                        </div>
-
-                        {cardDetails && (
-                          <p className="text-xs text-slate-600 line-clamp-2 mb-2 leading-relaxed">
-                            {cardDetails}
-                          </p>
-                        )}
-
-                        {card.attachments && card.attachments.length > 0 && (
-                          <div className="flex justify-end pt-1 border-t border-slate-100">
-                            <span className="text-[11px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200 font-medium">
-                              📎 {card.attachments.length}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {isTargetCardCol && draggedCard && String(draggedCard.column_id) !== String(col.id) && (
-                    <div className="border-2 border-dashed border-blue-400 bg-blue-100/50 rounded-lg p-3 text-center text-blue-600 text-xs font-medium">
-                      Rilascia qui la scheda
-                    </div>
-                  )}
-                </div>
+              {/* HEADER COLONNA COLORATO */}
+              <div className={`p-3 flex justify-between items-center cursor-grab active:cursor-grabbing ${headerColorStyle}`}>
+                <h3 className="font-bold text-sm flex items-center gap-1.5">
+                  <span className="opacity-60 text-xs">⋮⋮</span> {col.name}
+                </h3>
+                <span className="text-xs bg-white/20 text-white font-bold px-2 py-0.5 rounded-full border border-white/20">
+                  {colCards.length}
+                </span>
               </div>
 
-              {/* PULSANTE O FORM NUOVA SCHEDA */}
-              <div className="pt-2 border-t border-slate-300/70 mt-auto">
-                {isAddingHere ? (
-                  <div className="bg-white border border-slate-300 rounded-lg p-2 shadow-sm">
-                    <input
-                      type="text"
-                      placeholder="Titolo scheda..."
-                      value={cardTitleInput}
-                      onChange={(e) => setCardTitleInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddCard(col.id)}
-                      autoFocus
-                      className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 mb-2 focus:outline-none focus:border-blue-500"
-                    />
-                    <div className="flex justify-end gap-1.5">
-                      <button
-                        onClick={() => { setAddingCardColId(null); setCardTitleInput(''); }}
-                        className="px-2.5 py-1 text-slate-500 hover:text-slate-700 text-xs font-medium"
-                      >
-                        Annulla
-                      </button>
-                      <button
-                        onClick={() => handleAddCard(col.id)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded font-bold text-xs transition"
-                      >
-                        Aggiungi
-                      </button>
-                    </div>
+              {/* CONTENUTO COLONNA (PATTING COMPATTO SENZA MIN-HEIGHT QUANDO VUOTO) */}
+              <div className="p-2.5">
+                {colCards.length > 0 && (
+                  <div className="space-y-2 mb-2">
+                    {colCards.map((card) => {
+                      const cardDetails = card.description || card.details;
+                      const isBeingDragged = draggedCard?.id === card.id;
+
+                      return (
+                        <div
+                          key={card.id}
+                          draggable
+                          onDragStart={(e) => handleCardDragStart(e, card)}
+                          onClick={() => setSelectedCard(card)}
+                          className={`bg-white border border-slate-200 rounded-lg p-3 shadow-sm hover:border-blue-400 hover:shadow transition cursor-pointer relative ${
+                            isBeingDragged ? 'opacity-30 border-dashed border-blue-500' : ''
+                          }`}
+                        >
+                          <div className="flex justify-between items-start gap-2 mb-1.5">
+                            <h4 className="font-semibold text-slate-900 text-sm leading-snug flex-1">
+                              {card.title}
+                            </h4>
+                            <button
+                              onClick={(e) => handleDeleteCard(card.id, e)}
+                              title="Elimina scheda"
+                              className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-xs font-bold"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+
+                          {cardDetails && (
+                            <p className="text-xs text-slate-600 line-clamp-2 mb-2 leading-relaxed">
+                              {cardDetails}
+                            </p>
+                          )}
+
+                          {card.attachments && card.attachments.length > 0 && (
+                            <div className="flex justify-end pt-1 border-t border-slate-100">
+                              <span className="text-[11px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200 font-medium">
+                                📎 {card.attachments.length}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setAddingCardColId(col.id);
-                      setCardTitleInput('');
-                    }}
-                    className="w-full py-2 px-3 rounded-lg border border-dashed border-slate-300/80 bg-white/50 hover:bg-white hover:border-blue-400 text-slate-600 hover:text-blue-600 font-medium text-xs transition flex items-center justify-center gap-1.5"
-                  >
-                    <span>+</span> Aggiungi scheda
-                  </button>
                 )}
+
+                {isTargetCardCol && draggedCard && String(draggedCard.column_id) !== String(col.id) && (
+                  <div className="border-2 border-dashed border-blue-400 bg-blue-100/50 rounded-lg p-3 text-center text-blue-600 text-xs font-medium mb-2">
+                    Rilascia qui la scheda
+                  </div>
+                )}
+
+                {/* BOTTONE O FORM NUOVA SCHEDA COMPATTO */}
+                <div>
+                  {isAddingHere ? (
+                    <div className="bg-white border border-slate-300 rounded-lg p-2 shadow-sm">
+                      <input
+                        type="text"
+                        placeholder="Titolo scheda..."
+                        value={cardTitleInput}
+                        onChange={(e) => setCardTitleInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddCard(col.id)}
+                        autoFocus
+                        className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 mb-2 focus:outline-none focus:border-blue-500"
+                      />
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                          onClick={() => { setAddingCardColId(null); setCardTitleInput(''); }}
+                          className="px-2.5 py-1 text-slate-500 hover:text-slate-700 text-xs font-medium"
+                        >
+                          Annulla
+                        </button>
+                        <button
+                          onClick={() => handleAddCard(col.id)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded font-bold text-xs transition"
+                        >
+                          Aggiungi
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setAddingCardColId(col.id);
+                        setCardTitleInput('');
+                      }}
+                      className="w-full py-2 px-3 rounded-lg border border-dashed border-slate-300 bg-white hover:border-blue-400 text-slate-600 hover:text-blue-600 font-medium text-xs transition flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                      <span>+</span> Aggiungi scheda
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           );
         })}
 
-        {/* AGGIUNGI COLONNA */}
+        {/* BOX AGGIUNGI COLONNA */}
         <div className="w-72 bg-white border-2 border-dashed border-slate-300 rounded-xl p-3 flex-shrink-0">
           <input
             type="text"
