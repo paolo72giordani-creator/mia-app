@@ -76,7 +76,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         id: `card-${Date.now()}`,
         user_id: currentUser.id,
         column_id: String(columnId),
-        board_id: String(activeBoard.id),
         title: title,
         position: colCards.length
       };
