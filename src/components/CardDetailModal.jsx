@@ -67,7 +67,7 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
         setAttachments((prev) => [...prev, data[0]]);
       } catch (err) {
         alert('Errore caricamento allegato: ' + err.message);
-      } font-medium {
+      } finally {
         setUploading(false);
       }
     }
@@ -81,17 +81,16 @@ export default function CardDetailModal({ card, columnId, onClose, onSaveCard, o
 
     setUploading(true);
     try {
-      // Recupera la sessione utente corrente per garantire l'user_id
       const { data: { session } } = await supabase.auth.getSession();
       const currentUserId = session?.user?.id;
 
       if (!currentUserId) {
-        alert('Sessione utente non valida. Riapri l\'applicazione.');
+        alert("Sessione utente non valida. Riapri l'applicazione.");
         return;
       }
 
       if (isNew) {
-        // 1. Inserimento nuova scheda con user_id obbligatorio
+        // 1. Inserimento nuova scheda
         const newCardPayload = {
           id: `card-${Date.now()}`,
           user_id: currentUserId,
