@@ -111,7 +111,6 @@ export default function App() {
     }
   };
 
-  // FUNZIONE ELIMINAZIONE BACHECA
   const handleDeleteBoard = async (boardId, boardTitle, e) => {
     e.stopPropagation();
     if (!window.confirm(`Sei sicuro di voler eliminare definitivamente la bacheca "${boardTitle}"?`)) return;
@@ -145,70 +144,90 @@ export default function App() {
           onOpenShare={() => setIsShareModalOpen(true)}
         />
       ) : (
-        <div className="max-w-5xl mx-auto">
-          {/* HEADER DASHBOARD */}
-          <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-xl border shadow-sm">
+        <div className="max-w-6xl mx-auto">
+          {/* HEADER DASHBOARD SNELLO */}
+          <div className="bg-white p-4 rounded-xl border shadow-sm mb-6 flex justify-between items-center">
             <div>
               <h1 className="text-xl font-bold text-slate-800">Le Tue Bacheche</h1>
               <p className="text-xs text-slate-500">Utente: {session.user.email}</p>
             </div>
-            <button
-              onClick={() => setIsCreatingBoard(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-lg transition"
-            >
-              + Nuova Bacheca
-            </button>
           </div>
 
-          {/* CREAZIONE BACHECA */}
-          {isCreatingBoard && (
-            <div className="mb-6 bg-white border p-4 rounded-xl shadow-sm flex gap-3 items-center">
-              <input
-                type="text"
-                placeholder="Titolo bacheca..."
-                value={newBoardTitle}
-                onChange={(e) => setNewBoardTitle(e.target.value)}
-                className="border rounded-lg px-3 py-1.5 text-xs flex-1 focus:outline-none focus:border-blue-500"
-              />
-              <button onClick={handleCreateBoard} className="bg-blue-600 text-white font-bold text-xs px-4 py-1.5 rounded-lg">
-                Crea
-              </button>
-              <button onClick={() => setIsCreatingBoard(false)} className="border text-slate-600 text-xs px-3 py-1.5 rounded-lg">
-                Annulla
-              </button>
+          {/* GRIGLIA BACHECHE CON CREAZIONE COME PRIMO CARD */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {/* CARD 1: AGGIUNGI NUOVA BACHECA */}
+            <div className="bg-white border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-4 min-h-[120px] flex flex-col justify-center items-center transition shadow-sm">
+              {!isCreatingBoard ? (
+                <button
+                  onClick={() => setIsCreatingBoard(true)}
+                  className="w-full h-full flex flex-col items-center justify-center text-blue-600 hover:text-blue-700 font-bold text-sm gap-1"
+                >
+                  <span className="text-xl">+</span>
+                  <span>Nuova Bacheca</span>
+                </button>
+              ) : (
+                <div className="w-full space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Titolo bacheca..."
+                    value={newBoardTitle}
+                    onChange={(e) => setNewBoardTitle(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleCreateBoard()}
+                    autoFocus
+                    className="w-full border rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500"
+                  />
+                  <div className="flex gap-1.5 justify-end">
+                    <button
+                      onClick={() => setIsCreatingBoard(false)}
+                      className="border px-2.5 py-1 rounded-md text-[11px] text-slate-600 font-medium"
+                    >
+                      Annulla
+                    </button>
+                    <button
+                      onClick={handleCreateBoard}
+                      className="bg-blue-600 text-white font-bold text-[11px] px-3 py-1 rounded-md"
+                    >
+                      Crea
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
 
-          {/* LISTA BACHECHE CON PULSANTE ELIMINA */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* LISTA BACHECHE SALVATE */}
             {boards.map((board) => (
               <div
                 key={board.id}
                 onClick={() => setActiveBoard(board)}
-                className="bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition cursor-pointer relative flex justify-between items-start"
+                className="bg-white border rounded-xl p-4 min-h-[120px] shadow-sm hover:shadow-md transition cursor-pointer relative flex flex-col justify-between"
               >
-                <div>
-                  <h3 className="font-bold text-base text-slate-800 mb-1">{board.title}</h3>
-                  <p className="text-xs text-slate-500">
+                <div className="flex justify-between items-start gap-2">
+                  <h3 className="font-bold text-base text-slate-800 leading-snug line-clamp-2">
+                    {board.title}
+                  </h3>
+                  {board.isOwner && (
+                    <button
+                      onClick={(e) => handleDeleteBoard(board.id, board.title, e)}
+                      title="Elimina bacheca"
+                      className="text-slate-300 hover:text-red-600 transition p-1 rounded hover:bg-red-50 text-sm font-bold flex-shrink-0"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
+
+                <div className="mt-3">
+                  <p className="text-[11px] text-slate-500 truncate mb-1.5">
                     Proprietario: {board.ownerEmail}
                   </p>
-                  <span className={`inline-block mt-2 text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
-                    board.isOwner ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
-                  }`}>
+                  <span
+                    className={`inline-block text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${
+                      board.isOwner ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
                     {board.isOwner ? 'Proprietario' : board.role}
                   </span>
                 </div>
-
-                {/* PULSANTE CESTINO PER ELIMINARE LA BACHECA */}
-                {board.isOwner && (
-                  <button
-                    onClick={(e) => handleDeleteBoard(board.id, board.title, e)}
-                    title="Elimina bacheca"
-                    className="text-slate-400 hover:text-red-600 p-1.5 rounded transition hover:bg-red-50 text-sm font-bold"
-                  >
-                    🗑️
-                  </button>
-                )}
               </div>
             ))}
           </div>
