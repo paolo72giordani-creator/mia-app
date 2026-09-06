@@ -25,8 +25,8 @@ export default function CardDetailModal({ card, columnId, isViewer = false, onCl
     }
   };
 
-  // CARICAMENTO ALLEGATI
   const handleFileUpload = async (e) => {
+    if (isViewer) return;
     const file = e.target.files[0];
     if (!file) return;
 
@@ -74,8 +74,8 @@ export default function CardDetailModal({ card, columnId, isViewer = false, onCl
     }
   };
 
-  // ELIMINAZIONE ALLEGATO SALVATO SU DB
   const handleDeleteAttachment = async (attId) => {
+    if (isViewer) return;
     if (!window.confirm('Vuoi rimuovere questo allegato?')) return;
 
     try {
@@ -87,12 +87,13 @@ export default function CardDetailModal({ card, columnId, isViewer = false, onCl
     }
   };
 
-  // RIMOZIONE FILE IN ATTESA (NUOVA SCHEDA)
   const handleRemovePendingFile = (index) => {
+    if (isViewer) return;
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSave = async () => {
+    if (isViewer) return;
     if (!title.trim()) {
       alert('Inserisci un titolo per la scheda.');
       return;
@@ -109,7 +110,6 @@ export default function CardDetailModal({ card, columnId, isViewer = false, onCl
       }
 
       if (isNew) {
-        // 1. Inserimento nuova scheda
         const newCardPayload = {
           id: `card-${Date.now()}`,
           user_id: currentUserId,
@@ -127,7 +127,6 @@ export default function CardDetailModal({ card, columnId, isViewer = false, onCl
         if (error) throw error;
         const newCard = createdCard[0];
 
-        // 2. Caricamento file in attesa
         const uploadedAttachments = [];
         if (pendingFiles.length > 0) {
           for (const file of pendingFiles) {
@@ -163,7 +162,6 @@ export default function CardDetailModal({ card, columnId, isViewer = false, onCl
 
         onSaveCard({ ...newCard, attachments: uploadedAttachments }, true);
       } else {
-        // Aggiornamento scheda esistente
         const { error } = await supabase
           .from('cards')
           .update({ title, description })
@@ -185,7 +183,7 @@ export default function CardDetailModal({ card, columnId, isViewer = false, onCl
       <div className="bg-white border rounded-xl w-full max-w-md p-4 shadow-xl">
         <div className="flex justify-between items-center mb-3">
           <h3 className="font-bold text-sm text-slate-800">
-            {isNew ? 'Nuova Scheda' : 'Dettagli Scheda'}
+            {isViewer ? 'Dettagli Scheda (Sola Lettura)' : isNew ? 'Nuova Scheda' : 'Dettagli Scheda'}
           </h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
         </div>
@@ -197,9 +195,13 @@ export default function CardDetailModal({ card, columnId, isViewer = false, onCl
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            disabled={isViewer}
+            readOnly={isViewer}
             placeholder="Inserisci il titolo..."
-            autoFocus
-            className="w-full border rounded px-2.5 py-1.5 text-sm font-semibold focus:outline-none focus:border-blue-500"
+            autoFocus={!isViewer}
+            className={`w-full border rounded px-2.5 py-1.5 text-sm font-semibold focus:outline-none ${
+              isViewer ? 'bg-slate-100 text-slate-700 border-slate-200 cursor-not-allowed' : 'focus:border-blue-500'
+            }`}
           />
         </div>
 
@@ -210,8 +212,12 @@ export default function CardDetailModal({ card, columnId, isViewer = false, onCl
             rows="3"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Aggiungi dettagli, note o istruzioni..."
-            className="w-full border rounded p-2 text-sm focus:outline-none focus:border-blue-500"
+            disabled={isViewer}
+            readOnly={isViewer}
+            placeholder={isViewer ? 'Nessuna descrizione.' : 'Aggiungi dettagli, note o istruzioni...'}
+            className={`w-full border rounded p-2 text-sm focus:outline-none ${
+              isViewer ? 'bg-slate-100 text-slate-700 border-slate-200 cursor-not-allowed' : 'focus:border-blue-500'
+            }`}
           />
         </div>
 
@@ -219,7 +225,6 @@ export default function CardDetailModal({ card, columnId, isViewer = false, onCl
         <div className="mb-4">
           <label className="block text-[10px] font-semibold text-slate-500 mb-1">Allegati</label>
           <div className="space-y-1.5 mb-2 max-h-28 overflow-y-auto">
-            {/* ALLEGATI GIÀ SALVATI */}
             {attachments.map((att) => (
               <div key={att.id} className="flex justify-between items-center bg-slate-50 p-1.5 rounded border text-[11px]">
                 <span className="truncate max-w-[180px] font-medium text-slate-700">📎 {att.file_name}</span>
@@ -227,19 +232,20 @@ export default function CardDetailModal({ card, columnId, isViewer = false, onCl
                   <a href={att.file_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-medium">
                     Apri ↗
                   </a>
-                  <button
-                    onClick={() => handleDeleteAttachment(att.id)}
-                    title="Elimina allegato"
-                    className="text-slate-400 hover:text-red-600 transition p-0.5 rounded"
-                  >
-                    🗑️
-                  </button>
+                  {!isViewer && (
+                    <button
+                      onClick={() => handleDeleteAttachment(att.id)}
+                      title="Elimina allegato"
+                      className="text-slate-400 hover:text-red-600 transition p-0.5 rounded"
+                    >
+                      🗑️
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
 
-            {/* ALLEGATI IN ATTESA (PER NUOVE SCHEDE) */}
-            {pendingFiles.map((f, idx) => (
+            {!isViewer && pendingFiles.map((f, idx) => (
               <div key={idx} className="flex justify-between items-center bg-blue-50/60 p-1.5 rounded border border-blue-200 text-[11px]">
                 <span className="truncate max-w-[180px] font-medium text-slate-700">📎 {f.name}</span>
                 <div className="flex items-center gap-2">
@@ -260,15 +266,17 @@ export default function CardDetailModal({ card, columnId, isViewer = false, onCl
             )}
           </div>
 
-          <label className="inline-block bg-slate-100 hover:bg-slate-200 border text-slate-700 px-2.5 py-1 rounded cursor-pointer font-medium text-[10px]">
-            {uploading ? 'Elaborazione...' : '+ Carica File'}
-            <input type="file" onChange={handleFileUpload} className="hidden" disabled={uploading} />
-          </label>
+          {!isViewer && (
+            <label className="inline-block bg-slate-100 hover:bg-slate-200 border text-slate-700 px-2.5 py-1 rounded cursor-pointer font-medium text-[10px]">
+              {uploading ? 'Elaborazione...' : '+ Carica File'}
+              <input type="file" onChange={handleFileUpload} className="hidden" disabled={uploading} />
+            </label>
+          )}
         </div>
 
         {/* AZIONI */}
         <div className="flex justify-between items-center pt-3 border-t">
-          {!isNew ? (
+          {!isViewer && !isNew ? (
             <button
               onClick={() => {
                 if (window.confirm('Cancellare questa scheda?')) onDeleteCard(card.id);
@@ -280,10 +288,18 @@ export default function CardDetailModal({ card, columnId, isViewer = false, onCl
           ) : <div />}
 
           <div className="flex gap-2">
-            <button onClick={onClose} className="border px-3 py-1.5 rounded text-slate-600 font-medium">Annulla</button>
-            <button onClick={handleSave} disabled={uploading} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded font-bold">
-              {uploading ? 'Salvataggio...' : isNew ? 'Crea Scheda' : 'Salva'}
-            </button>
+            {isViewer ? (
+              <button onClick={onClose} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-1.5 rounded font-bold">
+                Chiudi
+              </button>
+            ) : (
+              <>
+                <button onClick={onClose} className="border px-3 py-1.5 rounded text-slate-600 font-medium">Annulla</button>
+                <button onClick={handleSave} disabled={uploading} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded font-bold">
+                  {uploading ? 'Salvataggio...' : isNew ? 'Crea Scheda' : 'Salva'}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
