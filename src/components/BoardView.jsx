@@ -220,7 +220,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           const isColumnBeingDragged = draggedColIndex === colIdx;
           const isAddingHere = addingCardColId === col.id;
 
-          // Assegnazione colore header
           const headerColorStyle = columnHeaderColors[colIdx % columnHeaderColors.length];
 
           return (
@@ -251,18 +250,18 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
             >
               {/* HEADER COLONNA COLORATO */}
               <div className={`p-3 flex justify-between items-center cursor-grab active:cursor-grabbing ${headerColorStyle}`}>
-                <h3 className="font-bold text-sm flex items-center gap-1.5">
-                  <span className="opacity-60 text-xs">⋮⋮</span> {col.name}
+                <h3 className="font-bold text-base flex items-center gap-1.5">
+                  <span className="opacity-60 text-sm">⋮⋮</span> {col.name}
                 </h3>
-                <span className="text-xs bg-white/20 text-white font-bold px-2 py-0.5 rounded-full border border-white/20">
+                <span className="text-xs bg-white/20 text-white font-bold px-2.5 py-0.5 rounded-full border border-white/20">
                   {colCards.length}
                 </span>
               </div>
 
-              {/* CONTENUTO COLONNA (PATTING COMPATTO SENZA MIN-HEIGHT QUANDO VUOTO) */}
+              {/* CONTENUTO COLONNA */}
               <div className="p-2.5">
                 {colCards.length > 0 && (
-                  <div className="space-y-2 mb-2">
+                  <div className="space-y-2.5 mb-2">
                     {colCards.map((card) => {
                       const cardDetails = card.description || card.details;
                       const isBeingDragged = draggedCard?.id === card.id;
@@ -273,32 +272,34 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                           draggable
                           onDragStart={(e) => handleCardDragStart(e, card)}
                           onClick={() => setSelectedCard(card)}
-                          className={`bg-white border border-slate-200 rounded-lg p-3 shadow-sm hover:border-blue-400 hover:shadow transition cursor-pointer relative ${
+                          className={`bg-white border border-slate-200 rounded-lg p-3.5 shadow-sm hover:border-blue-400 hover:shadow-md transition cursor-pointer relative ${
                             isBeingDragged ? 'opacity-30 border-dashed border-blue-500' : ''
                           }`}
                         >
-                          <div className="flex justify-between items-start gap-2 mb-1.5">
-                            <h4 className="font-semibold text-slate-900 text-sm leading-snug flex-1">
+                          <div className="flex justify-between items-start gap-2 mb-2">
+                            {/* TITOLO SCHEDA INGRANDITO */}
+                            <h4 className="font-bold text-slate-900 text-base leading-snug flex-1">
                               {card.title}
                             </h4>
                             <button
                               onClick={(e) => handleDeleteCard(card.id, e)}
                               title="Elimina scheda"
-                              className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-xs font-bold"
+                              className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-sm font-bold"
                             >
                               🗑️
                             </button>
                           </div>
 
+                          {/* DESCRIZIONE / DETTAGLI INGRANDITI */}
                           {cardDetails && (
-                            <p className="text-xs text-slate-600 line-clamp-2 mb-2 leading-relaxed">
+                            <p className="text-sm text-slate-600 line-clamp-3 mb-2 leading-relaxed">
                               {cardDetails}
                             </p>
                           )}
 
                           {card.attachments && card.attachments.length > 0 && (
-                            <div className="flex justify-end pt-1 border-t border-slate-100">
-                              <span className="text-[11px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200 font-medium">
+                            <div className="flex justify-end pt-1.5 border-t border-slate-100">
+                              <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200 font-medium">
                                 📎 {card.attachments.length}
                               </span>
                             </div>
@@ -315,10 +316,10 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   </div>
                 )}
 
-                {/* BOTTONE O FORM NUOVA SCHEDA COMPATTO */}
+                {/* BOTTONE O FORM NUOVA SCHEDA */}
                 <div>
                   {isAddingHere ? (
-                    <div className="bg-white border border-slate-300 rounded-lg p-2 shadow-sm">
+                    <div className="bg-white border border-slate-300 rounded-lg p-2.5 shadow-sm">
                       <input
                         type="text"
                         placeholder="Titolo scheda..."
@@ -326,7 +327,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                         onChange={(e) => setCardTitleInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleAddCard(col.id)}
                         autoFocus
-                        className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 mb-2 focus:outline-none focus:border-blue-500"
+                        className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-sm text-slate-800 mb-2 focus:outline-none focus:border-blue-500"
                       />
                       <div className="flex justify-end gap-1.5">
                         <button
@@ -349,7 +350,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                         setAddingCardColId(col.id);
                         setCardTitleInput('');
                       }}
-                      className="w-full py-2 px-3 rounded-lg border border-dashed border-slate-300 bg-white hover:border-blue-400 text-slate-600 hover:text-blue-600 font-medium text-xs transition flex items-center justify-center gap-1.5 shadow-sm"
+                      className="w-full py-2 px-3 rounded-lg border border-dashed border-slate-300 bg-white hover:border-blue-400 text-slate-600 hover:text-blue-600 font-semibold text-xs transition flex items-center justify-center gap-1.5 shadow-sm"
                     >
                       <span>+</span> Aggiungi scheda
                     </button>
