@@ -13,6 +13,10 @@ export default function App() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [draggedBoardIndex, setDraggedBoardIndex] = useState(null);
 
+  // Stati per la creazione di una nuova bacheca
+  const [newBoardTitle, setNewBoardTitle] = useState('');
+  const [isCreatingBoard, setIsCreatingBoard] = useState(false);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session));
@@ -40,7 +44,31 @@ export default function App() {
         ...(sharedList || []).map((b) => ({ ...b, isOwner: false, ownerEmail: 'Condivisa' }))
       ]);
     } catch (err) {
-      console.error(err);
+      console.error('Errore caricamento bacheche:', err);
+    }
+  };
+
+  // Creazione Nuova Bacheca
+  const handleCreateBoard = async () => {
+    if (!newBoardTitle.trim() || !session?.user) return;
+    try {
+      const newBoard = {
+        id: `board-${Date.now()}`,
+        user_id: session.user.id,
+        title: newBoardTitle.trim()
+      };
+
+      const { data, error } = await supabase.from('boards').insert([newBoard]).select();
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const created = { ...data[0], isOwner: true, ownerEmail: session.user.email };
+        setBoards((prev) => [...prev, created]);
+        setNewBoardTitle('');
+        setIsCreatingBoard(false);
+      }
+    } catch (err) {
+      alert('Errore creazione bacheca: ' + err.message);
     }
   };
 
@@ -64,11 +92,22 @@ export default function App() {
     <div className="min-h-screen bg-slate-100 text-slate-800 text-xs">
       <Header userEmail={session.user.email} />
 
-      <main className="p-4 max-w-6xl mx-auto">
+      <main className="p-6 max-w-6xl mx-auto">
         {!activeBoardId ? (
           <div>
-            <h2 className="text-sm font-bold text-slate-700 mb-3">Le Mie Bacheche</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {/* INTESTAZIONE DASHBOARD */}
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-base font-bold text-slate-800">Le Mie Bacheche</h2>
+              <button
+                onClick={() => setIsCreatingBoard(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-medium text-xs shadow-sm transition"
+              >
+                + Nuova Bacheca
+              </button>
+            </div>
+
+            {/* GRIGLIA BACHECHE CON CARD PIÙ GRANDI */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {boards.map((board, index) => (
                 <BoardCard
                   key={board.id}
@@ -80,6 +119,44 @@ export default function App() {
                   onDragEnd={() => setDraggedBoardIndex(null)}
                 />
               ))}
+
+              {/* CARD CREAZIONE NUOVA BACHECA */}
+              {isCreatingBoard ? (
+                <div className="rounded-xl p-4 border-2 border-blue-400 bg-white shadow-md flex flex-col justify-between">
+                  <h3 className="font-bold text-slate-800 text-sm mb-3">Crea Bacheca</h3>
+                  <input
+                    type="text"
+                    placeholder="Nome della bacheca..."
+                    value={newBoardTitle}
+                    onChange={(e) => setNewBoardTitle(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleCreateBoard()}
+                    autoFocus
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs mb-3 focus:outline-none focus:border-blue-500"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => { setIsCreatingBoard(false); setNewBoardTitle(''); }}
+                      className="px-3 py-1.5 border rounded-lg text-slate-600 hover:bg-slate-50 transition"
+                    >
+                      Annulla
+                    </button>
+                    <button
+                      onClick={handleCreateBoard}
+                      className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition"
+                    >
+                      Crea
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  onClick={() => setIsCreatingBoard(true)}
+                  className="cursor-pointer rounded-xl p-5 border-2 border-dashed border-slate-300 bg-white/60 hover:bg-white hover:border-blue-400 hover:shadow-md transition flex flex-col items-center justify-center min-h-[130px] text-slate-500 hover:text-blue-600"
+                >
+                  <span className="text-2xl font-light mb-1">+</span>
+                  <span className="font-semibold text-xs">Aggiungi Bacheca</span>
+                </div>
+              )}
             </div>
           </div>
         ) : (

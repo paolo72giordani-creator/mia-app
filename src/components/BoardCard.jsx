@@ -8,19 +8,25 @@ export default function BoardCard({ board, index, onSelect, onDragStart, onDragO
       onDragOver={(e) => onDragOver(e, index)}
       onDragEnd={onDragEnd}
       onClick={() => onSelect(board.id)}
-      className={`cursor-pointer rounded-lg p-3 border bg-white shadow-sm hover:shadow transition ${
-        board.isOwner ? 'border-blue-400' : 'border-orange-400'
+      className={`cursor-pointer rounded-xl p-5 border-2 bg-white shadow-sm hover:shadow-md transition-all duration-150 flex flex-col justify-between min-h-[130px] ${
+        board.isOwner ? 'border-blue-400/80 hover:border-blue-500' : 'border-orange-400/80 hover:border-orange-500'
       }`}
     >
-      <span className={`inline-block text-[10px] px-1.5 py-0.5 rounded font-semibold mb-1.5 ${
-        board.isOwner ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'
-      }`}>
-        {board.isOwner ? 'Proprietario' : 'Condivisa'}
-      </span>
-      <h3 className="font-bold text-slate-800 text-xs mb-2">{board.title}</h3>
-      <div className="text-[10px] text-slate-400 border-t pt-1.5 flex justify-between">
-        <span>👤 {board.ownerEmail}</span>
-        <span className="text-blue-500 font-medium">Apri →</span>
+      <div>
+        <div className="flex justify-between items-start mb-2">
+          <span className={`inline-block text-[11px] px-2.5 py-0.5 rounded-full font-semibold border ${
+            board.isOwner ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-orange-50 text-orange-700 border-orange-200'
+          }`}>
+            {board.isOwner ? 'Proprietario' : 'Condivisa con me'}
+          </span>
+          <span className="text-slate-300 text-xs">⋮⋮</span>
+        </div>
+        <h3 className="font-bold text-slate-900 text-sm mb-1 leading-snug">{board.title}</h3>
+      </div>
+
+      <div className="text-[11px] text-slate-500 border-t border-slate-100 pt-2.5 flex justify-between items-center mt-3">
+        <span>👤 <strong className="text-slate-700 font-medium">{board.ownerEmail}</strong></span>
+        <span className="text-blue-600 font-semibold">Apri →</span>
       </div>
     </div>
   );
