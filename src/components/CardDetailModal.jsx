@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
-export default function CardDetailModal({ card, onClose, onUpdateCard, onDeleteCard }) {
+export default function CardDetailModal({ card, columnId, onClose, onSaveCard, onDeleteCard }) {
+  const isNew = !card?.id;
   const [title, setTitle] = useState(card?.title || '');
   const [description, setDescription] = useState(card?.description || '');
   const [attachments, setAttachments] = useState(card?.attachments || []);
@@ -24,21 +25,36 @@ export default function CardDetailModal({ card, onClose, onUpdateCard, onDeleteC
   };
 
   const handleSave = async () => {
+    if (!title.trim()) {
+      alert('Inserisci un titolo per la scheda.');
+      return;
+    }
+
     try {
-      const { error } = await supabase
-        .from('cards')
-        .update({ title, description })
-        .eq('id', card.id);
+      if (isNew) {
+        // CREAZIONE NUOVA SCHEDA
+        const newCardPayload = {
+          id: `card-${Date.now()}`,
+          column_id: String(columnId),
+          title: title.trim(),
+          description: description.trim(),
+          position: 0
+        };
 
-      if (error) throw error;
+        const { data, error } = await supabase.from('cards').insert([newCardPayload]).select();
+        if (error) throw error;
 
-      // Passiamo l'oggetto aggiornato con la nuova descrizione
-      onUpdateCard({
-        ...card,
-        title,
-        description,
-        attachments
-      });
+        onSaveCard({ ...data[0], attachments: [] }, true);
+      } else {
+        // AGGIORNAMENTO SCHEDA ESISTENTE
+        const { error } = await supabase
+          .from('cards')
+          .update({ title, description })
+          .eq('id', card.id);
+
+        if (error) throw error;
+        onSaveCard({ ...card, title, description, attachments }, false);
+      }
       onClose();
     } catch (err) {
       alert('Errore salvataggio: ' + err.message);
@@ -47,26 +63,23 @@ export default function CardDetailModal({ card, onClose, onUpdateCard, onDeleteC
 
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
-    if (!file) return;
+    if (!file || isNew) return; // Allegati abilitati dopo il primo salvataggio
 
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
       const filePath = `${card.id}/${Date.now()}.${fileExt}`;
 
-      // Caricamento su Storage Bucket
       const { error: uploadErr } = await supabase.storage
         .from('card-attachments')
         .upload(filePath, file);
 
       if (uploadErr) throw uploadErr;
 
-      // Recupero URL pubblico
       const { data: publicUrlData } = supabase.storage
         .from('card-attachments')
         .getPublicUrl(filePath);
 
-      // Recupero sessione per user_id corretto
       const { data: { session } } = await supabase.auth.getSession();
 
       const newAttachment = {
@@ -92,13 +105,13 @@ export default function CardDetailModal({ card, onClose, onUpdateCard, onDeleteC
     }
   };
 
-  if (!card) return null;
-
   return (
     <div className="fixed inset-0 bg-slate-900/30 flex items-center justify-center p-3 z-50 text-xs">
       <div className="bg-white border rounded-xl w-full max-w-md p-4 shadow-xl">
         <div className="flex justify-between items-center mb-3">
-          <h3 className="font-bold text-sm text-slate-800">Dettagli Scheda</h3>
+          <h3 className="font-bold text-sm text-slate-800">
+            {isNew ? 'Nuova Scheda' : 'Dettagli Scheda'}
+          </h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
         </div>
 
@@ -109,7 +122,9 @@ export default function CardDetailModal({ card, onClose, onUpdateCard, onDeleteC
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full border rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-blue-500"
+            placeholder="Inserisci il titolo..."
+            autoFocus
+            className="w-full border rounded px-2.5 py-1.5 text-sm font-semibold focus:outline-none focus:border-blue-500"
           />
         </div>
 
@@ -117,51 +132,58 @@ export default function CardDetailModal({ card, onClose, onUpdateCard, onDeleteC
         <div className="mb-3">
           <label className="block text-[10px] font-semibold text-slate-500 mb-1">Descrizione / Note</label>
           <textarea
-            rows="3"
+            rows="4"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Aggiungi dettagli..."
-            className="w-full border rounded p-2 text-xs focus:outline-none focus:border-blue-500"
+            placeholder="Aggiungi dettagli, note o istruzioni..."
+            className="w-full border rounded p-2 text-sm focus:outline-none focus:border-blue-500"
           />
         </div>
 
-        {/* ALLEGATI */}
-        <div className="mb-4">
-          <label className="block text-[10px] font-semibold text-slate-500 mb-1">Allegati</label>
-          <div className="space-y-1 mb-2 max-h-24 overflow-y-auto">
-            {attachments.length === 0 ? (
-              <p className="text-[10px] text-slate-400 italic">Nessun allegato presente.</p>
-            ) : (
-              attachments.map((att) => (
-                <div key={att.id} className="flex justify-between items-center bg-slate-50 p-1.5 rounded border text-[11px]">
-                  <span className="truncate max-w-[200px] font-medium text-slate-700">{att.file_name}</span>
-                  <a href={att.file_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-medium">
-                    Apri ↗
-                  </a>
-                </div>
-              ))
-            )}
-          </div>
+        {/* ALLEGATI (solo se scheda già salvata) */}
+        {!isNew && (
+          <div className="mb-4">
+            <label className="block text-[10px] font-semibold text-slate-500 mb-1">Allegati</label>
+            <div className="space-y-1 mb-2 max-h-24 overflow-y-auto">
+              {attachments.length === 0 ? (
+                <p className="text-[10px] text-slate-400 italic">Nessun allegato presente.</p>
+              ) : (
+                attachments.map((att) => (
+                  <div key={att.id} className="flex justify-between items-center bg-slate-50 p-1.5 rounded border text-[11px]">
+                    <span className="truncate max-w-[200px] font-medium text-slate-700">{att.file_name}</span>
+                    <a href={att.file_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-medium">
+                      Apri ↗
+                    </a>
+                  </div>
+                ))
+              )}
+            </div>
 
-          <label className="inline-block bg-slate-100 hover:bg-slate-200 border text-slate-700 px-2.5 py-1 rounded cursor-pointer font-medium text-[10px]">
-            {uploading ? 'Caricamento...' : '+ Carica File'}
-            <input type="file" onChange={handleFileUpload} className="hidden" disabled={uploading} />
-          </label>
-        </div>
+            <label className="inline-block bg-slate-100 hover:bg-slate-200 border text-slate-700 px-2.5 py-1 rounded cursor-pointer font-medium text-[10px]">
+              {uploading ? 'Caricamento...' : '+ Carica File'}
+              <input type="file" onChange={handleFileUpload} className="hidden" disabled={uploading} />
+            </label>
+          </div>
+        )}
 
         {/* AZIONI */}
-        <div className="flex justify-between items-center pt-2 border-t">
-          <button
-            onClick={() => {
-              if (window.confirm('Cancellare questa scheda?')) onDeleteCard(card.id);
-            }}
-            className="text-red-500 hover:underline text-[11px] font-medium"
-          >
-            Elimina
-          </button>
-          <div className="flex gap-1.5">
-            <button onClick={onClose} className="border px-3 py-1 rounded text-slate-600">Annulla</button>
-            <button onClick={handleSave} className="bg-blue-600 text-white px-3 py-1 rounded font-medium">Salva</button>
+        <div className="flex justify-between items-center pt-3 border-t">
+          {!isNew ? (
+            <button
+              onClick={() => {
+                if (window.confirm('Cancellare questa scheda?')) onDeleteCard(card.id);
+              }}
+              className="text-red-500 hover:underline text-[11px] font-medium"
+            >
+              Elimina
+            </button>
+          ) : <div />}
+
+          <div className="flex gap-2">
+            <button onClick={onClose} className="border px-3 py-1.5 rounded text-slate-600 font-medium">Annulla</button>
+            <button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded font-bold">
+              {isNew ? 'Crea Scheda' : 'Salva'}
+            </button>
           </div>
         </div>
       </div>

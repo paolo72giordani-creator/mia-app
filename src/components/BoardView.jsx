@@ -6,18 +6,16 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   const [columns, setColumns] = useState([]);
   const [cards, setCards] = useState([]);
   const [newColumnName, setNewColumnName] = useState('');
-  const [selectedCard, setSelectedCard] = useState(null);
-
-  // Stato per il form di creazione scheda per colonna
-  const [addingCardColId, setAddingCardColId] = useState(null);
-  const [cardTitleInput, setCardTitleInput] = useState('');
+  
+  // Stato per la modale (modifica o creazione)
+  const [modalCard, setModalCard] = useState(null);
+  const [modalColId, setModalColId] = useState(null);
 
   // Drag & Drop States
   const [draggedCard, setDraggedCard] = useState(null);
   const [draggedColIndex, setDraggedColIndex] = useState(null);
   const [dragOverCardColId, setDragOverCardColId] = useState(null);
 
-  // Palette di colori ciclica per gli header delle colonne
   const columnHeaderColors = [
     'bg-slate-800 text-white',
     'bg-blue-600 text-white',
@@ -78,37 +76,13 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  const handleAddCard = async (columnId) => {
-    const title = cardTitleInput.trim();
-    if (!title) return;
-
-    try {
-      const colCards = cards.filter((c) => String(c.column_id) === String(columnId));
-      const newCard = {
-        id: `card-${Date.now()}`,
-        user_id: currentUser.id,
-        column_id: String(columnId),
-        title: title,
-        position: colCards.length
-      };
-
-      const { data, error } = await supabase.from('cards').insert([newCard]).select();
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        setCards((prev) => [...prev, { ...data[0], attachments: [] }]);
-        setCardTitleInput('');
-        setAddingCardColId(null);
-      }
-    } catch (err) {
-      alert('Errore scheda: ' + err.message);
+  // Salva o aggiorna scheda gestito dalla modale
+  const handleSaveCardFromModal = (savedCard, isNew) => {
+    if (isNew) {
+      setCards((prev) => [...prev, savedCard]);
+    } else {
+      setCards((prev) => prev.map((c) => (c.id === savedCard.id ? savedCard : c)));
     }
-  };
-
-  const handleUpdateCard = (updatedCard) => {
-    setCards((prevCards) =>
-      prevCards.map((c) => (c.id === updatedCard.id ? updatedCard : c))
-    );
   };
 
   const handleDeleteCard = async (cardId, e) => {
@@ -118,13 +92,13 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     try {
       await supabase.from('cards').delete().eq('id', cardId);
       setCards((prev) => prev.filter((c) => c.id !== cardId));
-      if (selectedCard?.id === cardId) setSelectedCard(null);
+      if (modalCard?.id === cardId) setModalCard(null);
     } catch (err) {
       alert('Errore eliminazione: ' + err.message);
     }
   };
 
-  // Drag & Drop Handlers
+  // Drag & Drop
   const handleCardDragStart = (e, card) => {
     e.stopPropagation();
     setDraggedCard(card);
@@ -218,8 +192,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           const colCards = cards.filter((c) => String(c.column_id) === String(col.id));
           const isTargetCardCol = dragOverCardColId === col.id;
           const isColumnBeingDragged = draggedColIndex === colIdx;
-          const isAddingHere = addingCardColId === col.id;
-
           const headerColorStyle = columnHeaderColors[colIdx % columnHeaderColors.length];
 
           return (
@@ -271,13 +243,15 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                           key={card.id}
                           draggable
                           onDragStart={(e) => handleCardDragStart(e, card)}
-                          onClick={() => setSelectedCard(card)}
+                          onClick={() => {
+                            setModalCard(card);
+                            setModalColId(col.id);
+                          }}
                           className={`bg-white border border-slate-200 rounded-lg p-3.5 shadow-sm hover:border-blue-400 hover:shadow-md transition cursor-pointer relative ${
                             isBeingDragged ? 'opacity-30 border-dashed border-blue-500' : ''
                           }`}
                         >
                           <div className="flex justify-between items-start gap-2 mb-2">
-                            {/* TITOLO SCHEDA INGRANDITO */}
                             <h4 className="font-bold text-slate-900 text-base leading-snug flex-1">
                               {card.title}
                             </h4>
@@ -290,7 +264,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                             </button>
                           </div>
 
-                          {/* DESCRIZIONE / DETTAGLI INGRANDITI */}
                           {cardDetails && (
                             <p className="text-sm text-slate-600 line-clamp-3 mb-2 leading-relaxed">
                               {cardDetails}
@@ -316,46 +289,16 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   </div>
                 )}
 
-                {/* BOTTONE O FORM NUOVA SCHEDA */}
-                <div>
-                  {isAddingHere ? (
-                    <div className="bg-white border border-slate-300 rounded-lg p-2.5 shadow-sm">
-                      <input
-                        type="text"
-                        placeholder="Titolo scheda..."
-                        value={cardTitleInput}
-                        onChange={(e) => setCardTitleInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddCard(col.id)}
-                        autoFocus
-                        className="w-full bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-sm text-slate-800 mb-2 focus:outline-none focus:border-blue-500"
-                      />
-                      <div className="flex justify-end gap-1.5">
-                        <button
-                          onClick={() => { setAddingCardColId(null); setCardTitleInput(''); }}
-                          className="px-2.5 py-1 text-slate-500 hover:text-slate-700 text-xs font-medium"
-                        >
-                          Annulla
-                        </button>
-                        <button
-                          onClick={() => handleAddCard(col.id)}
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded font-bold text-xs transition"
-                        >
-                          Aggiungi
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setAddingCardColId(col.id);
-                        setCardTitleInput('');
-                      }}
-                      className="w-full py-2 px-3 rounded-lg border border-dashed border-slate-300 bg-white hover:border-blue-400 text-slate-600 hover:text-blue-600 font-semibold text-xs transition flex items-center justify-center gap-1.5 shadow-sm"
-                    >
-                      <span>+</span> Aggiungi scheda
-                    </button>
-                  )}
-                </div>
+                {/* BOTTONE AGGIUNGI SCHEDA DIRECTO IN MODALE */}
+                <button
+                  onClick={() => {
+                    setModalCard(null); // Scheda nuova
+                    setModalColId(col.id);
+                  }}
+                  className="w-full py-2 px-3 rounded-lg border border-dashed border-slate-300 bg-white hover:border-blue-400 text-slate-600 hover:text-blue-600 font-semibold text-xs transition flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <span>+</span> Aggiungi scheda
+                </button>
               </div>
             </div>
           );
@@ -380,12 +323,16 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         </div>
       </div>
 
-      {/* DETTAGLI SCHEDA */}
-      {selectedCard && (
+      {/* POP-UP UNICO DETTAGLI / NUOVA SCHEDA */}
+      {(modalCard !== null || modalColId !== null) && (
         <CardDetailModal
-          card={selectedCard}
-          onClose={() => setSelectedCard(null)}
-          onUpdateCard={handleUpdateCard}
+          card={modalCard}
+          columnId={modalColId}
+          onClose={() => {
+            setModalCard(null);
+            setModalColId(null);
+          }}
+          onSaveCard={handleSaveCardFromModal}
           onDeleteCard={(id) => handleDeleteCard(id)}
         />
       )}
