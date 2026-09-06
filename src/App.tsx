@@ -30,32 +30,36 @@ export default function App() {
   const fetchBoards = async () => {
     if (!session?.user) return;
     try {
-      // 1. Carica le bacheche di proprietà dell'utente
-      const { data: owned } = await supabase
+      // 1. Carica bacheche di mia proprietà
+      const { data: owned, error: ownedErr } = await supabase
         .from('boards')
         .select('*')
         .eq('user_id', session.user.id);
 
-      // 2. Recupera gli ID delle bacheche condivise con l'utente
-      const { data: memberEntries } = await supabase
+      if (ownedErr) throw ownedErr;
+
+      // 2. Carica le bacheche di cui sono membro condiviso
+      const { data: memberEntries, error: memberErr } = await supabase
         .from('board_members')
         .select('board_id')
         .eq('user_id', session.user.id);
 
+      if (memberErr) throw memberErr;
+
       let sharedList = [];
       if (memberEntries && memberEntries.length > 0) {
         const boardIds = memberEntries.map((m) => m.board_id);
-        
-        // 3. Esegui la query joinando le bacheche con la tabella degli utenti/profili
-        // per ottenere l'email del vero proprietario
-        const { data: shared } = await supabase
+
+        // Query diretta senza join complessi per evitare errori di schema
+        const { data: shared, error: sharedErr } = await supabase
           .from('boards')
-          .select('*, profiles:user_id(email)')
+          .select('*')
           .in('id', boardIds);
 
-        sharedList = shared || [];
+        if (!sharedErr) sharedList = shared || [];
       }
 
+      // 3. Unisci le liste impostando l'email del proprietario
       setBoards([
         ...(owned || []).map((b) => ({
           ...b,
@@ -65,11 +69,11 @@ export default function App() {
         ...(sharedList || []).map((b) => ({
           ...b,
           isOwner: false,
-          ownerEmail: b.profiles?.email || b.owner_email || 'Proprietario'
+          ownerEmail: b.owner_email || 'Proprietario'
         }))
       ]);
     } catch (err) {
-      console.error('Errore caricamento bacheche:', err);
+      console.error('Errore caricamento bacheche:', err.message);
     }
   };
 
@@ -80,7 +84,7 @@ export default function App() {
         id: `board-${Date.now()}`,
         user_id: session.user.id,
         title: newBoardTitle.trim(),
-        owner_email: session.user.email
+        owner_email: session.user.email // Salva l'email del creatore
       };
 
       const { data, error } = await supabase.from('boards').insert([newBoard]).select();
