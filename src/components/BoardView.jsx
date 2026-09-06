@@ -12,6 +12,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   // Drag & Drop States
   const [draggedCard, setDraggedCard] = useState(null);
   const [draggedColIndex, setDraggedColIndex] = useState(null);
+  const [dropColIndex, setDropColIndex] = useState(null);
   const [dragOverColId, setDragOverColId] = useState(null);
 
   useEffect(() => {
@@ -128,7 +129,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     const sourceColId = draggedCard.column_id;
     if (String(sourceColId) === String(targetColumnId)) return;
 
-    // Aggiornamento optimistico locale
     const updatedCards = cards.map((c) =>
       c.id === draggedCard.id ? { ...c, column_id: String(targetColumnId) } : c
     );
@@ -140,28 +140,49 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         .update({ column_id: String(targetColumnId) })
         .eq('id', draggedCard.id);
     } catch (err) {
-      console.error('Errore durante lo spostamento scheda:', err);
-      fetchBoardData(); // Rollback in caso di errore
+      console.error('Errore spostamento scheda:', err);
+      fetchBoardData();
     } finally {
       setDraggedCard(null);
     }
   };
 
-  // --- LOGICA DRAG & DROP COLONNE ---
+  // --- LOGICA DRAG & DROP COLONNE CON BARRA VERTICALE ---
   const handleColDragStart = (e, index) => {
     setDraggedColIndex(index);
+    e.dataTransfer.setData('type/col', index.toString());
   };
 
   const handleColDragOver = (e, index) => {
     e.preventDefault();
     if (draggedColIndex === null || draggedColIndex === index) return;
+    setDropColIndex(index);
+  };
+
+  const handleColDrop = async (e, targetIndex) => {
+    e.preventDefault();
+    setDropColIndex(null);
+
+    if (draggedColIndex === null || draggedColIndex === targetIndex) return;
 
     const reordered = [...columns];
-    const [moved] = reordered.splice(draggedColIndex, 1);
-    reordered.splice(index, 0, moved);
+    const [movedCol] = reordered.splice(draggedColIndex, 1);
+    reordered.splice(targetIndex, 0, movedCol);
 
-    setDraggedColIndex(index);
     setColumns(reordered);
+    setDraggedColIndex(null);
+
+    // Aggiornamento posizioni su database
+    try {
+      for (let i = 0; i < reordered.length; i++) {
+        await supabase
+          .from('columns')
+          .update({ position: i })
+          .eq('id', reordered[i].id);
+      }
+    } catch (err) {
+      console.error('Errore salvataggio posizione colonna:', err);
+    }
   };
 
   return (
@@ -184,115 +205,139 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         </button>
       </div>
 
-      {/* AREA COLONNE KANBAN TRASCINABILI */}
+      {/* AREA COLONNE KANBAN CON BARRA VERTICALE DI POSIZIONAMENTO */}
       <div className="flex gap-4 overflow-x-auto pb-6 items-start">
         {columns.map((col, colIdx) => {
           const colCards = cards.filter((c) => String(c.column_id) === String(col.id));
-          const isTargetCol = dragOverColId === col.id;
+          const isTargetCardCol = dragOverColId === col.id;
+          const showBarBefore = dropColIndex === colIdx && draggedColIndex > colIdx;
+          const showBarAfter = dropColIndex === colIdx && draggedColIndex < colIdx;
 
           return (
-            <div
-              key={col.id}
-              draggable
-              onDragStart={(e) => handleColDragStart(e, colIdx)}
-              onDragOver={(e) => {
-                e.preventDefault();
-                handleColDragOver(e, colIdx);
-                setDragOverColId(col.id);
-              }}
-              onDragLeave={() => setDragOverColId(null)}
-              onDrop={(e) => handleCardDrop(e, col.id)}
-              className={`w-72 border rounded-xl p-3 flex-shrink-0 shadow-sm transition-all duration-150 ${
-                isTargetCol
-                  ? 'bg-blue-50/80 border-blue-400 ring-2 ring-blue-300 ring-offset-1'
-                  : 'bg-slate-200/70 border-slate-300/70'
-              }`}
-            >
-              {/* HEADER COLONNA */}
-              <div className="flex justify-between items-center mb-3 cursor-grab active:cursor-grabbing">
-                <h3 className="font-bold text-slate-800 text-sm">{col.name}</h3>
-                <span className="text-xs bg-slate-300/80 text-slate-700 font-bold px-2 py-0.5 rounded-full">
-                  {colCards.length}
-                </span>
-              </div>
+            <React.Fragment key={col.id}>
+              {/* BARRA VERTICALE DI ANTEPRIMA INSERIMENTO COLONNA (A SINISTRA) */}
+              {showBarBefore && (
+                <div className="w-1.5 self-stretch bg-blue-500 rounded-full shadow-md shadow-blue-500/50 animate-pulse my-1" />
+              )}
 
-              {/* LISTA SCHEDE TRASCINABILI */}
-              <div className="space-y-2.5 mb-3 min-h-[50px]">
-                {colCards.map((card) => {
-                  const cardDetails = card.description || card.details;
-                  const isBeingDragged = draggedCard?.id === card.id;
+              <div
+                draggable
+                onDragStart={(e) => handleColDragStart(e, colIdx)}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (draggedCard) {
+                    setDragOverColId(col.id);
+                  } else {
+                    handleColDragOver(e, colIdx);
+                  }
+                }}
+                onDragLeave={() => {
+                  setDragOverColId(null);
+                }}
+                onDrop={(e) => {
+                  if (draggedCard) {
+                    handleCardDrop(e, col.id);
+                  } else {
+                    handleColDrop(e, colIdx);
+                  }
+                }}
+                className={`w-72 border rounded-xl p-3 flex-shrink-0 shadow-sm transition-all duration-150 ${
+                  isTargetCardCol
+                    ? 'bg-blue-50/80 border-blue-400 ring-2 ring-blue-300 ring-offset-1'
+                    : draggedColIndex === colIdx
+                    ? 'opacity-40 border-dashed border-blue-400'
+                    : 'bg-slate-200/70 border-slate-300/70'
+                }`}
+              >
+                {/* HEADER COLONNA */}
+                <div className="flex justify-between items-center mb-3 cursor-grab active:cursor-grabbing">
+                  <h3 className="font-bold text-slate-800 text-sm">{col.name}</h3>
+                  <span className="text-xs bg-slate-300/80 text-slate-700 font-bold px-2 py-0.5 rounded-full">
+                    {colCards.length}
+                  </span>
+                </div>
 
-                  return (
-                    <div
-                      key={card.id}
-                      draggable
-                      onDragStart={(e) => handleCardDragStart(e, card)}
-                      onClick={() => setSelectedCard(card)}
-                      className={`bg-white border border-slate-200 rounded-lg p-3 shadow-sm hover:border-blue-400 hover:shadow transition cursor-pointer relative group ${
-                        isBeingDragged ? 'opacity-40 border-dashed border-blue-500' : ''
-                      }`}
-                    >
-                      {/* INTESTAZIONE SCHEDA: TITOLO E BOTTONE ELIMINA */}
-                      <div className="flex justify-between items-start gap-2 mb-1.5">
-                        <h4 className="font-semibold text-slate-900 text-sm leading-snug flex-1">
-                          {card.title}
-                        </h4>
-                        
-                        {/* PULSANTE ELIMINA SCHEDA */}
-                        <button
-                          onClick={(e) => handleDeleteCard(card.id, e)}
-                          title="Elimina scheda"
-                          className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-xs font-bold"
-                        >
-                          🗑️
-                        </button>
-                      </div>
+                {/* LISTA SCHEDE TRASCINABILI */}
+                <div className="space-y-2.5 mb-3 min-h-[50px]">
+                  {colCards.map((card) => {
+                    const cardDetails = card.description || card.details;
+                    const isBeingDragged = draggedCard?.id === card.id;
 
-                      {/* ESTRATTO DETTAGLI/DESCRIZIONE (CARATTERI PIÙ GRANDI) */}
-                      {cardDetails && (
-                        <p className="text-xs text-slate-600 line-clamp-2 mb-2 leading-relaxed">
-                          {cardDetails}
-                        </p>
-                      )}
-
-                      {/* BADGE ALLEGATI */}
-                      {card.attachments && card.attachments.length > 0 && (
-                        <div className="flex justify-end pt-1 border-t border-slate-100">
-                          <span className="text-[11px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200 font-medium">
-                            📎 {card.attachments.length}
-                          </span>
+                    return (
+                      <div
+                        key={card.id}
+                        draggable
+                        onDragStart={(e) => handleCardDragStart(e, card)}
+                        onClick={() => setSelectedCard(card)}
+                        className={`bg-white border border-slate-200 rounded-lg p-3 shadow-sm hover:border-blue-400 hover:shadow transition cursor-pointer relative group ${
+                          isBeingDragged ? 'opacity-40 border-dashed border-blue-500' : ''
+                        }`}
+                      >
+                        {/* INTESTAZIONE SCHEDA: TITOLO E BOTTONE ELIMINA */}
+                        <div className="flex justify-between items-start gap-2 mb-1.5">
+                          <h4 className="font-semibold text-slate-900 text-sm leading-snug flex-1">
+                            {card.title}
+                          </h4>
+                          <button
+                            onClick={(e) => handleDeleteCard(card.id, e)}
+                            title="Elimina scheda"
+                            className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-xs font-bold"
+                          >
+                            🗑️
+                          </button>
                         </div>
-                      )}
+
+                        {/* ESTRATTO DETTAGLI/DESCRIZIONE */}
+                        {cardDetails && (
+                          <p className="text-xs text-slate-600 line-clamp-2 mb-2 leading-relaxed">
+                            {cardDetails}
+                          </p>
+                        )}
+
+                        {/* BADGE ALLEGATI */}
+                        {card.attachments && card.attachments.length > 0 && (
+                          <div className="flex justify-end pt-1 border-t border-slate-100">
+                            <span className="text-[11px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200 font-medium">
+                              📎 {card.attachments.length}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* PLACEHOLDER SCHEDA */}
+                  {isTargetCardCol && draggedCard && String(draggedCard.column_id) !== String(col.id) && (
+                    <div className="border-2 border-dashed border-blue-400 bg-blue-100/50 rounded-lg p-3 text-center text-blue-600 text-xs font-medium">
+                      Rilascia qui per spostare
                     </div>
-                  );
-                })}
+                  )}
+                </div>
 
-                {/* PLACEHOLDER VISIVO DI DESTINAZIONE SCHEDA */}
-                {isTargetCol && draggedCard && String(draggedCard.column_id) !== String(col.id) && (
-                  <div className="border-2 border-dashed border-blue-400 bg-blue-100/50 rounded-lg p-3 text-center text-blue-600 text-xs font-medium">
-                    Rilascia qui per spostare
-                  </div>
-                )}
+                {/* FORM NUOVA SCHEDA */}
+                <div className="flex gap-1.5 pt-2 border-t border-slate-300/70">
+                  <input
+                    type="text"
+                    placeholder="Nuova scheda..."
+                    value={newCardTitles[col.id] || ''}
+                    onChange={(e) => setNewCardTitles({ ...newCardTitles, [col.id]: e.target.value })}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddCard(col.id)}
+                    className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 shadow-inner"
+                  />
+                  <button
+                    onClick={() => handleAddCard(col.id)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm transition"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
 
-              {/* FORM NUOVA SCHEDA */}
-              <div className="flex gap-1.5 pt-2 border-t border-slate-300/70">
-                <input
-                  type="text"
-                  placeholder="Nuova scheda..."
-                  value={newCardTitles[col.id] || ''}
-                  onChange={(e) => setNewCardTitles({ ...newCardTitles, [col.id]: e.target.value })}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddCard(col.id)}
-                  className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 shadow-inner"
-                />
-                <button
-                  onClick={() => handleAddCard(col.id)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm transition"
-                >
-                  +
-                </button>
-              </div>
-            </div>
+              {/* BARRA VERTICALE DI ANTEPRIMA INSERIMENTO COLONNA (A DESTRA) */}
+              {showBarAfter && (
+                <div className="w-1.5 self-stretch bg-blue-500 rounded-full shadow-md shadow-blue-500/50 animate-pulse my-1" />
+              )}
+            </React.Fragment>
           );
         })}
 
@@ -315,7 +360,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         </div>
       </div>
 
-      {/* DETTAGLI SCHEDA MODALE */}
+      {/* POP-UP DETTAGLI SCHEDA */}
       {selectedCard && (
         <CardDetailModal
           card={selectedCard}
