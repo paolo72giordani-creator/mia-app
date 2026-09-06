@@ -12,7 +12,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   // Drag & Drop States
   const [draggedCard, setDraggedCard] = useState(null);
   const [draggedColIndex, setDraggedColIndex] = useState(null);
-  const [dropTargetColIndex, setDropTargetColIndex] = useState(null);
   const [dragOverCardColId, setDragOverCardColId] = useState(null);
 
   useEffect(() => {
@@ -112,7 +111,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // --- DRAG SCHEDE ---
+  // --- LOGICA DRAG & DROP SCHEDE ---
   const handleCardDragStart = (e, card) => {
     e.stopPropagation();
     setDraggedCard(card);
@@ -147,7 +146,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // --- DRAG COLONNE ---
+  // --- LOGICA DRAG & DROP COLONNE REATTIVA AL VOLO ---
   const handleColDragStart = (e, index) => {
     setDraggedColIndex(index);
     setDraggedCard(null);
@@ -155,32 +154,31 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
   const handleColDragOver = (e, index) => {
     e.preventDefault();
-    if (draggedColIndex === null || draggedColIndex === index) return;
-    setDropTargetColIndex(index);
-  };
+    if (draggedColIndex === null || draggedColIndex === index || draggedCard !== null) return;
 
-  const handleColDrop = async (e, targetIndex) => {
-    e.preventDefault();
-    setDropTargetColIndex(null);
-
-    if (draggedColIndex === null || draggedColIndex === targetIndex) return;
-
+    // Scambia le colonne in tempo reale nello stato locale per un feedback immediato
     const reordered = [...columns];
     const [movedCol] = reordered.splice(draggedColIndex, 1);
-    reordered.splice(targetIndex, 0, movedCol);
+    reordered.splice(index, 0, movedCol);
 
+    setDraggedColIndex(index);
     setColumns(reordered);
+  };
+
+  const handleColDragEnd = async () => {
+    if (draggedColIndex === null) return;
     setDraggedColIndex(null);
 
+    // Salva le nuove posizioni su Supabase
     try {
-      for (let i = 0; i < reordered.length; i++) {
+      for (let i = 0; i < columns.length; i++) {
         await supabase
           .from('columns')
           .update({ position: i })
-          .eq('id', reordered[i].id);
+          .eq('id', columns[i].id);
       }
     } catch (err) {
-      console.error('Errore salvataggio posizioni colonne:', err);
+      console.error('Errore salvataggio ordine colonne:', err);
     }
   };
 
@@ -204,144 +202,122 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         </button>
       </div>
 
-      {/* AREA COLONNE KANBAN CON INDICATORE BARRA BLUE INSERIMENTO */}
-      <div className="flex gap-3 overflow-x-auto pb-6 items-stretch">
+      {/* AREA COLONNE KANBAN */}
+      <div className="flex gap-4 overflow-x-auto pb-6 items-start">
         {columns.map((col, colIdx) => {
           const colCards = cards.filter((c) => String(c.column_id) === String(col.id));
           const isTargetCardCol = dragOverCardColId === col.id;
-          const isColumnDropTarget = dropTargetColIndex === colIdx && draggedColIndex !== null;
-          const isBarOnLeft = isColumnDropTarget && draggedColIndex > colIdx;
-          const isBarOnRight = isColumnDropTarget && draggedColIndex < colIdx;
+          const isColumnBeingDragged = draggedColIndex === colIdx;
 
           return (
-            <React.Fragment key={col.id}>
-              {/* BARRA INDICATORE A SINISTRA */}
-              {isBarOnLeft && (
-                <div className="w-2 bg-blue-600 rounded-full shadow-lg shadow-blue-500/50 self-stretch my-1 transition-all" />
-              )}
-
-              <div
-                draggable
-                onDragStart={(e) => handleColDragStart(e, colIdx)}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  if (draggedCard) {
-                    setDragOverCardColId(col.id);
-                  } else {
-                    handleColDragOver(e, colIdx);
-                  }
-                }}
-                onDragLeave={() => {
-                  setDragOverCardColId(null);
-                }}
-                onDrop={(e) => {
-                  if (draggedCard) {
-                    handleCardDrop(e, col.id);
-                  } else {
-                    handleColDrop(e, colIdx);
-                  }
-                }}
-                onDragEnd={() => {
-                  setDraggedColIndex(null);
-                  setDropTargetColIndex(null);
-                }}
-                className={`w-72 border rounded-xl p-3 flex-shrink-0 shadow-sm transition-all duration-150 flex flex-col justify-between ${
-                  isTargetCardCol
-                    ? 'bg-blue-50/80 border-blue-400 ring-2 ring-blue-300'
-                    : draggedColIndex === colIdx
-                    ? 'opacity-30 border-dashed border-blue-500 bg-slate-300/50'
-                    : 'bg-slate-200/70 border-slate-300/70'
-                }`}
-              >
-                <div>
-                  {/* HEADER COLONNA */}
-                  <div className="flex justify-between items-center mb-3 cursor-grab active:cursor-grabbing">
-                    <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                      <span className="text-slate-400 text-xs">⋮⋮</span> {col.name}
-                    </h3>
-                    <span className="text-xs bg-slate-300/80 text-slate-700 font-bold px-2 py-0.5 rounded-full">
-                      {colCards.length}
-                    </span>
-                  </div>
-
-                  {/* LISTA SCHEDE */}
-                  <div className="space-y-2.5 mb-3 min-h-[50px]">
-                    {colCards.map((card) => {
-                      const cardDetails = card.description || card.details;
-                      const isBeingDragged = draggedCard?.id === card.id;
-
-                      return (
-                        <div
-                          key={card.id}
-                          draggable
-                          onDragStart={(e) => handleCardDragStart(e, card)}
-                          onClick={() => setSelectedCard(card)}
-                          className={`bg-white border border-slate-200 rounded-lg p-3 shadow-sm hover:border-blue-400 hover:shadow transition cursor-pointer relative ${
-                            isBeingDragged ? 'opacity-40 border-dashed border-blue-500' : ''
-                          }`}
-                        >
-                          <div className="flex justify-between items-start gap-2 mb-1.5">
-                            <h4 className="font-semibold text-slate-900 text-sm leading-snug flex-1">
-                              {card.title}
-                            </h4>
-                            <button
-                              onClick={(e) => handleDeleteCard(card.id, e)}
-                              title="Elimina scheda"
-                              className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-xs font-bold"
-                            >
-                              🗑️
-                            </button>
-                          </div>
-
-                          {cardDetails && (
-                            <p className="text-xs text-slate-600 line-clamp-2 mb-2 leading-relaxed">
-                              {cardDetails}
-                            </p>
-                          )}
-
-                          {card.attachments && card.attachments.length > 0 && (
-                            <div className="flex justify-end pt-1 border-t border-slate-100">
-                              <span className="text-[11px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200 font-medium">
-                                📎 {card.attachments.length}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-
-                    {isTargetCardCol && draggedCard && String(draggedCard.column_id) !== String(col.id) && (
-                      <div className="border-2 border-dashed border-blue-400 bg-blue-100/50 rounded-lg p-3 text-center text-blue-600 text-xs font-medium">
-                        Rilascia qui la scheda
-                      </div>
-                    )}
-                  </div>
+            <div
+              key={col.id}
+              draggable
+              onDragStart={(e) => handleColDragStart(e, colIdx)}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (draggedCard) {
+                  setDragOverCardColId(col.id);
+                } else {
+                  handleColDragOver(e, colIdx);
+                }
+              }}
+              onDragLeave={() => setDragOverCardColId(null)}
+              onDrop={(e) => {
+                if (draggedCard) handleCardDrop(e, col.id);
+              }}
+              onDragEnd={handleColDragEnd}
+              className={`w-72 border rounded-xl p-3 flex-shrink-0 shadow-sm transition-all duration-200 flex flex-col justify-between ${
+                isColumnBeingDragged
+                  ? 'border-2 border-dashed border-blue-500 bg-blue-50/40 opacity-60 scale-95'
+                  : isTargetCardCol
+                  ? 'bg-blue-50/80 border-blue-400 ring-2 ring-blue-300'
+                  : 'bg-slate-200/70 border-slate-300/70'
+              }`}
+            >
+              <div>
+                {/* HEADER COLONNA */}
+                <div className="flex justify-between items-center mb-3 cursor-grab active:cursor-grabbing">
+                  <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                    <span className="text-slate-400 text-xs">⋮⋮</span> {col.name}
+                  </h3>
+                  <span className="text-xs bg-slate-300/80 text-slate-700 font-bold px-2 py-0.5 rounded-full">
+                    {colCards.length}
+                  </span>
                 </div>
 
-                {/* FORM NUOVA SCHEDA */}
-                <div className="flex gap-1.5 pt-2 border-t border-slate-300/70 mt-auto">
-                  <input
-                    type="text"
-                    placeholder="Nuova scheda..."
-                    value={newCardTitles[col.id] || ''}
-                    onChange={(e) => setNewCardTitles({ ...newCardTitles, [col.id]: e.target.value })}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddCard(col.id)}
-                    className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 shadow-inner"
-                  />
-                  <button
-                    onClick={() => handleAddCard(col.id)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm transition"
-                  >
-                    +
-                  </button>
+                {/* LISTA SCHEDE */}
+                <div className="space-y-2.5 mb-3 min-h-[50px]">
+                  {colCards.map((card) => {
+                    const cardDetails = card.description || card.details;
+                    const isBeingDragged = draggedCard?.id === card.id;
+
+                    return (
+                      <div
+                        key={card.id}
+                        draggable
+                        onDragStart={(e) => handleCardDragStart(e, card)}
+                        onClick={() => setSelectedCard(card)}
+                        className={`bg-white border border-slate-200 rounded-lg p-3 shadow-sm hover:border-blue-400 hover:shadow transition cursor-pointer relative ${
+                          isBeingDragged ? 'opacity-30 border-dashed border-blue-500' : ''
+                        }`}
+                      >
+                        <div className="flex justify-between items-start gap-2 mb-1.5">
+                          <h4 className="font-semibold text-slate-900 text-sm leading-snug flex-1">
+                            {card.title}
+                          </h4>
+                          <button
+                            onClick={(e) => handleDeleteCard(card.id, e)}
+                            title="Elimina scheda"
+                            className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-xs font-bold"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+
+                        {cardDetails && (
+                          <p className="text-xs text-slate-600 line-clamp-2 mb-2 leading-relaxed">
+                            {cardDetails}
+                          </p>
+                        )}
+
+                        {card.attachments && card.attachments.length > 0 && (
+                          <div className="flex justify-end pt-1 border-t border-slate-100">
+                            <span className="text-[11px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200 font-medium">
+                              📎 {card.attachments.length}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {isTargetCardCol && draggedCard && String(draggedCard.column_id) !== String(col.id) && (
+                    <div className="border-2 border-dashed border-blue-400 bg-blue-100/50 rounded-lg p-3 text-center text-blue-600 text-xs font-medium">
+                      Rilascia qui la scheda
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* BARRA INDICATORE A DESTRA */}
-              {isBarOnRight && (
-                <div className="w-2 bg-blue-600 rounded-full shadow-lg shadow-blue-500/50 self-stretch my-1 transition-all" />
-              )}
-            </React.Fragment>
+              {/* FORM NUOVA SCHEDA */}
+              <div className="flex gap-1.5 pt-2 border-t border-slate-300/70 mt-auto">
+                <input
+                  type="text"
+                  placeholder="Nuova scheda..."
+                  value={newCardTitles[col.id] || ''}
+                  onChange={(e) => setNewCardTitles({ ...newCardTitles, [col.id]: e.target.value })}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddCard(col.id)}
+                  className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 shadow-inner"
+                />
+                <button
+                  onClick={() => handleAddCard(col.id)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-bold text-xs shadow-sm transition"
+                >
+                  +
+                </button>
+              </div>
+            </div>
           );
         })}
 
