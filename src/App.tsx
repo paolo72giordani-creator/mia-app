@@ -30,18 +30,43 @@ export default function App() {
   const fetchBoards = async () => {
     if (!session?.user) return;
     try {
-      const { data: owned } = await supabase.from('boards').select('*').eq('user_id', session.user.id);
-      const { data: memberEntries } = await supabase.from('board_members').select('board_id').eq('user_id', session.user.id);
+      // 1. Carica le bacheche di proprietà dell'utente
+      const { data: owned } = await supabase
+        .from('boards')
+        .select('*')
+        .eq('user_id', session.user.id);
+
+      // 2. Recupera gli ID delle bacheche condivise con l'utente
+      const { data: memberEntries } = await supabase
+        .from('board_members')
+        .select('board_id')
+        .eq('user_id', session.user.id);
 
       let sharedList = [];
       if (memberEntries && memberEntries.length > 0) {
-        const { data: shared } = await supabase.from('boards').select('*').in('id', memberEntries.map((m) => m.board_id));
+        const boardIds = memberEntries.map((m) => m.board_id);
+        
+        // 3. Esegui la query joinando le bacheche con la tabella degli utenti/profili
+        // per ottenere l'email del vero proprietario
+        const { data: shared } = await supabase
+          .from('boards')
+          .select('*, profiles:user_id(email)')
+          .in('id', boardIds);
+
         sharedList = shared || [];
       }
 
       setBoards([
-        ...(owned || []).map((b) => ({ ...b, isOwner: true, ownerEmail: session.user.email })),
-        ...(sharedList || []).map((b) => ({ ...b, isOwner: false, ownerEmail: 'Condivisa' }))
+        ...(owned || []).map((b) => ({
+          ...b,
+          isOwner: true,
+          ownerEmail: session.user.email
+        })),
+        ...(sharedList || []).map((b) => ({
+          ...b,
+          isOwner: false,
+          ownerEmail: b.profiles?.email || b.owner_email || 'Proprietario'
+        }))
       ]);
     } catch (err) {
       console.error('Errore caricamento bacheche:', err);
@@ -54,22 +79,10 @@ export default function App() {
       const newBoard = {
         id: `board-${Date.now()}`,
         user_id: session.user.id,
-        title: newBoardTitle.trim()
+        title: newBoardTitle.trim(),
+        owner_email: session.user.email
       };
-
-      const { data, error } = await supabase.from('boards').insert([newBoard]).select();
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        const created = { ...data[0], isOwner: true, ownerEmail: session.user.email };
-        setBoards((prev) => [created, ...prev]);
-        setNewBoardTitle('');
-        setIsCreatingBoard(false);
-      }
-    } catch (err) {
-      alert('Errore creazione bacheca: ' + err.message);
-    }
-  };
+      // ... resto della funzione
 
   const handleDragStart = (e, index) => { setDraggedBoardIndex(index); e.dataTransfer.effectAllowed = 'move'; };
   const handleDragOver = (e, index) => {
