@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import CardDetailModal from './CardDetailModal';
 
 export default function BoardView({ activeBoard, currentUser, onBack, onOpenShare }) {
   const [columns, setColumns] = useState([]);
   const [cards, setCards] = useState([]);
   const [newColumnName, setNewColumnName] = useState('');
   const [newCardTitles, setNewCardTitles] = useState({});
+  const [selectedCard, setSelectedCard] = useState(null);
 
   useEffect(() => {
     if (activeBoard) fetchBoardData();
@@ -22,7 +24,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
       const { data: crds } = await supabase
         .from('cards')
-        .select('*')
+        .select('*, attachments(*)')
         .eq('board_id', activeBoard.id)
         .order('position', { ascending: true });
       setCards(crds || []);
@@ -56,8 +58,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
     try {
       const colCards = cards.filter((c) => c.column_id === columnId);
-      
-      // Rimosso board_id dal payload per allinearsi allo schema Supabase
       const newCard = {
         id: `card-${Date.now()}`,
         user_id: currentUser.id,
@@ -70,11 +70,25 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
       if (error) throw error;
 
       if (data && data.length > 0) {
-        setCards((prev) => [...prev, data[0]]);
+        setCards((prev) => [...prev, { ...data[0], attachments: [] }]);
         setNewCardTitles((prev) => ({ ...prev, [columnId]: '' }));
       }
     } catch (err) {
       alert('Errore scheda: ' + err.message);
+    }
+  };
+
+  const handleUpdateCard = (updatedCard) => {
+    setCards(cards.map((c) => (c.id === updatedCard.id ? updatedCard : c)));
+  };
+
+  const handleDeleteCard = async (cardId) => {
+    try {
+      await supabase.from('cards').delete().eq('id', cardId);
+      setCards(cards.filter((c) => c.id !== cardId));
+      setSelectedCard(null);
+    } catch (err) {
+      alert('Errore eliminazione: ' + err.message);
     }
   };
 
@@ -111,11 +125,18 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                 </span>
               </div>
 
-              {/* LISTA SCHEDE */}
+              {/* LISTA SCHEDE CLICCABILI */}
               <div className="space-y-1.5 mb-2 min-h-[30px]">
                 {colCards.map((card) => (
-                  <div key={card.id} className="bg-white border rounded p-2 shadow-sm text-xs text-slate-800 font-medium">
-                    {card.title}
+                  <div
+                    key={card.id}
+                    onClick={() => setSelectedCard(card)}
+                    className="bg-white border rounded p-2 shadow-sm text-xs text-slate-800 font-medium cursor-pointer hover:border-blue-400 hover:shadow transition flex justify-between items-center"
+                  >
+                    <span className="truncate">{card.title}</span>
+                    {card.attachments && card.attachments.length > 0 && (
+                      <span className="text-[10px] text-slate-400 font-normal">📎 {card.attachments.length}</span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -153,6 +174,16 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           </button>
         </div>
       </div>
+
+      {/* POP-UP DETTAGLI SCHEDA */}
+      {selectedCard && (
+        <CardDetailModal
+          card={selectedCard}
+          onClose={() => setSelectedCard(null)}
+          onUpdateCard={handleUpdateCard}
+          onDeleteCard={handleDeleteCard}
+        />
+      )}
     </div>
   );
 }
