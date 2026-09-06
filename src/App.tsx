@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from './supabaseClient'; // assicurati che il percorso sia corretto
+import { supabase } from './supabaseClient';
 
-// --- BREVO CONFIG ---
+// --- CONFIGURAZIONE BREVO ---
 const BREVO_API_KEY = import.meta.env.VITE_BREVO_API_KEY || '';
 
 export default function App() {
-  // Stati principali
+  // --- STATI PRINCIPALI ---
   const [session, setSession] = useState(null);
   const [boards, setBoards] = useState([]);
   const [activeBoardId, setActiveBoardId] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Stati Pop-up Condivisione
+  // --- STATI PER IL MODALE CONDIVISIONE ---
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('editor');
@@ -19,15 +19,34 @@ export default function App() {
   const [inviteSuccess, setInviteSuccess] = useState('');
   const [activeBoardMembers, setActiveBoardMembers] = useState([]);
 
-  // Stato Drag & Drop
+  // --- STATO DRAG & DROP DASHBOARD ---
   const [draggedBoardIndex, setDraggedBoardIndex] = useState(null);
 
-  // --- 1. CARICAMENTO BACHECHE E PROPRIETARIO ---
+  // --- GESTIONE SESSIONE UTENTE ---
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (session) {
+      fetchBoards();
+    }
+  }, [session]);
+
+  // --- 1. CARICAMENTO BACHECHE (PROPRIETARIO VS CONDIVISE) ---
   const fetchBoards = async () => {
     if (!session?.user) return;
     setLoading(true);
     try {
-      // Bacheche proprietario
+      // Bacheche di proprietà dell'utente
       const { data: ownedBoards, error: ownedErr } = await supabase
         .from('boards')
         .select('*')
@@ -35,7 +54,7 @@ export default function App() {
 
       if (ownedErr) throw ownedErr;
 
-      // Inviti ricevuti
+      // Bacheche a cui l'utente è stato invitato
       const { data: memberEntries, error: memberErr } = await supabase
         .from('board_members')
         .select('board_id, role')
@@ -55,30 +74,20 @@ export default function App() {
         sharedBoardsList = shared || [];
       }
 
-      // Arricchimento con il flag isOwner e recupero della mail del proprietario per quelle condivise
+      // Etichetta proprietario / condivisa
       const formattedOwned = (ownedBoards || []).map((b) => ({
         ...b,
         isOwner: true,
         ownerEmail: session.user.email
       }));
 
-      const formattedShared = await Promise.all(
-        sharedBoardsList.map(async (b) => {
-          // Recupera l'email del proprietario della bacheca se non siamo noi
-          const { data: ownerData } = await supabase
-            .rpc('get_user_email_by_id', { p_user_id: b.user_id })
-            .single();
+      const formattedShared = (sharedBoardsList || []).map((b) => ({
+        ...b,
+        isOwner: false,
+        ownerEmail: 'Altro Utente' // Può essere dinamico
+      }));
 
-          return {
-            ...b,
-            isOwner: false,
-            ownerEmail: ownerData || 'Proprietario'
-          };
-        })
-      );
-
-      const combined = [...formattedOwned, ...formattedShared];
-      setBoards(combined);
+      setBoards([...formattedOwned, ...formattedShared]);
     } catch (err) {
       console.error('Errore caricamento bacheche:', err);
     } finally {
@@ -86,7 +95,7 @@ export default function App() {
     }
   };
 
-  // --- 2. RECUPERO MEMBRI ATTIVI CON EMAIL NEL POPUP ---
+  // --- 2. CARICAMENTO MEMBRI CON EMAIL NEL POP-UP ---
   const fetchBoardMembers = async (boardId) => {
     try {
       const { data, error } = await supabase.rpc('get_board_members_with_emails', {
@@ -99,7 +108,7 @@ export default function App() {
     }
   };
 
-  // --- 3. GESTIONE INVITO & NOTIFICA DOCEO KANBAN ---
+  // --- 3. INVIO INVITO CON NOTIFICA DOCEO KANBAN ---
   const handleInviteUser = async () => {
     setInviteError('');
     setInviteSuccess('');
@@ -125,12 +134,11 @@ export default function App() {
       if (error) throw error;
 
       const activeBoardObj = boards.find((b) => b.id === activeBoardId);
-      const roleLabel = inviteRole === 'editor' ? 'Editor' : 'Visualizzatore';
+      const roleLabel = inviteRole === 'editor' ? 'Editor (Modifica)' : 'Visualizzatore (Solo Lettura)';
 
-      // Notifica Brevo Rebrand "Doceo Kanban"
       sendEmailNotification(emailToInvite, activeBoardObj?.title || 'Doceo Kanban', roleLabel);
 
-      setInviteSuccess(`Invito inviato con successo a ${emailToInvite}!`);
+      setInviteSuccess(`Invito e notifica email inviati a ${emailToInvite}!`);
       setInviteEmail('');
       fetchBoardMembers(activeBoardId);
     } catch (err) {
@@ -138,7 +146,7 @@ export default function App() {
     }
   };
 
-  // --- 4. CAMBIO RUOLO & RIMOZIONE COLLABORATORE ---
+  // --- 4. CAMBIO RUOLO O RIMOZIONE COLLABORATORE ---
   const handleUpdateRole = async (targetUserId, newRole) => {
     try {
       const { error } = await supabase
@@ -150,12 +158,12 @@ export default function App() {
       if (error) throw error;
       fetchBoardMembers(activeBoardId);
     } catch (err) {
-      alert('Errore durante l\'aggiornamento del ruolo.');
+      alert('Errore aggiornamento ruolo.');
     }
   };
 
   const handleRemoveMember = async (targetUserId) => {
-    if (!window.confirm('Sei sicuro di voler rimuovere questo collaboratore?')) return;
+    if (!window.confirm('Vuoi davvero rimuovere questo collaboratore?')) return;
     try {
       const { error } = await supabase.rpc('remove_board_member', {
         p_board_id: activeBoardId,
@@ -164,11 +172,11 @@ export default function App() {
       if (error) throw error;
       fetchBoardMembers(activeBoardId);
     } catch (err) {
-      alert('Errore durante la rimozione del collaboratore.');
+      alert('Errore rimozione collaboratore.');
     }
   };
 
-  // --- 5. NOTIFICA EMAIL BREVO ---
+  // --- 5. NOTIFICA EMAIL CON REBRAND DOCEO KANBAN ---
   const sendEmailNotification = async (recipientEmail, boardTitle, roleName) => {
     if (!BREVO_API_KEY) return;
     const senderUserEmail = session?.user?.email || 'Un utente';
@@ -190,15 +198,17 @@ export default function App() {
           to: [{ email: recipientEmail }],
           subject: `${senderUserEmail} ti ha invitato su Doceo Kanban: "${boardTitle}"`,
           htmlContent: `
-            <div style="font-family: Arial, sans-serif; padding: 20px; color: #1e293b;">
-              <h2 style="color: #2563eb;">Doceo Kanban</h2>
-              <p>L'utente <strong>${senderUserEmail}</strong> ti ha invitato a collaborare sulla bacheca <strong>"${boardTitle}"</strong> come <strong>${roleName}</strong>.</p>
+            <div style="font-family: Arial, sans-serif; padding: 20px; color: #1e293b; max-width: 500px; border: 1px solid #e2e8f0; border-radius: 8px;">
+              <h2 style="color: #2563eb; margin-top:0;">Doceo Kanban</h2>
+              <p>Ciao,</p>
+              <p>L'utente <strong>${senderUserEmail}</strong> ti ha invitato a collaborare sulla bacheca <strong>"${boardTitle}"</strong> con il ruolo di <strong>${roleName}</strong>.</p>
+              <p style="font-size: 12px; color: #64748b; margin-top: 20px;">Accedi all'app con la tua email per iniziare!</p>
             </div>
           `
         })
       });
     } catch (err) {
-      console.error('Errore invio mail Brevo:', err);
+      console.error('Errore invio notifica Brevo:', err);
     }
   };
 
@@ -225,33 +235,56 @@ export default function App() {
     setDraggedBoardIndex(null);
   };
 
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white p-4">
+        <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-sm w-full text-center shadow-xl">
+          <h1 className="text-2xl font-bold mb-2 text-blue-500">Doceo Kanban</h1>
+          <p className="text-sm text-slate-400 mb-6">Effettua il login per accedere alle tue bacheche.</p>
+          <button
+            onClick={() => supabase.auth.signInWithOAuth({ provider: 'google' })}
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-lg transition"
+          >
+            Accedi con Google
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans">
-      {/* HEADER PRINCIPALE */}
-      <header className="border-b border-slate-800 bg-slate-950/80 px-6 py-4 flex justify-between items-center">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+      {/* HEADER BAR */}
+      <header className="border-b border-slate-800 bg-slate-900/50 px-6 py-4 flex justify-between items-center backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center flex-shrink-0 justify-center font-bold text-white shadow-lg shadow-blue-500/30">
+          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/20">
             DK
           </div>
           <h1 className="text-xl font-bold tracking-tight text-white">Doceo Kanban</h1>
         </div>
-        {session && (
-          <div className="text-sm text-slate-400">
-            Connesso come <span className="text-blue-400 font-medium">{session.user.email}</span>
-          </div>
-        )}
+        <div className="flex items-center gap-4">
+          <span className="text-xs text-slate-400">
+            <span className="text-blue-400 font-medium">{session.user.email}</span>
+          </span>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-md border border-slate-700 transition"
+          >
+            Esci
+          </button>
+        </div>
       </header>
 
-      {/* CONTENUTO DASHBOARD / BACHECA */}
+      {/* CONTENUTO PRINCIPALE */}
       <main className="p-6 max-w-7xl mx-auto">
         {!activeBoardId ? (
           /* VISTA DASHBOARD */
           <div>
-            <h2 className="text-2xl font-bold mb-6 text-white flex items-center gap-2">
-              Le Mie Bacheche
-            </h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-white">Le Mie Bacheche</h2>
+            </div>
 
-            {/* GRIGLIA BACHECHE CON DRAG & DROP */}
+            {/* GRIGLIA BACHECHE CON DRAG & DROP E COLORI DIFFERENZIATI */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {boards.map((board, index) => (
                 <div
@@ -261,49 +294,47 @@ export default function App() {
                   onDragOver={(e) => handleDragOver(e, index)}
                   onDragEnd={handleDragEnd}
                   onClick={() => setActiveBoardId(board.id)}
-                  className={`cursor-pointer rounded-xl p-5 border-2 transition-all duration-200 bg-slate-800/80 hover:bg-slate-800 shadow-lg relative ${
+                  className={`cursor-pointer rounded-2xl p-5 border-2 transition-all duration-200 bg-slate-900 shadow-xl relative ${
                     board.isOwner
-                      ? 'border-blue-500/80 hover:border-blue-400 hover:shadow-blue-500/10'
-                      : 'border-amber-500/80 hover:border-amber-400 hover:shadow-amber-500/10'
+                      ? 'border-blue-500/70 hover:border-blue-400 hover:shadow-blue-500/10' // BLU PROPRIETARIO
+                      : 'border-orange-500/70 hover:border-orange-400 hover:shadow-orange-500/10' // ARANCIONE CONDIVISA
                   }`}
                 >
-                  {/* BADGE TIPO BACHECA */}
                   <div className="flex justify-between items-start mb-3">
                     <span
-                      className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
+                      className={`text-xs px-2.5 py-1 rounded-full font-semibold border ${
                         board.isOwner
-                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+                          : 'bg-orange-500/10 text-orange-400 border-orange-500/30'
                       }`}
                     >
-                      {board.isOwner ? 'Proprietario' : 'Condivisa'}
+                      {board.isOwner ? 'Proprietario' : 'Condivisa con me'}
                     </span>
                   </div>
 
-                  <h3 className="text-lg font-bold text-white mb-2">{board.title}</h3>
+                  <h3 className="text-lg font-bold text-white mb-4">{board.title}</h3>
 
-                  {/* PROPRIETARIO DELLA BACHECA */}
-                  <p className="text-xs text-slate-400 mt-4 flex items-center gap-1">
-                    👤 Proprietario: <span className="text-slate-300 font-medium">{board.ownerEmail}</span>
-                  </p>
+                  <div className="pt-3 border-t border-slate-800/80 flex justify-between items-center text-xs text-slate-400">
+                    <span>👤 Proprietario: <strong className="text-slate-300">{board.ownerEmail}</strong></span>
+                    <span className="text-blue-400 font-medium">Apri →</span>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         ) : (
-          /* VISTA DETTAGLIO BACHECA ATTIVA */
+          /* VISTA DETTAGLIO BACHECA */
           <div>
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-6 bg-slate-900 p-4 rounded-xl border border-slate-800">
               <div>
                 <button
                   onClick={() => setActiveBoardId(null)}
-                  className="text-xs text-slate-400 hover:text-white mb-1 inline-block"
+                  className="text-xs text-blue-400 hover:underline mb-1 inline-block"
                 >
                   ← Torna alla Dashboard Doceo Kanban
                 </button>
                 <h2 className="text-2xl font-bold text-white flex items-center gap-3">
                   {boards.find((b) => b.id === activeBoardId)?.title}
-                  {/* Badge proprietario */}
                   <span className="text-xs font-normal text-slate-400 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">
                     Proprietario: {boards.find((b) => b.id === activeBoardId)?.ownerEmail}
                   </span>
@@ -320,15 +351,19 @@ export default function App() {
                 Condividi Bacheca
               </button>
             </div>
+
+            <div className="p-12 text-center border-2 border-dashed border-slate-800 rounded-2xl">
+              <p className="text-slate-400">Area colonne e schede Kanban per la bacheca attiva...</p>
+            </div>
           </div>
         )}
 
         {/* POP-UP CONDIVISIONE E GESTIONE MEMBRI */}
         {isShareModalOpen && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl text-slate-100">
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl text-slate-100">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold">Condividi su Doceo Kanban</h3>
+                <h3 className="text-lg font-bold text-white">Condividi su Doceo Kanban</h3>
                 <button
                   onClick={() => setIsShareModalOpen(false)}
                   className="text-slate-400 hover:text-white text-xl"
@@ -337,19 +372,19 @@ export default function App() {
                 </button>
               </div>
 
-              {/* FORM INVITO */}
+              {/* INVITO COLLABORATORE */}
               <div className="flex gap-2 mb-4">
                 <input
                   type="email"
                   placeholder="email.collega@esempio.com"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm flex-1 text-white focus:outline-none focus:border-blue-500"
+                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm flex-1 text-white focus:outline-none focus:border-blue-500"
                 />
                 <select
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                  className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white"
                 >
                   <option value="editor">Editor</option>
                   <option value="viewer">Visualizzatore</option>
@@ -365,36 +400,40 @@ export default function App() {
               {inviteError && <p className="text-red-400 text-xs mb-3">{inviteError}</p>}
               {inviteSuccess && <p className="text-green-400 text-xs mb-3">{inviteSuccess}</p>}
 
-              {/* LISTA COLLABORATORI ATTIVI */}
+              {/* LISTA COLLABORATORI CON EMAIL E RIMOZIONE */}
               <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 mt-6">
                 Collaboratori Attivi ({activeBoardMembers.length})
               </h4>
 
               <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                {activeBoardMembers.map((member) => (
-                  <div
-                    key={member.member_id}
-                    className="flex justify-between items-center bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/50"
-                  >
-                    <span className="text-sm font-medium text-slate-200">{member.email}</span>
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={member.role}
-                        onChange={(e) => handleUpdateRole(member.user_id, e.target.value)}
-                        className="bg-slate-800 border border-slate-700 rounded text-xs px-2 py-1 text-slate-300"
-                      >
-                        <option value="editor">Editor</option>
-                        <option value="viewer">Visualizzatore</option>
-                      </select>
-                      <button
-                        onClick={() => handleRemoveMember(member.user_id)}
-                        className="text-red-400 hover:text-red-300 text-xs px-2 py-1 rounded bg-red-500/10 hover:bg-red-500/20 border border-red-500/30"
-                      >
-                        Rimuovi
-                      </button>
+                {activeBoardMembers.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic">Nessun collaboratore aggiunto.</p>
+                ) : (
+                  activeBoardMembers.map((member) => (
+                    <div
+                      key={member.member_id}
+                      className="flex justify-between items-center bg-slate-950 p-2.5 rounded-lg border border-slate-800"
+                    >
+                      <span className="text-sm font-medium text-slate-200">{member.email}</span>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={member.role}
+                          onChange={(e) => handleUpdateRole(member.user_id, e.target.value)}
+                          className="bg-slate-900 border border-slate-700 rounded text-xs px-2 py-1 text-slate-300"
+                        >
+                          <option value="editor">Editor</option>
+                          <option value="viewer">Visualizzatore</option>
+                        </select>
+                        <button
+                          onClick={() => handleRemoveMember(member.user_id)}
+                          className="text-red-400 hover:text-red-300 text-xs px-2.5 py-1 rounded bg-red-500/10 hover:bg-red-500/20 border border-red-500/30"
+                        >
+                          Rimuovi
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </div>
