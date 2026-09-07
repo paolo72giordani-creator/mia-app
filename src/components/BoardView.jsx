@@ -28,18 +28,18 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     { label: 'Viola', value: 'bg-purple-600' }
   ];
 
-  // CARICAMENTO E ASCOLTO IN TEMPO REALE
+  // CARICAMENTO E ASCOLTO IN TEMPO REALE (BIDIREZIONALE)
   useEffect(() => {
     if (!activeBoard) return;
 
     fetchBoardData();
 
-    // Sottoscrizione ai cambiamenti di colonne e schede per questa bacheca
+    // Sottoscrizione globale ai cambiamenti di colonne e schede
     const channel = supabase
       .channel(`board-realtime-${activeBoard.id}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'columns', filter: `board_id=eq.${activeBoard.id}` },
+        { event: '*', schema: 'public', table: 'columns' },
         () => fetchBoardData()
       )
       .on(
