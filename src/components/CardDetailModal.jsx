@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 
+
+
 export default function CardDetailModal({
   card,
   columnId,
+  currentUser, // <--- Ricevuto qui
   isViewer,
   onClose,
   onSaveCard,
@@ -45,14 +48,19 @@ export default function CardDetailModal({
 
     setIsSaving(true);
     try {
+      // Recupera l'ID dell'utente loggato
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData?.user?.id || currentUser?.id;
+
       const currentCardId = card?.id || `card-${Date.now()}`;
 
       const cardPayload = {
         id: currentCardId,
+        user_id: userId, // <--- INCLUSO USER_ID PER IL CONSTRAINT NOT-NULL
         column_id: String(columnId),
         title: title.trim(),
         description: description.trim(),
-        position: card?.position ?? Math.floor(Math.random() * 1000) // <--- Corretto qui (intero piccolo)
+        position: card?.position ?? Math.floor(Math.random() * 1000)
       };
 
       const { data: savedCard, error: cardError } = await supabase

@@ -691,6 +691,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         <CardDetailModal
           card={modalCard}
           columnId={modalColId}
+          currentUser={currentUser} // <--- AGGIUNTO QUI
           isViewer={isViewer}
           onClose={() => {
             setModalCard(null);
