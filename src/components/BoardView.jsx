@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import CardDetailModal from './CardDetailModal';
+import { exportBoardToWord } from '../utils/exportBoard';
 
 const availableColors = [
   { label: 'Blu', value: 'bg-blue-600' },
@@ -18,6 +19,8 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   const [newColumnName, setNewColumnName] = useState('');
 
   const isViewer = activeBoard?.role === 'viewer';
+  
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
   // Rinomina bacheca
   const [isEditingBoardTitle, setIsEditingBoardTitle] = useState(false);
@@ -396,6 +399,44 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
             <span>🚪</span> Esci
           </button>
         </div>
+		
+		{/* PULSANTE ESPORTA / STAMPA */}
+<div className="relative no-print">
+  <button
+    onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+    className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3.5 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 shadow-sm"
+  >
+    <span>🖨️</span> Esporta / Stampa
+  </button>
+
+  {isExportMenuOpen && (
+    <div 
+      onClick={(e) => e.stopPropagation()}
+      className="absolute right-0 top-9 bg-white border border-slate-200 rounded-xl p-1 shadow-2xl z-40 w-44 text-xs text-slate-800"
+    >
+      <button
+        onClick={() => {
+          setIsExportMenuOpen(false);
+          window.print(); // Stampa nativa o Salvataggio in PDF
+        }}
+        className="w-full text-left px-3 py-2 hover:bg-slate-100 rounded-lg font-medium flex items-center gap-2"
+      >
+        📄 Stampa o Salva PDF
+      </button>
+
+      <button
+        onClick={() => {
+          setIsExportMenuOpen(false);
+          exportBoardToWord(activeBoard.title, columns, cards);
+        }}
+        className="w-full text-left px-3 py-2 hover:bg-slate-100 rounded-lg font-medium flex items-center gap-2 border-t border-slate-100"
+      >
+        📝 Esporta per Word (.doc)
+      </button>
+    </div>
+  )}
+</div>
+
       </div>
 
       {/* AREA COLONNE KANBAN */}

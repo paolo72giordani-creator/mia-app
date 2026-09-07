@@ -182,3 +182,31 @@
     border-right-color: var(--border);
   }
 }
+
+/* REGOLA PER LA STAMPA / SALVATAGGIO PDF */
+@media print {
+  /* Nasconde intestazioni app, pulsanti di azione ed elementi interattivi */
+  button, 
+  header, 
+  .no-print,
+  input {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    padding: 0 !important;
+  }
+
+  /* Rende la griglia delle colonne fluida e ben impaginata su carta */
+  .overflow-x-auto {
+    overflow: visible !important;
+    flex-wrap: wrap !important;
+  }
+
+  .w-72 {
+    width: 48% !important;
+    margin-bottom: 20px !important;
+    page-break-inside: avoid;
+  }
+}
