@@ -94,6 +94,7 @@ export default function App() {
       setAuthLoading(false);
     }
   };
+
   const fetchBoards = async () => {
     if (!session?.user) return;
     try {
