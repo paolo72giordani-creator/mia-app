@@ -134,21 +134,37 @@ export default function App() {
     }
   };
 
-  const handleCreateBoard = async () => {
-    if (!newBoardTitle.trim() || !session?.user) return;
+  const handleCreateBoardWithTemplate = async (title, template) => {
+    if (!title || !session?.user) return;
     try {
-      const newBoard = {
-        id: `board-${Date.now()}`,
-        user_id: session.user.id,
-        title: newBoardTitle.trim(),
-        position: boards.length
-      };
+      const boardId = `board-${Date.now()}`;
 
-      const { error } = await supabase.from('boards').insert([newBoard]);
-      if (error) throw error;
+      // 1. Inserisce la bacheca
+      const { error: boardErr } = await supabase.from('boards').insert([
+        {
+          id: boardId,
+          user_id: session.user.id,
+          title: title,
+          position: boards.length
+        }
+      ]);
+      if (boardErr) throw boardErr;
+
+      // 2. Se il template include colonne, le crea automaticamente
+      if (template.columns && template.columns.length > 0) {
+        const columnsToInsert = template.columns.map((col, idx) => ({
+          id: `col-${Date.now()}-${idx}`,
+          user_id: session.user.id,
+          board_id: boardId,
+          name: col.name,
+          color: col.color,
+          position: idx
+        }));
+
+        await supabase.from('columns').insert(columnsToInsert);
+      }
 
       await fetchBoards();
-      setNewBoardTitle('');
       setIsCreatingBoard(false);
     } catch (err) {
       alert('Errore creazione bacheca: ' + err.message);
@@ -336,43 +352,22 @@ export default function App() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {/* CARD 1: NUOVA BACHECA QUADRATA */}
-            <div className="aspect-square bg-white border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-4 flex flex-col justify-center items-center transition shadow-sm">
-              {!isCreatingBoard ? (
-                <button
-                  onClick={() => setIsCreatingBoard(true)}
-                  className="w-full h-full flex flex-col items-center justify-center text-blue-600 hover:text-blue-700 font-bold text-sm gap-1"
-                >
-                  <span className="text-3xl">+</span>
-                  <span className="font-extrabold text-sm">Nuova Bacheca</span>
-                </button>
-              ) : (
-                <div className="w-full h-full flex flex-col justify-center space-y-2">
-                  <input
-                    type="text"
-                    placeholder="Titolo bacheca..."
-                    value={newBoardTitle}
-                    onChange={(e) => setNewBoardTitle(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateBoard()}
-                    autoFocus
-                    className="w-full border rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500"
-                  />
-                  <div className="flex gap-1 justify-center">
-                    <button
-                      onClick={() => setIsCreatingBoard(false)}
-                      className="border px-2 py-1 rounded text-[10px] text-slate-600 font-medium"
-                    >
-                      Annulla
-                    </button>
-                    <button
-                      onClick={handleCreateBoard}
-                      className="bg-blue-600 text-white font-bold text-[10px] px-2.5 py-1 rounded"
-                    >
-                      Crea
-                    </button>
-                  </div>
-                </div>
-              )}
+            {/* CARD NUOVA BACHECA */}
+<div 
+  onClick={() => setIsCreatingBoard(true)}
+  className="aspect-square bg-white border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-4 flex flex-col justify-center items-center cursor-pointer transition shadow-sm group"
+>
+  <span className="text-3xl text-blue-600 group-hover:scale-110 transition">+</span>
+  <span className="font-extrabold text-sm text-blue-600">Nuova Bacheca</span>
+</div>
+
+{/* MODAL CREAZIONE BACHECA CON TEMPLATE */}
+{isCreatingBoard && (
+  <CreateBoardModal
+    onClose={() => setIsCreatingBoard(false)}
+    onCreate={handleCreateBoardWithTemplate}
+  />
+)}
             </div>
 
             {/* LISTA BACHECHE SALVATE TRASCINABILI CON EDIT TITOLO */}
