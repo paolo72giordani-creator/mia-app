@@ -11,7 +11,6 @@ export default function App() {
   const [isCreatingBoard, setIsCreatingBoard] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
-  // Drag & Drop States per le bacheche
   const [draggedBoardIndex, setDraggedBoardIndex] = useState(null);
   const [dragOverBoardIndex, setDragOverBoardIndex] = useState(null);
 
@@ -36,12 +35,11 @@ export default function App() {
     try {
       const userEmail = session.user.email.toLowerCase();
 
-      // 1. Bacheche proprietarie ordinate per position
+      // 1. Bacheche proprietarie
       const { data: owned, error: ownedErr } = await supabase
         .from('boards_with_owners')
         .select('*')
-        .eq('user_id', session.user.id)
-        .order('position', { ascending: true });
+        .eq('user_id', session.user.id);
 
       if (ownedErr) throw ownedErr;
 
@@ -65,8 +63,7 @@ export default function App() {
         const { data: shared, error: sharedErr } = await supabase
           .from('boards_with_owners')
           .select('*')
-          .in('id', boardIds)
-          .order('position', { ascending: true });
+          .in('id', boardIds);
 
         if (!sharedErr && shared) {
           sharedList = shared.map((board) => {
@@ -79,19 +76,26 @@ export default function App() {
         }
       }
 
-      setBoards([
+      const allBoards = [
         ...(owned || []).map((b) => ({
           ...b,
           isOwner: true,
           role: 'owner',
-          ownerEmail: b.owner_email
+          ownerEmail: b.owner_email,
+          position: b.position ?? 0
         })),
         ...(sharedList || []).map((b) => ({
           ...b,
           isOwner: false,
-          ownerEmail: b.owner_email
+          ownerEmail: b.owner_email,
+          position: b.position ?? 0
         }))
-      ]);
+      ];
+
+      // Ordina in memoria in modo sicuro
+      allBoards.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+
+      setBoards(allBoards);
     } catch (err) {
       console.error('Errore recupero bacheche:', err.message);
     }
@@ -133,7 +137,6 @@ export default function App() {
     }
   };
 
-  // DRAG & DROP HANDLERS PER LE BACHECHE
   const handleBoardDragStart = (e, index) => {
     e.stopPropagation();
     setDraggedBoardIndex(index);
@@ -163,7 +166,6 @@ export default function App() {
     setDraggedBoardIndex(null);
     setDragOverBoardIndex(null);
 
-    // Salva l'ordine aggiornato su Supabase
     try {
       for (let i = 0; i < reordered.length; i++) {
         await supabase
@@ -195,7 +197,6 @@ export default function App() {
         />
       ) : (
         <div className="max-w-6xl mx-auto">
-          {/* HEADER DASHBOARD */}
           <div className="bg-white p-4 rounded-xl border shadow-sm mb-6 flex justify-between items-center">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/20">
@@ -216,9 +217,7 @@ export default function App() {
             </span>
           </div>
 
-          {/* GRIGLIA BACHECHE QUADRATE */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {/* CARD 1: NUOVA BACHECA QUADRATA */}
             <div className="aspect-square bg-white border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-4 flex flex-col justify-center items-center transition shadow-sm">
               {!isCreatingBoard ? (
                 <button
@@ -257,7 +256,6 @@ export default function App() {
               )}
             </div>
 
-            {/* LISTA BACHECHE TRASCINABILI */}
             {boards.map((board, index) => {
               const isBeingDragged = draggedBoardIndex === index;
               const isDragOver = dragOverBoardIndex === index;
