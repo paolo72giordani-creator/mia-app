@@ -248,7 +248,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
   return (
     <div>
-      {/* BARRA SUPERIORE UNIFORMATA */}
+     {/* BARRA SUPERIORE UNIFORMATA */}
 <div className="flex justify-between items-center mb-5 bg-white p-4 rounded-xl border shadow-sm">
   <div className="flex items-center gap-4">
     {/* LOGO DK */}
@@ -268,16 +268,20 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         )}
       </div>
 
-      {/* SOTTO-TESTO: PROPRIETARIO SE CONDIVISA, ALTRIMENTI UTENTE CORRENTE */}
-      <p className="text-[11px] text-slate-500 font-medium">
-        {!activeBoard?.isOwner
-          ? `Proprietario: ${activeBoard?.ownerEmail}`
-          : `Utente: ${currentUser?.email}`}
+      {/* MOSTRA SIA L'UTENTE CHE IL PROPRIETARIO NELLE BACHECHE CONDIVISE */}
+      <p className="text-[11px] text-slate-500 font-medium flex items-center gap-2">
+        <span>Utente: {currentUser?.email}</span>
+        {!activeBoard?.isOwner && (
+          <>
+            <span className="text-slate-300">•</span>
+            <span>Proprietario: {activeBoard?.ownerEmail}</span>
+          </>
+        )}
       </p>
     </div>
   </div>
 
-  {/* PULSANTI DI AZIONE: DASHBOARD EVIDENTE, CONDIVIDI ED ESCI */}
+  {/* PULSANTI DI AZIONE: DASHBOARD, CONDIVIDI ED ESCI */}
   <div className="flex items-center gap-2">
     <button
       onClick={onBack}
