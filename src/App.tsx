@@ -152,7 +152,6 @@ export default function App() {
       const boardId = `board-${Date.now()}`;
       const userEmail = session.user.email;
 
-      // 1. Inserisce la nuova bacheca nel database
       const { error: boardErr } = await supabase.from('boards').insert([
         {
           id: boardId,
@@ -163,7 +162,6 @@ export default function App() {
       ]);
       if (boardErr) throw boardErr;
 
-      // 2. Se il template include colonne, le crea automaticamente
       if (template.columns && template.columns.length > 0) {
         const columnsToInsert = template.columns.map((col, idx) => ({
           id: `col-${Date.now()}-${idx}`,
@@ -177,18 +175,17 @@ export default function App() {
         await supabase.from('columns').insert(columnsToInsert);
       }
 
-      // 3. Costruisce l'oggetto bacheca appena creata
       const newBoardObj = {
         id: boardId,
         user_id: session.user.id,
         title: title,
+        icon: template.icon,
         isOwner: true,
         role: 'owner',
         ownerEmail: userEmail,
         position: boards.length
       };
 
-      // 4. Aggiorna lo stato locale e apre SUBITO la nuova bacheca
       await fetchBoards();
       setIsCreatingBoard(false);
       setActiveBoard(newBoardObj);
@@ -382,7 +379,7 @@ export default function App() {
           <h2 className="text-xl font-extrabold text-slate-900 mb-4 px-1">Le mie bacheche</h2>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
-            {/* CARD 1: CREA NUOVA BACHECA (STILE NOTEBOOKLM) */}
+            {/* CARD CREA NUOVA BACHECA */}
             <div
               onClick={() => setIsCreatingBoard(true)}
               className="aspect-[4/3] bg-white border border-slate-200 hover:border-slate-300 rounded-2xl p-5 flex flex-col justify-center items-center cursor-pointer transition-all shadow-sm hover:shadow-md group"
@@ -393,12 +390,15 @@ export default function App() {
               <span className="font-bold text-sm text-slate-800">Crea nuova bacheca</span>
             </div>
 
-            {/* LISTA BACHECHE PASTELLO */}
+            {/* LISTA BACHECHE CON ICONE E BADGE CONDIVISIONE */}
             {boards.map((board, index) => {
               const isBeingDragged = draggedBoardIndex === index;
               const isEditingThisBoard = editingBoardId === board.id;
               const isMenuOpen = openMenuBoardId === board.id;
               const pastelStyle = PASTEL_BG_CLASSES[index % PASTEL_BG_CLASSES.length];
+
+              // Icona del template o predefinita
+              const boardIcon = board.icon || (board.isOwner ? '📘' : '📚');
 
               return (
                 <div
@@ -414,10 +414,10 @@ export default function App() {
                     isBeingDragged ? 'opacity-30 border-2 border-dashed border-blue-500 scale-95' : ''
                   }`}
                 >
-                  {/* PARTE SUPERIORE CARD: ICONA + MENU 3 PALLINI */}
+                  {/* ICONA E MENU 3 PALLINI */}
                   <div className="flex justify-between items-start gap-1">
                     <div className="text-2xl">
-                      {board.isOwner ? '📘' : '👥'}
+                      {boardIcon}
                     </div>
 
                     {board.isOwner && (
@@ -433,7 +433,6 @@ export default function App() {
                           ⋮
                         </button>
 
-                        {/* MENU CONTESTUALE DROP-DOWN */}
                         {isMenuOpen && (
                           <div 
                             onClick={(e) => e.stopPropagation()}
@@ -481,13 +480,21 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* SOTTO-TESTO STILE METADATI NotebookLM */}
+                  {/* METADATI E BADGE DI CONDIVISIONE */}
                   <div className="text-[11px] text-slate-500 font-medium truncate pt-2 border-t border-black/5 flex items-center justify-between">
-                    <span className="truncate">
-                      {board.isOwner ? 'Personale' : `Da ${board.ownerEmail?.split('@')[0]}`}
-                    </span>
+                    {board.isOwner ? (
+                      <span className="truncate">Personale</span>
+                    ) : (
+                      <div className="flex items-center gap-1.5 truncate text-indigo-900">
+                        <span>🔗</span>
+                        <span className="truncate">
+                          {board.ownerEmail?.split('@')[0]}
+                        </span>
+                      </div>
+                    )}
+
                     {!board.isOwner && (
-                      <span className="text-[10px] bg-white/80 px-1.5 py-0.5 rounded border border-slate-200">
+                      <span className="text-[10px] bg-indigo-100/80 text-indigo-800 px-1.5 py-0.5 rounded border border-indigo-200/80 font-semibold flex-shrink-0">
                         {board.role}
                       </span>
                     )}
