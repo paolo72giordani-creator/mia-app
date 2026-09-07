@@ -52,7 +52,7 @@ export default function CardDetailModal({
         column_id: String(columnId),
         title: title.trim(),
         description: description.trim(),
-        position: card ? card.position : Date.now()
+        position: card?.position ?? Math.floor(Math.random() * 1000) // <--- Corretto qui (intero piccolo)
       };
 
       const { data: savedCard, error: cardError } = await supabase
