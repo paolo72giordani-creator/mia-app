@@ -150,7 +150,9 @@ export default function App() {
     if (!title || !session?.user) return;
     try {
       const boardId = `board-${Date.now()}`;
+      const userEmail = session.user.email;
 
+      // 1. Inserisce la nuova bacheca nel database
       const { error: boardErr } = await supabase.from('boards').insert([
         {
           id: boardId,
@@ -161,6 +163,7 @@ export default function App() {
       ]);
       if (boardErr) throw boardErr;
 
+      // 2. Se il template include colonne, le crea automaticamente
       if (template.columns && template.columns.length > 0) {
         const columnsToInsert = template.columns.map((col, idx) => ({
           id: `col-${Date.now()}-${idx}`,
@@ -174,8 +177,22 @@ export default function App() {
         await supabase.from('columns').insert(columnsToInsert);
       }
 
+      // 3. Costruisce l'oggetto bacheca appena creata
+      const newBoardObj = {
+        id: boardId,
+        user_id: session.user.id,
+        title: title,
+        isOwner: true,
+        role: 'owner',
+        ownerEmail: userEmail,
+        position: boards.length
+      };
+
+      // 4. Aggiorna lo stato locale e apre SUBITO la nuova bacheca
       await fetchBoards();
       setIsCreatingBoard(false);
+      setActiveBoard(newBoardObj);
+
     } catch (err) {
       alert('Errore creazione bacheca: ' + err.message);
     }
