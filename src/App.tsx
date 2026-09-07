@@ -4,16 +4,19 @@ import BoardView from './components/BoardView';
 import ShareModal from './components/ShareModal';
 import CreateBoardModal from './components/CreateBoardModal';
 
-// Palette Colori Pastello stile NotebookLM
-const PASTEL_BG_CLASSES = [
-  'bg-emerald-50/80 border-emerald-100 hover:border-emerald-200',
-  'bg-sky-50/80 border-sky-100 hover:border-sky-200',
-  'bg-rose-50/80 border-rose-100 hover:border-rose-200',
-  'bg-amber-50/80 border-amber-100 hover:border-amber-200',
-  'bg-purple-50/80 border-purple-100 hover:border-purple-200',
-  'bg-teal-50/80 border-teal-100 hover:border-teal-200',
-  'bg-indigo-50/80 border-indigo-100 hover:border-indigo-200'
+// Palette Colori Pastello per la Dashboard
+const PASTEL_PALETTE = [
+  { label: 'Smeraldo', value: 'bg-emerald-50/80 border-emerald-100 hover:border-emerald-200' },
+  { label: 'Cielo', value: 'bg-sky-50/80 border-sky-100 hover:border-sky-200' },
+  { label: 'Rosa', value: 'bg-rose-50/80 border-rose-100 hover:border-rose-200' },
+  { label: 'Ambra', value: 'bg-amber-50/80 border-amber-100 hover:border-amber-200' },
+  { label: 'Viola', value: 'bg-purple-50/80 border-purple-100 hover:border-purple-200' },
+  { label: 'Teal', value: 'bg-teal-50/80 border-teal-100 hover:border-teal-200' },
+  { label: 'Indaco', value: 'bg-indigo-50/80 border-indigo-100 hover:border-indigo-200' }
 ];
+
+// Emoji disponibili per personalizzare le bacheche
+const AVAILABLE_ICONS = ['📄', '📘', '📚', '🏫', '👥', '💡', '🎨', '🧠', '🔬', '🌍', '📐', '🎯'];
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -28,10 +31,11 @@ export default function App() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Menu contestuale 3 pallini & Rinomina
+  // Menu contestuale 3 pallini & Rinomina / Popovers
   const [openMenuBoardId, setOpenMenuBoardId] = useState(null);
   const [editingBoardId, setEditingBoardId] = useState(null);
   const [editingBoardTitle, setEditingBoardTitle] = useState('');
+  const [activePicker, setActivePicker] = useState(null); // { boardId, type: 'icon' | 'color' }
 
   // Drag & drop bacheche
   const [draggedBoardIndex, setDraggedBoardIndex] = useState(null);
@@ -129,7 +133,8 @@ export default function App() {
           isOwner: true,
           role: 'owner',
           ownerEmail: b.owner_email,
-          icon: b.icon || '📘',
+          icon: b.icon || '📄',
+          color: b.color || null,
           position: b.position ?? 0
         })),
         ...(sharedList || []).map((b) => ({
@@ -137,6 +142,7 @@ export default function App() {
           isOwner: false,
           ownerEmail: b.owner_email,
           icon: b.icon || '📚',
+          color: b.color || null,
           position: b.position ?? 0
         }))
       ];
@@ -153,7 +159,7 @@ export default function App() {
     try {
       const boardId = `board-${Date.now()}`;
       const userEmail = session.user.email;
-      const boardIcon = template.icon || '📘';
+      const boardIcon = template.icon || '📄';
 
       const { error: boardErr } = await supabase.from('boards').insert([
         {
@@ -223,6 +229,30 @@ export default function App() {
     }
   };
 
+  const handleChangeIcon = async (boardId, icon) => {
+    try {
+      setBoards((prev) => prev.map((b) => (b.id === boardId ? { ...b, icon } : b)));
+      setActivePicker(null);
+      setOpenMenuBoardId(null);
+
+      await supabase.from('boards').update({ icon }).eq('id', boardId);
+    } catch (err) {
+      console.error('Errore cambio icona:', err);
+    }
+  };
+
+  const handleChangeColor = async (boardId, color) => {
+    try {
+      setBoards((prev) => prev.map((b) => (b.id === boardId ? { ...b, color } : b)));
+      setActivePicker(null);
+      setOpenMenuBoardId(null);
+
+      await supabase.from('boards').update({ color }).eq('id', boardId);
+    } catch (err) {
+      console.error('Errore cambio colore:', err);
+    }
+  };
+
   const handleDeleteBoard = async (boardId, boardTitle, e) => {
     if (e) e.stopPropagation();
     setOpenMenuBoardId(null);
@@ -277,7 +307,6 @@ export default function App() {
     }
   };
 
-  // Divisione delle bacheche personali e condivise
   const myBoards = boards.filter((b) => b.isOwner);
   const sharedBoards = boards.filter((b) => !b.isOwner);
 
@@ -342,7 +371,13 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#fcfcfd] p-6 text-slate-800" onClick={() => setOpenMenuBoardId(null)}>
+    <div 
+      className="min-h-screen bg-[#fcfcfd] p-6 text-slate-800" 
+      onClick={() => {
+        setOpenMenuBoardId(null);
+        setActivePicker(null);
+      }}
+    >
       {activeBoard ? (
         <BoardView
           activeBoard={activeBoard}
@@ -397,7 +432,7 @@ export default function App() {
               {/* CARD CREA NUOVA BACHECA */}
               <div
                 onClick={() => setIsCreatingBoard(true)}
-                className="aspect-[4/3] bg-white border border-slate-200 hover:border-blue-400 rounded-2xl p-5 flex flex-col justify-center items-center cursor-pointer transition-all shadow-sm hover:shadow-md group"
+                className="aspect-[4/3] bg-white border border-slate-200 hover:border-slate-300 rounded-2xl p-5 flex flex-col justify-center items-center cursor-pointer transition-all shadow-sm hover:shadow-md group"
               >
                 <div className="w-12 h-12 bg-blue-50 group-hover:bg-blue-100 rounded-full flex items-center justify-center mb-3 transition">
                   <span className="text-2xl text-blue-600 font-bold">+</span>
@@ -411,7 +446,9 @@ export default function App() {
                 const isBeingDragged = draggedBoardIndex === globalIndex;
                 const isEditingThisBoard = editingBoardId === board.id;
                 const isMenuOpen = openMenuBoardId === board.id;
-                const pastelStyle = PASTEL_BG_CLASSES[globalIndex % PASTEL_BG_CLASSES.length];
+                
+                // Usa il colore personalizzato salvato oppure quello predefinito della palette
+                const pastelStyle = board.color || PASTEL_PALETTE[globalIndex % PASTEL_PALETTE.length].value;
 
                 return (
                   <div
@@ -429,13 +466,14 @@ export default function App() {
                   >
                     {/* ICONA E MENU 3 PALLINI */}
                     <div className="flex justify-between items-start gap-1">
-                      <div className="text-2xl">{board.icon || '📘'}</div>
+                      <div className="text-2xl">{board.icon || '📄'}</div>
 
                       <div className="relative">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             setOpenMenuBoardId(isMenuOpen ? null : board.id);
+                            setActivePicker(null);
                           }}
                           className="text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-white/60 transition"
                           title="Opzioni bacheca"
@@ -443,10 +481,11 @@ export default function App() {
                           ⋮
                         </button>
 
+                        {/* MENU CONTESTUALE */}
                         {isMenuOpen && (
                           <div
                             onClick={(e) => e.stopPropagation()}
-                            className="absolute right-0 top-7 bg-white border border-slate-200 rounded-xl p-1 shadow-xl z-20 w-32 text-xs"
+                            className="absolute right-0 top-7 bg-white border border-slate-200 rounded-xl p-1 shadow-xl z-20 w-36 text-xs"
                           >
                             <button
                               onClick={() => {
@@ -458,12 +497,62 @@ export default function App() {
                             >
                               ✏️ Rinomina
                             </button>
+
+                            <button
+                              onClick={() => setActivePicker(activePicker?.type === 'icon' ? null : { boardId: board.id, type: 'icon' })}
+                              className="w-full text-left px-3 py-1.5 hover:bg-slate-100 rounded-lg text-slate-700 font-medium flex items-center gap-2"
+                            >
+                              😀 Cambia icona
+                            </button>
+
+                            <button
+                              onClick={() => setActivePicker(activePicker?.type === 'color' ? null : { boardId: board.id, type: 'color' })}
+                              className="w-full text-left px-3 py-1.5 hover:bg-slate-100 rounded-lg text-slate-700 font-medium flex items-center gap-2"
+                            >
+                              🎨 Cambia colore
+                            </button>
+
                             <button
                               onClick={(e) => handleDeleteBoard(board.id, board.title, e)}
-                              className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-600 font-medium rounded-lg flex items-center gap-2"
+                              className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-600 font-medium rounded-lg flex items-center gap-2 border-t border-slate-100 mt-0.5"
                             >
                               🗑️ Elimina
                             </button>
+                          </div>
+                        )}
+
+                        {/* PICKER ICONE */}
+                        {activePicker?.boardId === board.id && activePicker.type === 'icon' && (
+                          <div 
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute right-0 top-7 bg-white border border-slate-200 rounded-xl p-2 shadow-2xl z-30 grid grid-cols-4 gap-1.5 w-40 text-lg"
+                          >
+                            {AVAILABLE_ICONS.map((emoji) => (
+                              <button
+                                key={emoji}
+                                onClick={() => handleChangeIcon(board.id, emoji)}
+                                className="p-1 hover:bg-slate-100 rounded-lg text-center transition hover:scale-110"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* PICKER COLORI PASTELLO */}
+                        {activePicker?.boardId === board.id && activePicker.type === 'color' && (
+                          <div 
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute right-0 top-7 bg-white border border-slate-200 rounded-xl p-2 shadow-2xl z-30 flex flex-wrap gap-1.5 w-36"
+                          >
+                            {PASTEL_PALETTE.map((c) => (
+                              <button
+                                key={c.label}
+                                onClick={() => handleChangeColor(board.id, c.value)}
+                                className={`w-6 h-6 rounded-full border border-black/10 transition hover:scale-110 ${c.value.split(' ')[0]}`}
+                                title={c.label}
+                              />
+                            ))}
                           </div>
                         )}
                       </div>
@@ -512,10 +601,10 @@ export default function App() {
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
-                {sharedBoards.map((board, index) => {
+                {sharedBoards.map((board) => {
                   const globalIndex = boards.findIndex((b) => b.id === board.id);
                   const isEditingThisBoard = editingBoardId === board.id;
-                  const pastelStyle = PASTEL_BG_CLASSES[globalIndex % PASTEL_BG_CLASSES.length];
+                  const pastelStyle = board.color || PASTEL_PALETTE[globalIndex % PASTEL_PALETTE.length].value;
 
                   return (
                     <div
