@@ -17,7 +17,11 @@ export default function App() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Drag & drop bacheche con anteprima visiva in tempo reale
+  // Rinomina bacheca in Dashboard
+  const [editingBoardId, setEditingBoardId] = useState(null);
+  const [editingBoardTitle, setEditingBoardTitle] = useState('');
+
+  // Drag & drop bacheche con anteprima visiva
   const [draggedBoardIndex, setDraggedBoardIndex] = useState(null);
 
   useEffect(() => {
@@ -151,6 +155,30 @@ export default function App() {
     }
   };
 
+  const handleRenameBoard = async (boardId) => {
+    if (!editingBoardTitle.trim()) {
+      setEditingBoardId(null);
+      return;
+    }
+    const updatedTitle = editingBoardTitle.trim();
+    try {
+      setBoards((prev) =>
+        prev.map((b) => (b.id === boardId ? { ...b, title: updatedTitle } : b))
+      );
+      if (activeBoard?.id === boardId) {
+        setActiveBoard((prev) => ({ ...prev, title: updatedTitle }));
+      }
+      setEditingBoardId(null);
+
+      await supabase
+        .from('boards')
+        .update({ title: updatedTitle })
+        .eq('id', boardId);
+    } catch (err) {
+      console.error('Errore rinomina bacheca:', err);
+    }
+  };
+
   const handleDeleteBoard = async (boardId, boardTitle, e) => {
     e.stopPropagation();
     if (!window.confirm(`Sei sicuro di voler eliminare definitivamente la bacheca "${boardTitle}"?`)) return;
@@ -171,7 +199,6 @@ export default function App() {
     setActiveBoard(null);
   };
 
-  // DRAG & DROP BACHECHE CON DYNAMIC ANTEPRIMA VISIVA IN TEMPO REALE
   const handleBoardDragStart = (e, index) => {
     e.stopPropagation();
     setDraggedBoardIndex(index);
@@ -181,7 +208,6 @@ export default function App() {
     e.preventDefault();
     if (draggedBoardIndex === null || draggedBoardIndex === index) return;
 
-    // Scambia dinamicamente l'array in memoria per mostrare l'anteprima prima del rilascio
     const reordered = [...boards];
     const [movedBoard] = reordered.splice(draggedBoardIndex, 1);
     reordered.splice(index, 0, movedBoard);
@@ -194,7 +220,6 @@ export default function App() {
     if (draggedBoardIndex === null) return;
     setDraggedBoardIndex(null);
 
-    // Salva il nuovo ordine delle bacheche su Supabase
     try {
       for (let i = 0; i < boards.length; i++) {
         await supabase
@@ -276,6 +301,12 @@ export default function App() {
           onBack={() => setActiveBoard(null)}
           onOpenShare={() => setIsShareModalOpen(true)}
           onLogout={handleLogout}
+          onBoardTitleChange={(newTitle) => {
+            setBoards((prev) =>
+              prev.map((b) => (b.id === activeBoard.id ? { ...b, title: newTitle } : b))
+            );
+            setActiveBoard((prev) => ({ ...prev, title: newTitle }));
+          }}
         />
       ) : (
         <div className="max-w-6xl mx-auto">
@@ -344,18 +375,21 @@ export default function App() {
               )}
             </div>
 
-            {/* LISTA BACHECHE SALVATE TRASCINABILI CON ANTEPRIMA */}
+            {/* LISTA BACHECHE SALVATE TRASCINABILI CON EDIT TITOLO */}
             {boards.map((board, index) => {
               const isBeingDragged = draggedBoardIndex === index;
+              const isEditingThisBoard = editingBoardId === board.id;
 
               return (
                 <div
                   key={board.id}
-                  draggable
+                  draggable={!isEditingThisBoard}
                   onDragStart={(e) => handleBoardDragStart(e, index)}
                   onDragOver={(e) => handleBoardDragOver(e, index)}
                   onDragEnd={handleBoardDragEnd}
-                  onClick={() => setActiveBoard(board)}
+                  onClick={() => {
+                    if (!isEditingThisBoard) setActiveBoard(board);
+                  }}
                   className={`aspect-square border rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing relative flex flex-col justify-between ${
                     isBeingDragged
                       ? 'opacity-30 border-2 border-dashed border-blue-500 scale-95 bg-blue-50/50'
@@ -365,17 +399,44 @@ export default function App() {
                   }`}
                 >
                   <div className="flex justify-between items-start gap-1">
-                    <h3 className="font-extrabold text-lg text-slate-900 leading-snug line-clamp-3">
-                      {board.title}
-                    </h3>
-                    {board.isOwner && (
-                      <button
-                        onClick={(e) => handleDeleteBoard(board.id, board.title, e)}
-                        title="Elimina bacheca"
-                        className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-base font-bold flex-shrink-0"
-                      >
-                        🗑️
-                      </button>
+                    {!isEditingThisBoard ? (
+                      <h3 className="font-extrabold text-lg text-slate-900 leading-snug line-clamp-3 flex-1">
+                        {board.title}
+                      </h3>
+                    ) : (
+                      <input
+                        type="text"
+                        value={editingBoardTitle}
+                        onChange={(e) => setEditingBoardTitle(e.target.value)}
+                        onBlur={() => handleRenameBoard(board.id)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleRenameBoard(board.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        autoFocus
+                        className="w-full border border-blue-500 rounded px-2 py-1 text-sm font-bold text-slate-900 focus:outline-none"
+                      />
+                    )}
+
+                    {board.isOwner && !isEditingThisBoard && (
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingBoardId(board.id);
+                            setEditingBoardTitle(board.title);
+                          }}
+                          title="Rinomina bacheca"
+                          className="text-slate-300 hover:text-blue-600 transition p-0.5 rounded hover:bg-blue-50 text-sm font-bold"
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteBoard(board.id, board.title, e)}
+                          title="Elimina bacheca"
+                          className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-base font-bold"
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     )}
                   </div>
 

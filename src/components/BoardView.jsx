@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import CardDetailModal from './CardDetailModal';
 
-export default function BoardView({ activeBoard, currentUser, onBack, onOpenShare, onLogout }) {
+export default function BoardView({ activeBoard, currentUser, onBack, onOpenShare, onLogout, onBoardTitleChange }) {
   const [columns, setColumns] = useState([]);
   const [cards, setCards] = useState([]);
   const [newColumnName, setNewColumnName] = useState('');
@@ -12,6 +12,10 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   // Rinomina colonna
   const [editingColId, setEditingColId] = useState(null);
   const [editingColName, setEditingColName] = useState('');
+  
+  //Rinomina bacheca
+  const [isEditingBoardTitle, setIsEditingBoardTitle] = useState(false);
+  const [boardTitleInput, setBoardTitleInput] = useState('');
 
   const [modalCard, setModalCard] = useState(null);
   const [modalColId, setModalColId] = useState(null);
@@ -267,72 +271,117 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
       console.error('Errore salvataggio ordine colonne:', err);
     }
   };
+  
+  const handleSaveBoardTitle = async () => {
+  if (isViewer || !boardTitleInput.trim()) {
+    setIsEditingBoardTitle(false);
+    return;
+  }
+  const newTitle = boardTitleInput.trim();
+  try {
+    setIsEditingBoardTitle(false);
+    if (onBoardTitleChange) onBoardTitleChange(newTitle);
+
+    await supabase
+      .from('boards')
+      .update({ title: newTitle })
+      .eq('id', activeBoard.id);
+  } catch (err) {
+    console.error('Errore rinomina bacheca:', err);
+  }
+};
 
   return (
     <div>
-      {/* BARRA SUPERIORE UNIFORMATA */}
-      <div className="flex justify-between items-center mb-5 bg-white p-4 rounded-xl border shadow-sm">
-        <div className="flex items-center gap-4">
-          <div 
-            onClick={onBack}
-            className="flex items-center gap-3 cursor-pointer group"
-            title="Torna alla Dashboard"
+      {/* BARRA SUPERIORE UNIFORMATA CON EDIT TITOLO */}
+<div className="flex justify-between items-center mb-5 bg-white p-4 rounded-xl border shadow-sm">
+  <div className="flex items-center gap-4">
+    <div 
+      onClick={onBack}
+      className="w-10 h-10 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center justify-center text-white font-black text-base shadow-md shadow-blue-500/20 tracking-tighter flex-shrink-0 transition cursor-pointer"
+      title="Torna alla Dashboard"
+    >
+      DK
+    </div>
+
+    <div>
+      <div className="flex items-center gap-2">
+        {!isEditingBoardTitle ? (
+          <h1 
+            onClick={() => {
+              if (!isViewer && activeBoard?.isOwner) {
+                setIsEditingBoardTitle(true);
+                setBoardTitleInput(activeBoard.title);
+              }
+            }}
+            className={`text-lg font-extrabold text-slate-900 leading-tight flex items-center gap-1.5 ${
+              !isViewer && activeBoard?.isOwner ? 'cursor-pointer hover:text-blue-600' : ''
+            }`}
+            title={!isViewer && activeBoard?.isOwner ? 'Clicca per rinominare la bacheca' : ''}
           >
-            <div className="w-10 h-10 bg-blue-600 group-hover:bg-blue-700 rounded-lg flex items-center justify-center text-white font-black text-base shadow-md shadow-blue-500/20 tracking-tighter flex-shrink-0 transition">
-              DK
-            </div>
+            <span>{activeBoard?.title}</span>
+            {!isViewer && activeBoard?.isOwner && (
+              <span className="text-xs text-slate-300 hover:text-blue-600 font-normal">✏️</span>
+            )}
+          </h1>
+        ) : (
+          <input
+            type="text"
+            value={boardTitleInput}
+            onChange={(e) => setBoardTitleInput(e.target.value)}
+            onBlur={handleSaveBoardTitle}
+            onKeyDown={(e) => e.key === 'Enter' && handleSaveBoardTitle()}
+            autoFocus
+            className="border border-blue-500 rounded px-2 py-0.5 text-base font-extrabold text-slate-900 focus:outline-none"
+          />
+        )}
 
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-extrabold text-slate-900 group-hover:text-blue-600 transition leading-tight">
-                  {activeBoard?.title}
-                </h1>
-                {isViewer && (
-                  <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-300 font-bold">
-                    👁️ Sola Lettura
-                  </span>
-                )}
-              </div>
-
-              <p className="text-[11px] text-slate-500 font-medium flex items-center gap-2">
-                <span>Utente: {currentUser?.email}</span>
-                {!activeBoard?.isOwner && (
-                  <>
-                    <span className="text-slate-300">•</span>
-                    <span>Proprietario: {activeBoard?.ownerEmail}</span>
-                  </>
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onBack}
-            className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3.5 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 shadow-sm"
-          >
-            <span>←</span> Dashboard
-          </button>
-
-          {activeBoard?.isOwner && (
-            <button
-              onClick={onOpenShare}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs shadow-sm transition"
-            >
-              Condividi
-            </button>
-          )}
-
-          <button
-            onClick={onLogout}
-            className="bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
-            title="Disconnetti account"
-          >
-            <span>🚪</span> Esci
-          </button>
-        </div>
+        {isViewer && (
+          <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-300 font-bold">
+            👁️ Sola Lettura
+          </span>
+        )}
       </div>
+
+      <p className="text-[11px] text-slate-500 font-medium flex items-center gap-2">
+        <span>Utente: {currentUser?.email}</span>
+        {!activeBoard?.isOwner && (
+          <>
+            <span className="text-slate-300">•</span>
+            <span>Proprietario: {activeBoard?.ownerEmail}</span>
+          </>
+        )}
+      </p>
+    </div>
+  </div>
+
+  {/* PULSANTI DI AZIONE */}
+  <div className="flex items-center gap-2">
+    <button
+      onClick={onBack}
+      className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3.5 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 shadow-sm"
+    >
+      <span>←</span> Dashboard
+    </button>
+
+    {activeBoard?.isOwner && (
+      <button
+        onClick={onOpenShare}
+        className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs shadow-sm transition"
+      >
+        Condividi
+      </button>
+    )}
+
+    <button
+      onClick={onLogout}
+      className="bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
+      title="Disconnetti account"
+    >
+      <span>🚪</span> Esci
+    </button>
+  </div>
+</div>
 
       {/* AREA COLONNE KANBAN */}
       <div className="flex gap-4 overflow-x-auto pb-6 items-start">
