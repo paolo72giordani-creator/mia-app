@@ -1,21 +1,96 @@
 import React, { useState } from 'react';
-import { BOARD_TEMPLATES } from '../data/templates';
+
+const TEACHING_TEMPLATES = [
+  {
+    id: 'empty',
+    name: 'Bacheca vuota',
+    icon: '📄',
+    description: 'Una bacheca completamente personalizzabile da zero.',
+    columns: [
+      { name: 'Da fare', color: 'bg-slate-600' },
+      { name: 'In corso', color: 'bg-amber-600' },
+      { name: 'Completato', color: 'bg-emerald-600' }
+    ]
+  },
+  {
+    id: 'ud',
+    name: 'Unità Didattica / Lezione',
+    icon: '📚',
+    description: 'Ideale per strutturare gli argomenti di una materia, materiali e verifiche.',
+    columns: [
+      { name: 'Obiettivi & Risorse', color: 'bg-sky-600' },
+      { name: 'Spiegazione / Attività', color: 'bg-amber-600' },
+      { name: 'Verifiche / Valutazioni', color: 'bg-rose-600' },
+      { name: 'Archivio / Fatto', color: 'bg-emerald-600' }
+    ]
+  },
+  {
+    id: 'group_project',
+    name: 'Lavoro di Gruppo / PCTO',
+    icon: '👥',
+    description: 'Gestisci i ruoli degli studenti, i compiti assegnati e i deliverable.',
+    columns: [
+      { name: 'Ideazione & Brief', color: 'bg-indigo-600' },
+      { name: 'In Lavorazione', color: 'bg-blue-600' },
+      { name: 'In Revisione Docente', color: 'bg-purple-600' },
+      { name: 'Consegnato', color: 'bg-emerald-600' }
+    ]
+  },
+  {
+    id: 'pei_pdp',
+    name: 'Inclusione (PEI / PDP)',
+    icon: '🧩',
+    description: 'Pianificazione di strategie, misure dispensative e obiettivi personalizzati.',
+    columns: [
+      { name: 'Analisi & Strategie', color: 'bg-teal-600' },
+      { name: 'Strumenti Compensativi', color: 'bg-cyan-600' },
+      { name: 'Attività in Corso', color: 'bg-amber-600' },
+      { name: 'Obiettivi Raggiunti', color: 'bg-emerald-600' }
+    ]
+  },
+  {
+    id: 'class_council',
+    name: 'Consiglio di Classe',
+    icon: '🏫',
+    description: 'Pianifica odg, programmazioni disciplinari, uscite didattiche e verbali.',
+    columns: [
+      { name: 'Ordine del Giorno', color: 'bg-slate-700' },
+      { name: 'Programmazione & Uscite', color: 'bg-indigo-600' },
+      { name: 'Segnalazioni / Note', color: 'bg-rose-600' },
+      { name: 'Approvato / Concluso', color: 'bg-emerald-600' }
+    ]
+  },
+  {
+    id: 'evaluation',
+    name: 'Verifiche & Valutazione',
+    icon: '🎯',
+    description: 'Traccia la preparazione delle verifiche, le correzioni e i recuperi.',
+    columns: [
+      { name: 'Da Preparare / Stampare', color: 'bg-rose-600' },
+      { name: 'Somministrate / Da Correggere', color: 'bg-amber-600' },
+      { name: 'Voti Registrati', color: 'bg-blue-600' },
+      { name: 'Attività di Recupero', color: 'bg-purple-600' }
+    ]
+  }
+];
 
 export default function CreateBoardModal({ onClose, onCreate }) {
-  const [boardTitle, setBoardTitle] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState(BOARD_TEMPLATES[0]);
+  const [title, setTitle] = useState('');
+  const [selectedTemplate, setSelectedTemplate] = useState(TEACHING_TEMPLATES[0]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!boardTitle.trim()) return;
-    onCreate(boardTitle.trim(), selectedTemplate);
+    if (!title.trim()) return;
+    onCreate(title.trim(), selectedTemplate);
   };
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-black text-slate-900">Nuova Bacheca</h2>
+      <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200">
+        <div className="flex justify-between items-center mb-5">
+          <h2 className="text-lg font-black text-slate-900">
+            Crea nuova bacheca
+          </h2>
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 font-bold text-lg"
@@ -24,62 +99,68 @@ export default function CreateBoardModal({ onClose, onCreate }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* NOME BACHECA */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              Titolo della bacheca
+              Nome della bacheca
             </label>
             <input
               type="text"
-              placeholder="es. Matematica 3A, Progetto PCTO..."
-              value={boardTitle}
-              onChange={(e) => setBoardTitle(e.target.value)}
-              autoFocus
               required
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+              placeholder="Es. Storia 3A - Risorgimento italiano"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-blue-500 font-medium"
             />
           </div>
 
+          {/* SELEZIONE TEMPLATES */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-2">
-              Scegli un modello (Template)
+              Scegli un modello didattico
             </label>
 
-            <div className="grid grid-cols-1 gap-2 max-h-60 overflow-y-auto pr-1">
-              {BOARD_TEMPLATES.map((tmpl) => {
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-1">
+              {TEACHING_TEMPLATES.map((tmpl) => {
                 const isSelected = selectedTemplate.id === tmpl.id;
                 return (
                   <div
                     key={tmpl.id}
                     onClick={() => setSelectedTemplate(tmpl)}
-                    className={`p-3 rounded-xl border cursor-pointer transition flex items-start gap-3 ${
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition flex flex-col justify-between text-left ${
                       isSelected
-                        ? 'border-blue-500 bg-blue-50/60 ring-2 ring-blue-300'
-                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                        ? 'border-blue-600 bg-blue-50/60 shadow-sm'
+                        : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
                     }`}
                   >
-                    <span className="text-2xl">{tmpl.icon}</span>
-                    <div className="flex-1">
-                      <h4 className="font-bold text-xs text-slate-900">{tmpl.title}</h4>
-                      <p className="text-[11px] text-slate-500 leading-snug">{tmpl.description}</p>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xl">{tmpl.icon}</span>
+                      <h3 className="font-extrabold text-xs text-slate-900 truncate">
+                        {tmpl.name}
+                      </h3>
                     </div>
+                    <p className="text-[11px] text-slate-500 leading-snug font-medium line-clamp-2">
+                      {tmpl.description}
+                    </p>
                   </div>
                 );
               })}
             </div>
           </div>
 
-          <div className="flex justify-end gap-2 pt-3 border-t">
+          {/* BOTTONI DI CONFERMA */}
+          <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition"
             >
               Annulla
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-xl text-xs transition shadow-md shadow-blue-500/20"
             >
               Crea Bacheca
             </button>
