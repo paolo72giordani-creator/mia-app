@@ -398,7 +398,7 @@ export default function App() {
 
         {/* FOOTER */}
         <footer className="text-center py-6 text-xs text-slate-400 font-medium border-t border-slate-100">
-          Doceo Kanban © {new Date().getFullYear()} — La piattaforma Kanban per la scuola moderna
+          Doceo Kanban © {new Date().getFullYear()} — La piattaforma Kanban per la scuola moderna - creata da Paolo Giordani
         </footer>
 
         {/* MODAL AUTH (LOGIN / REGISTRAZIONE) */}
