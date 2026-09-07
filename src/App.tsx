@@ -11,6 +11,12 @@ export default function App() {
   const [isCreatingBoard, setIsCreatingBoard] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
+  // Auth form state
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+
   const [draggedBoardIndex, setDraggedBoardIndex] = useState(null);
   const [dragOverBoardIndex, setDragOverBoardIndex] = useState(null);
 
@@ -30,12 +36,38 @@ export default function App() {
     if (session) fetchBoards();
   }, [session]);
 
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    if (!authEmail.trim() || !authPassword.trim()) return;
+
+    setAuthLoading(true);
+    try {
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({
+          email: authEmail.trim(),
+          password: authPassword
+        });
+        if (error) throw error;
+        alert('Registrazione completata! Controlla la tua email o effettua il login.');
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: authEmail.trim(),
+          password: authPassword
+        });
+        if (error) throw error;
+      }
+    } catch (err) {
+      alert('Errore autenticazione: ' + err.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
   const fetchBoards = async () => {
     if (!session?.user) return;
     try {
       const userEmail = session.user.email.toLowerCase();
 
-      // 1. Bacheche proprietarie
       const { data: owned, error: ownedErr } = await supabase
         .from('boards_with_owners')
         .select('*')
@@ -43,7 +75,6 @@ export default function App() {
 
       if (ownedErr) throw ownedErr;
 
-      // 2. Inviti per user_id o email
       const { data: memberEntries, error: memberErr } = await supabase
         .from('board_members')
         .select('board_id, role, invited_email');
@@ -135,9 +166,9 @@ export default function App() {
     }
   };
 
-  // LOGOUT UTENTE
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    setActiveBoard(null);
   };
 
   const handleBoardDragStart = (e, index) => {
@@ -181,10 +212,63 @@ export default function App() {
     }
   };
 
+  // FORM LOGIN / REGISTRAZIONE QUANDO LA SESSIONE È NULL
   if (!session) {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <p className="text-slate-600 font-medium">Inizia effettuando l'accesso con Supabase Auth...</p>
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 text-xs">
+        <div className="bg-white border rounded-xl max-w-sm w-full p-6 shadow-xl">
+          <div className="flex items-center gap-3 mb-6 justify-center">
+            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-xl shadow-md shadow-blue-500/20">
+              D
+            </div>
+            <h1 className="text-xl font-black text-slate-900">
+              Doceo <span className="text-blue-600">Kanban</span>
+            </h1>
+          </div>
+
+          <form onSubmit={handleAuth} className="space-y-3">
+            <div>
+              <label className="block text-slate-600 font-semibold mb-1">Email</label>
+              <input
+                type="email"
+                required
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
+                placeholder="nome@esempio.com"
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-600 font-semibold mb-1">Password</label>
+              <input
+                type="password"
+                required
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={authLoading}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition shadow-sm mt-2"
+            >
+              {authLoading ? 'Elaborazione...' : isSignUp ? 'Registrati' : 'Accedi'}
+            </button>
+          </form>
+
+          <div className="mt-4 text-center pt-3 border-t">
+            <button
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="text-blue-600 hover:underline font-semibold text-xs"
+            >
+              {isSignUp ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati'}
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -200,7 +284,7 @@ export default function App() {
         />
       ) : (
         <div className="max-w-6xl mx-auto">
-          {/* HEADER DASHBOARD CON BOTTONE LOGOUT */}
+          {/* HEADER DASHBOARD */}
           <div className="bg-white p-4 rounded-xl border shadow-sm mb-6 flex justify-between items-center">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/20">
