@@ -434,10 +434,10 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   : ''
               }`}
             >
-              {/* HEADER COLONNA CON MENU 3 PALLINI */}
+              {/* HEADER COLONNA CON MENU 3 PALLINI E TOOLTIP SUL NOME */}
               <div className={`p-3 flex justify-between items-center text-white relative ${colBgColor} ${!isViewer && !isEditingThisCol ? 'cursor-grab active:cursor-grabbing' : ''}`}>
                 {!isEditingThisCol ? (
-                  <h3 className="font-bold text-base flex items-center gap-1.5 flex-1 pr-2 truncate">
+                  <h3 className="font-bold text-base flex items-center gap-1.5 flex-1 pr-2 truncate" title={col.name}>
                     {!isViewer && <span className="opacity-60 text-sm flex-shrink-0">⋮⋮</span>}
                     <span 
                       onClick={() => {
@@ -447,7 +447,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                         }
                       }}
                       className={`${!isViewer ? 'cursor-pointer hover:underline' : ''} leading-snug truncate`}
-                      title={!isViewer ? 'Clicca per rinominare' : ''}
                     >
                       {col.name}
                     </span>
