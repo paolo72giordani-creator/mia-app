@@ -25,7 +25,7 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
     }
   };
 
-  const sendBrevoEmail = async (targetEmail, isRegistered) => {
+  const sendBrevoEmail = async (targetEmail) => {
     const brevoApiKey = import.meta.env.VITE_BREVO_API_KEY;
 
     if (!brevoApiKey) {
@@ -33,40 +33,29 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
       return;
     }
 
-    const subject = isRegistered
-      ? `Invito alla bacheca "${activeBoard.title}" su Doceo Kanban`
-      : `Invito a unirti a Doceo Kanban - Bacheca "${activeBoard.title}"`;
+    const subject = `Sei stato invitato alla bacheca "${activeBoard.title}" su Doceo Kanban`;
+    const roleText = selectedRole === 'editor' ? 'Editor (Modifica)' : 'Visualizzatore (Sola lettura)';
 
-    const roleText = selectedRole === 'editor' ? 'Editor' : 'Visualizzatore';
-
-    const htmlContent = isRegistered
-      ? `
-        <div style="font-family: sans-serif; padding: 20px; color: #1e293b;">
-          <h2>Ciao! 👋</h2>
-          <p><strong>${currentUserEmail}</strong> ti ha invitato a collaborare alla bacheca <strong>"${activeBoard.title}"</strong> con il ruolo di <em>${roleText}</em>.</p>
-          <p style="margin-top: 20px;">
-            <a href="https://doceokanban.vercel.app" style="background-color: #2563eb; color: white; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: bold;">
-              Accedi a Doceo Kanban
-            </a>
-          </p>
+    // Testo unico e generico sia per utenti registrati che per i nuovi
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; padding: 24px; color: #1e293b; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px;">
+        <h2 style="color: #0f172a; margin-top: 0;">Ciao! 👋</h2>
+        <p style="font-size: 15px; line-height: 1.6;">
+          <strong>${currentUserEmail}</strong> ti ha invitato a collaborare alla bacheca <strong>"${activeBoard.title}"</strong> su Doceo Kanban con il ruolo di <em>${roleText}</em>.
+        </p>
+        <div style="margin: 28px 0; text-align: center;">
+          <a href="https://doceokanban.vercel.app" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; font-size: 14px; display: inline-block;">
+            Apri la bacheca in Doceo Kanban
+          </a>
         </div>
-      `
-      : `
-        <div style="font-family: sans-serif; padding: 20px; color: #1e293b;">
-          <h2>Benvenuto su Doceo Kanban! 🚀</h2>
-          <p><strong>${currentUserEmail}</strong> ti ha invitato a collaborare sulla bacheca <strong>"${activeBoard.title}"</strong>.</p>
-          <p>Non risulti ancora registrato sulla piattaforma. Per accettare l'invito e accedere alla bacheca, crea un account usando questa email (<em>${targetEmail}</em>).</p>
-          <p style="margin-top: 20px;">
-            <a href="https://doceokanban.vercel.app" style="background-color: #2563eb; color: white; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: bold;">
-              Registrati ora
-            </a>
-          </p>
-        </div>
-      `;
+        <p style="font-size: 12px; color: #64748b; line-height: 1.5; border-t: 1px solid #f1f5f9; padding-top: 16px;">
+          Se sei già registrato, effettua l'accesso per visualizzarla. Se non possiedi ancora un account, puoi registrarti gratuitamente sull'app con l'indirizzo email <strong>${targetEmail}</strong> per accedere direttamente alla bacheca condivisa.
+        </p>
+      </div>
+    `;
 
     try {
-      // INSERISCI QUI L'EMAIL DEL TUO ACCOUNT BREVO
-      const verifiedBrevoSender = 'paolo72.giordani@gmail.com';
+      const verifiedBrevoSender = 'paolo.giordani@gmail.com';
 
       const response = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
@@ -88,13 +77,12 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
 
       if (!response.ok) {
         console.error('Errore da Brevo API:', resData);
-        alert(`Impossibile inviare la mail tramite Brevo: ${resData.message || JSON.stringify(resData)}`);
+        alert(`Errore invio mail Brevo: ${resData.message || JSON.stringify(resData)}`);
       } else {
         console.log('Email inviata con successo via Brevo:', resData);
       }
     } catch (err) {
-      console.error('Errore di rete durante l\'invio email:', err);
-      alert('Errore di connessione verso il servizio email Brevo.');
+      console.error('Errore durante l\'invio email:', err);
     }
   };
 
@@ -106,7 +94,7 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
     try {
       const emailToInvite = inviteEmail.trim().toLowerCase();
 
-      // 1. Inserisci/Aggiorna il membro nella tabella board_members
+      // Inserisci/Aggiorna il membro nella tabella board_members
       const { error } = await supabase.from('board_members').upsert([
         {
           board_id: activeBoard.id,
@@ -117,14 +105,11 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
 
       if (error) throw error;
 
-      // 2. Verifica se l'utente esiste già nella lista dei membri
-      const isAlreadyMember = members.some(m => m.invited_email?.toLowerCase() === emailToInvite);
-
-      // 3. Invio email transazionale tramite Brevo
-      await sendBrevoEmail(emailToInvite, isAlreadyMember);
+      // Invia l'email con il nuovo testo unificato
+      await sendBrevoEmail(emailToInvite);
 
       setInviteEmail('');
-      alert(`Condivisione salvata! Verificato invio email a ${emailToInvite}`);
+      alert(`Invito inviato con successo a ${emailToInvite}!`);
       fetchMembers();
     } catch (err) {
       alert('Errore durante l\'invito: ' + err.message);
