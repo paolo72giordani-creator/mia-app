@@ -571,18 +571,18 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   )}
                 </div>
 
-                {/* 3. PULSANTE TRATTEGGIATO IN FONDO PER AGGIUNGERE SCHEDA */}
-                {!isViewer && (
-                  <button
-                    onClick={() => {
-                      setModalCard(null);
-                      setModalColId(col.id);
-                    }}
-                    className="w-full py-2 px-3 rounded-lg border border-dashed border-slate-300 bg-white hover:border-blue-400 text-slate-600 hover:text-blue-600 font-semibold text-xs transition flex items-center justify-center gap-1.5 shadow-sm mt-2"
-                  >
-                    <span>+</span> Aggiungi scheda
-                  </button>
-                )}
+                {/* PULSANTE TRATTEGGIATO IN FONDO CON SFONDO GRIGIO PIÙ SCURO */}
+{!isViewer && (
+  <button
+    onClick={() => {
+      setModalCard(null);
+      setModalColId(col.id);
+    }}
+    className="w-full py-2 px-3 rounded-lg border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-blue-700 font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm mt-2"
+  >
+    <span>+</span> Aggiungi scheda
+  </button>
+)}
               </div>
             </div>
           );
