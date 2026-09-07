@@ -28,8 +28,30 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     { label: 'Viola', value: 'bg-purple-600' }
   ];
 
+  // CARICAMENTO E ASCOLTO IN TEMPO REALE
   useEffect(() => {
-    if (activeBoard) fetchBoardData();
+    if (!activeBoard) return;
+
+    fetchBoardData();
+
+    // Sottoscrizione ai cambiamenti di colonne e schede per questa bacheca
+    const channel = supabase
+      .channel(`board-realtime-${activeBoard.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'columns', filter: `board_id=eq.${activeBoard.id}` },
+        () => fetchBoardData()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'cards' },
+        () => fetchBoardData()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [activeBoard]);
 
   const fetchBoardData = async () => {
@@ -60,6 +82,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
       console.error('Errore recupero dati bacheca:', err.message);
     }
   };
+
 
   const handleAddColumn = async () => {
     if (isViewer || !newColumnName.trim()) return;
