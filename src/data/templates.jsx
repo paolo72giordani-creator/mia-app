@@ -2,7 +2,7 @@ export const BOARD_TEMPLATES = [
   {
     id: 'empty',
     title: 'Bacheca Vuota',
-    icon: '➕',
+    icon: '📄',
     description: 'Parte da zero con una bacheca completamente personalizzabile.',
     columns: []
   },
