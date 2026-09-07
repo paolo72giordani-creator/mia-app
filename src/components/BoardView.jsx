@@ -2,6 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import CardDetailModal from './CardDetailModal';
 
+const availableColors = [
+  { label: 'Blu', value: 'bg-blue-600' },
+  { label: 'Grigio', value: 'bg-slate-800' },
+  { label: 'Indaco', value: 'bg-indigo-600' },
+  { label: 'Smeraldo', value: 'bg-emerald-600' },
+  { label: 'Ambra', value: 'bg-amber-600' },
+  { label: 'Rosso', value: 'bg-rose-600' },
+  { label: 'Viola', value: 'bg-purple-600' }
+];
+
 export default function BoardView({ activeBoard, currentUser, onBack, onOpenShare, onLogout, onBoardTitleChange }) {
   const [columns, setColumns] = useState([]);
   const [cards, setCards] = useState([]);
@@ -13,28 +23,19 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   const [isEditingBoardTitle, setIsEditingBoardTitle] = useState(false);
   const [boardTitleInput, setBoardTitleInput] = useState('');
 
-  // Rinomina colonna
+  // Rinomina colonna e Menu 3 pallini
+  const [openColMenuId, setOpenColMenuId] = useState(null);
   const [editingColId, setEditingColId] = useState(null);
   const [editingColName, setEditingColName] = useState('');
+  const [activeColorPickerColId, setActiveColorPickerColId] = useState(null);
 
   const [modalCard, setModalCard] = useState(null);
   const [modalColId, setModalColId] = useState(null);
-  const [activeColorPickerColId, setActiveColorPickerColId] = useState(null);
 
   const [draggedCard, setDraggedCard] = useState(null);
   const [draggedColIndex, setDraggedColIndex] = useState(null);
   const [dragOverCardColId, setDragOverCardColId] = useState(null);
   const [dragOverCardId, setDragOverCardId] = useState(null);
-
-  const availableColors = [
-    { label: 'Blu', value: 'bg-blue-600' },
-    { label: 'Grigio', value: 'bg-slate-800' },
-    { label: 'Indaco', value: 'bg-indigo-600' },
-    { label: 'Smeraldo', value: 'bg-emerald-600' },
-    { label: 'Ambra', value: 'bg-amber-600' },
-    { label: 'Rosso', value: 'bg-rose-600' },
-    { label: 'Viola', value: 'bg-purple-600' }
-  ];
 
   useEffect(() => {
     if (!activeBoard) return;
@@ -156,6 +157,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         prev.map((c) => (c.id === columnId ? { ...c, color: newColor } : c))
       );
       setActiveColorPickerColId(null);
+      setOpenColMenuId(null);
 
       await supabase
         .from('columns')
@@ -167,7 +169,8 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   };
 
   const handleDeleteColumn = async (columnId, colName, e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
+    setOpenColMenuId(null);
     if (isViewer) return;
     if (!window.confirm(`Sei sicuro di voler eliminare la colonna "${colName}" e tutte le sue schede?`)) return;
 
@@ -205,7 +208,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // --- GESTIONE DRAG & DROP SCHEDE ---
   const handleCardDragStart = (e, card) => {
     if (isViewer) return;
     e.stopPropagation();
@@ -222,7 +224,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   };
 
   const handleCardDragEnd = () => {
-    // Reset di sicurezza se la scheda viene rilasciata fuori area valida
     setDraggedCard(null);
     setDragOverCardColId(null);
     setDragOverCardId(null);
@@ -264,7 +265,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  // --- GESTIONE DRAG & DROP COLONNE ---
   const handleColDragStart = (e, index) => {
     if (isViewer) return;
     setDraggedColIndex(index);
@@ -301,9 +301,16 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   };
 
   return (
-    <div onDragOver={(e) => e.preventDefault()} onDrop={handleCardDragEnd}>
+    <div 
+      onDragOver={(e) => e.preventDefault()} 
+      onDrop={handleCardDragEnd}
+      onClick={() => {
+        setOpenColMenuId(null);
+        setActiveColorPickerColId(null);
+      }}
+    >
       {/* BARRA SUPERIORE */}
-      <div className="flex justify-between items-center mb-5 bg-white p-4 rounded-xl border shadow-sm">
+      <div className="flex justify-between items-center mb-5 bg-white p-4 rounded-xl border border-slate-200/80 shadow-sm">
         <div className="flex items-center gap-4">
           <div 
             onClick={onBack}
@@ -398,6 +405,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           const isTargetCardCol = dragOverCardColId === col.id;
           const isColumnBeingDragged = draggedColIndex === colIdx;
           const colBgColor = col.color || 'bg-blue-600';
+          const isMenuOpen = openColMenuId === col.id;
           const isPickerOpen = activeColorPickerColId === col.id;
           const isEditingThisCol = editingColId === col.id;
 
@@ -418,7 +426,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                 if (draggedCard) handleCardDrop(e, col.id);
               }}
               onDragEnd={handleColDragEnd}
-              className={`w-72 border rounded-xl overflow-hidden flex-shrink-0 shadow-sm transition-all duration-200 bg-slate-200/70 border-slate-300/70 relative ${
+              className={`w-72 border rounded-2xl overflow-hidden flex-shrink-0 shadow-sm transition-all duration-200 bg-slate-200/70 border-slate-300/70 relative ${
                 isColumnBeingDragged
                   ? 'border-2 border-dashed border-blue-500 opacity-60 scale-95'
                   : isTargetCardCol
@@ -426,10 +434,10 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   : ''
               }`}
             >
-              {/* HEADER COLONNA */}
-              <div className={`p-3 flex justify-between items-center text-white ${colBgColor} ${!isViewer && !isEditingThisCol ? 'cursor-grab active:cursor-grabbing' : ''}`}>
+              {/* HEADER COLONNA CON MENU 3 PALLINI */}
+              <div className={`p-3 flex justify-between items-center text-white relative ${colBgColor} ${!isViewer && !isEditingThisCol ? 'cursor-grab active:cursor-grabbing' : ''}`}>
                 {!isEditingThisCol ? (
-                  <h3 className="font-bold text-base flex items-center gap-1.5 flex-1 pr-2">
+                  <h3 className="font-bold text-base flex items-center gap-1.5 flex-1 pr-2 truncate">
                     {!isViewer && <span className="opacity-60 text-sm flex-shrink-0">⋮⋮</span>}
                     <span 
                       onClick={() => {
@@ -438,7 +446,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                           setEditingColName(col.name);
                         }
                       }}
-                      className={`${!isViewer ? 'cursor-pointer hover:underline' : ''} leading-snug break-words`}
+                      className={`${!isViewer ? 'cursor-pointer hover:underline' : ''} leading-snug truncate`}
                       title={!isViewer ? 'Clicca per rinominare' : ''}
                     >
                       {col.name}
@@ -456,60 +464,85 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   />
                 )}
 
-                <span className="text-xs bg-white/20 text-white font-bold px-2 py-0.5 rounded-full border border-white/20 flex-shrink-0">
-                  {colCards.length}
-                </span>
-              </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className="text-xs bg-white/20 text-white font-bold px-2 py-0.5 rounded-full border border-white/20">
+                    {colCards.length}
+                  </span>
 
-              {/* BARRA STRUMENTI SOTTO L'HEADER */}
-              {!isViewer && (
-                <div className="bg-slate-100/90 border-b border-slate-300/70 px-3 py-1 flex items-center justify-end gap-1 relative">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingColId(col.id);
-                      setEditingColName(col.name);
-                    }}
-                    title="Rinomina colonna"
-                    className="text-slate-600 hover:text-blue-600 p-1 hover:bg-white rounded text-xs transition"
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveColorPickerColId(isPickerOpen ? null : col.id);
-                    }}
-                    title="Cambia colore colonna"
-                    className="text-slate-600 hover:text-blue-600 p-1 hover:bg-white rounded text-xs transition"
-                  >
-                    🎨
-                  </button>
-                  <button
-                    onClick={(e) => handleDeleteColumn(col.id, col.name, e)}
-                    title="Elimina colonna"
-                    className="text-slate-400 hover:text-red-600 p-1 hover:bg-white rounded text-xs transition font-bold"
-                  >
-                    🗑️
-                  </button>
+                  {/* PULSANTE 3 PALLINI MENU COLONNA */}
+                  {!isViewer && (
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenColMenuId(isMenuOpen ? null : col.id);
+                          setActiveColorPickerColId(null);
+                        }}
+                        className="text-white/80 hover:text-white hover:bg-white/20 p-1 rounded-full transition font-bold text-sm leading-none"
+                        title="Opzioni colonna"
+                      >
+                        ⋮
+                      </button>
 
-                  {isPickerOpen && (
-                    <div className="absolute right-2 top-8 bg-white border border-slate-200 rounded-xl p-2 shadow-xl z-30 flex gap-1.5">
-                      {availableColors.map((c) => (
-                        <button
-                          key={c.value}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleChangeColumnColor(col.id, c.value);
-                          }}
-                          className={`w-6 h-6 rounded-full border border-black/10 transition hover:scale-110 ${c.value}`}
-                          title={c.label}
-                        />
-                      ))}
+                      {/* MENU DROPDOWN PER LA COLONNA */}
+                      {isMenuOpen && (
+                        <div 
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 top-7 bg-white border border-slate-200 rounded-xl p-1 shadow-2xl z-30 w-36 text-xs text-slate-800"
+                        >
+                          <button
+                            onClick={() => {
+                              setEditingColId(col.id);
+                              setEditingColName(col.name);
+                              setOpenColMenuId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 hover:bg-slate-100 rounded-lg font-medium flex items-center gap-2"
+                          >
+                            ✏️ Rinomina
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setActiveColorPickerColId(isPickerOpen ? null : col.id);
+                              setOpenColMenuId(null);
+                            }}
+                            className="w-full text-left px-3 py-1.5 hover:bg-slate-100 rounded-lg font-medium flex items-center gap-2"
+                          >
+                            🎨 Cambia colore
+                          </button>
+
+                          <button
+                            onClick={(e) => handleDeleteColumn(col.id, col.name, e)}
+                            className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-600 font-medium rounded-lg flex items-center gap-2 border-t border-slate-100 mt-0.5"
+                          >
+                            🗑️ Elimina
+                          </button>
+                        </div>
+                      )}
+
+                      {/* POPUP SELETTORE COLORE */}
+                      {isPickerOpen && (
+                        <div 
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 top-7 bg-white border border-slate-200 rounded-xl p-2 shadow-2xl z-30 flex gap-1.5"
+                        >
+                          {availableColors.map((c) => (
+                            <button
+                              key={c.value}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleChangeColumnColor(col.id, c.value);
+                              }}
+                              className={`w-6 h-6 rounded-full border border-black/10 transition hover:scale-110 ${c.value}`}
+                              title={c.label}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
+              </div>
 
               {/* SCHEDE DELLA COLONNA */}
               <div 
@@ -620,7 +653,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
         {/* BOX NUOVA COLONNA */}
         {!isViewer && (
-          <div className="w-72 bg-white border-2 border-dashed border-slate-300 rounded-xl p-3 flex-shrink-0">
+          <div className="w-72 bg-white border-2 border-dashed border-slate-300 rounded-2xl p-3 flex-shrink-0">
             <input
               type="text"
               placeholder="Nome nuova colonna..."
