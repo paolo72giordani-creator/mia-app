@@ -13,13 +13,18 @@ export default function CardDetailModal({
   const isNew = !card;
   const [title, setTitle] = useState(card?.title || '');
   const [description, setDescription] = useState(card?.description || card?.details || '');
-  const [attachments, setAttachments] = useState(card?.attachments || []);
+  const [attachments, setAttachments] = useState([]);
   const [pendingFiles, setPendingFiles] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Recupera gli allegati SOLO se la scheda esiste già (non è nuova)
+  // Carica gli allegati salvati su Supabase ogni volta che il componente si apre o il card cambia
   useEffect(() => {
     if (card && card.id) {
+      // Se la scheda ha già gli allegati passati tramite prop
+      if (card.attachments && Array.isArray(card.attachments)) {
+        setAttachments(card.attachments);
+      }
+      // Effettua un fetch di sicurezza per sincronizzare eventuali nuovi allegati
       fetchAttachments(card.id);
     } else {
       setAttachments([]);
@@ -70,7 +75,6 @@ export default function CardDetailModal({
 
     setIsSaving(true);
     try {
-      // 1. Recupera ID utente in modo sicuro
       const { data: authData } = await supabase.auth.getUser();
       const userId = authData?.user?.id || currentUser?.id;
 
@@ -85,6 +89,7 @@ export default function CardDetailModal({
         position: card?.position ?? Math.floor(Math.random() * 1000)
       };
 
+      // 1. Salva/Aggiorna la Scheda
       const { data: savedCard, error: cardError } = await supabase
         .from('cards')
         .upsert([cardPayload])
@@ -93,7 +98,9 @@ export default function CardDetailModal({
 
       if (cardError) throw cardError;
 
-      // 2. Carica gli allegati sul bucket 'card-attachments'
+      const newlyUploadedAttachments = [];
+
+      // 2. Carica i file su 'card-attachments' e crea le righe nella tabella 'attachments'
       if (pendingFiles && pendingFiles.length > 0) {
         for (const fileObj of pendingFiles) {
           const fileExt = fileObj.file.name.split('.').pop();
@@ -110,18 +117,32 @@ export default function CardDetailModal({
             .from('card-attachments')
             .getPublicUrl(filePath);
 
-          await supabase.from('attachments').insert([
-            {
-              card_id: currentCardId,
-              file_name: fileObj.file.name,
-              file_url: urlData.publicUrl
-            }
-          ]);
+          const { data: attData, error: attError } = await supabase
+            .from('attachments')
+            .insert([
+              {
+                card_id: currentCardId,
+                file_name: fileObj.file.name,
+                file_url: urlData.publicUrl
+              }
+            ])
+            .select()
+            .single();
+
+          if (!attError && attData) {
+            newlyUploadedAttachments.push(attData);
+          }
         }
       }
 
+      // Costruisce l'oggetto scheda aggiornato includendo tutti gli allegati
+      const completeCard = {
+        ...savedCard,
+        attachments: [...attachments, ...newlyUploadedAttachments]
+      };
+
       if (onSaveCard) {
-        onSaveCard(savedCard, isNew);
+        onSaveCard(completeCard, isNew);
       }
       onClose();
     } catch (err) {
@@ -182,7 +203,7 @@ export default function CardDetailModal({
               Allegati
             </label>
 
-            {/* Liste allegati salvati */}
+            {/* Allegati salvati su Supabase */}
             {attachments && attachments.length > 0 && (
               <div className="space-y-1.5 mb-2">
                 {attachments.map((att) => (
@@ -212,7 +233,7 @@ export default function CardDetailModal({
               </div>
             )}
 
-            {/* Lista file in attesa di caricamento */}
+            {/* File in attesa di salvataggio */}
             {pendingFiles && pendingFiles.length > 0 && (
               <div className="space-y-1.5 mb-2">
                 {pendingFiles.map((pf) => (
@@ -238,7 +259,7 @@ export default function CardDetailModal({
               </div>
             )}
 
-            {/* Pulsante caricamento file */}
+            {/* Bottone Seleziona File */}
             {!isViewer && (
               <label className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-xs px-3 py-1.5 rounded-xl cursor-pointer transition mt-1">
                 <span>+ Carica File</span>
