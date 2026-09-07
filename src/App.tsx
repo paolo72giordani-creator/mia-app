@@ -277,7 +277,6 @@ export default function App() {
     }
   };
 
-  // Divisione delle bacheche personali e condivise
   const myBoards = boards.filter((b) => b.isOwner);
   const sharedBoards = boards.filter((b) => !b.isOwner);
 
@@ -394,15 +393,15 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
-              {/* CARD CREA NUOVA BACHECA */}
+              {/* CARD CREA NUOVA BACHECA (ICONA FOGLIO BIANCO / DOCUMENTO) */}
               <div
                 onClick={() => setIsCreatingBoard(true)}
                 className="aspect-[4/3] bg-white border border-slate-200 hover:border-blue-400 rounded-2xl p-5 flex flex-col justify-center items-center cursor-pointer transition-all shadow-sm hover:shadow-md group"
               >
-                <div className="w-12 h-12 bg-blue-50 group-hover:bg-blue-100 rounded-full flex items-center justify-center mb-3 transition">
-                  <span className="text-2xl text-blue-600 font-bold">+</span>
+                <div className="w-12 h-12 bg-slate-50 group-hover:bg-blue-50 border border-slate-100 rounded-2xl flex items-center justify-center mb-3 transition shadow-sm">
+                  <span className="text-2xl text-slate-600 group-hover:text-blue-600">📄</span>
                 </div>
-                <span className="font-bold text-sm text-slate-800">Crea nuova bacheca</span>
+                <span className="font-bold text-sm text-slate-800 group-hover:text-blue-600 transition">Crea nuova bacheca</span>
               </div>
 
               {/* LISTA BACHECHE PERSONALI */}
