@@ -580,22 +580,26 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                       </React.Fragment>
                     );
                   })}
-
-                  {/* ANTEPRIMA IN FONDO: MOSTRATA SOLO SE NON SI STA TRASCINANDO SOPRA UN'ALTRA SCHEDA */}
-                  {isTargetCardCol && draggedCard && !dragOverCardId && (
-                    <div 
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setDragOverCardColId(col.id);
-                        setDragOverCardId(null);
-                      }}
-                      className="border-2 border-dashed border-blue-500 bg-blue-50/90 rounded-lg p-3 text-center text-blue-700 text-xs font-bold shadow-inner my-1"
-                    >
-                      📍 Rilascia qui in fondo
-                    </div>
-                  )}
                 </div>
+
+                {/* ZONA DI DROP PER IL RILASCIO IN FONDO ALLA COLONNA */}
+                {isTargetCardCol && draggedCard && (
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDragOverCardColId(col.id);
+                      setDragOverCardId(null);
+                    }}
+                    className={`border-2 border-dashed rounded-lg p-3 text-center text-xs font-bold transition-all my-1 ${
+                      !dragOverCardId
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-inner scale-[1.01]'
+                        : 'border-slate-300 text-slate-400 opacity-60'
+                    }`}
+                  >
+                    📍 Rilascia qui in fondo
+                  </div>
+                )}
 
                 {/* PULSANTE TRATTEGGIATO IN FONDO */}
                 {!isViewer && (
