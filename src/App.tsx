@@ -92,9 +92,7 @@ export default function App() {
         }))
       ];
 
-      // Ordina in memoria in modo sicuro
       allBoards.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
-
       setBoards(allBoards);
     } catch (err) {
       console.error('Errore recupero bacheche:', err.message);
@@ -135,6 +133,11 @@ export default function App() {
     } catch (err) {
       alert('Errore eliminazione bacheca: ' + err.message);
     }
+  };
+
+  // LOGOUT UTENTE
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
   };
 
   const handleBoardDragStart = (e, index) => {
@@ -197,6 +200,7 @@ export default function App() {
         />
       ) : (
         <div className="max-w-6xl mx-auto">
+          {/* HEADER DASHBOARD CON BOTTONE LOGOUT */}
           <div className="bg-white p-4 rounded-xl border shadow-sm mb-6 flex justify-between items-center">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/20">
@@ -212,12 +216,22 @@ export default function App() {
               </div>
             </div>
 
-            <span className="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-semibold border">
-              Dashboard
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs bg-slate-100 text-slate-600 px-3 py-1 rounded-full font-semibold border hidden sm:inline-block">
+                Dashboard
+              </span>
+              <button
+                onClick={handleLogout}
+                className="bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
+                title="Disconnetti account"
+              >
+                <span>🚪</span> Esci
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {/* CARD 1: NUOVA BACHECA QUADRATA */}
             <div className="aspect-square bg-white border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-4 flex flex-col justify-center items-center transition shadow-sm">
               {!isCreatingBoard ? (
                 <button
@@ -256,6 +270,7 @@ export default function App() {
               )}
             </div>
 
+            {/* LISTA BACHECHE SALVATE */}
             {boards.map((board, index) => {
               const isBeingDragged = draggedBoardIndex === index;
               const isDragOver = dragOverBoardIndex === index;
