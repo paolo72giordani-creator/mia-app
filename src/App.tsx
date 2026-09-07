@@ -355,11 +355,11 @@ export default function App() {
           </span>
 
           <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-900 max-w-3xl leading-tight mb-6">
-            Pianifica, collabora e condividi la tua didattica in <span className="text-blue-600">stile NotebookLM</span>
+            Pianifica, collabora e condividi la tua didattica con <span className="text-blue-600">Doceo Kanban</span>
           </h1>
 
           <p className="text-base sm:text-lg text-slate-600 max-w-2xl mb-8 leading-relaxed font-medium">
-            Doceo Kanban trasforma la gestione delle tue lezioni, consigli di classe e progetti di gruppo in un’esperienza visiva pulita, moderna e in tempo reale.
+            Doceo Kanban trasforma la gestione delle tue lezioni, consigli di classe e progetti di gruppo in un’esperienza visiva pulita e collaborativa.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 w-full max-w-xs sm:max-w-none">
