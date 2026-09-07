@@ -72,7 +72,7 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
           'api-key': brevoApiKey
         },
         body: JSON.stringify({
-          sender: { name: 'Doceo Kanban', email: currentUserEmail },
+          sender: { name: 'Doceo Kanban', email: 'paolo72.giordani@gmail.com' },
           to: [{ email: targetEmail }],
           subject: subject,
           htmlContent: htmlContent
