@@ -277,9 +277,10 @@ export default function App() {
       {activeBoard ? (
         <BoardView
           activeBoard={activeBoard}
-          currentUser={session.user}
-          onBack={() => setActiveBoard(null)}
-          onOpenShare={() => setIsShareModalOpen(true)}
+    currentUser={session.user}
+    onBack={() => setActiveBoard(null)}
+    onOpenShare={() => setIsShareModalOpen(true)}
+    onLogout={handleLogout}
         />
       ) : (
         <div className="max-w-6xl mx-auto">
