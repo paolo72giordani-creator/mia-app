@@ -63,27 +63,37 @@ export default function App() {
     setAuthLoading(true);
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email: authEmail.trim(),
           password: authPassword
         });
+        
         if (error) throw error;
+
+        // Se Supabase restituisce identità vuote, l'utente esiste già
+        if (data?.user && data?.user?.identities?.length === 0) {
+          alert('Questa email è già registrata! Passaggio automatico al Login...');
+          setIsSignUp(false);
+          setAuthLoading(false);
+          return;
+        }
+
         alert('Registrazione completata! Controlla la tua email o effettua il login.');
+        setIsSignUp(false);
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email: authEmail.trim(),
           password: authPassword
         });
         if (error) throw error;
+        setIsAuthModalOpen(false);
       }
-      setIsAuthModalOpen(false);
     } catch (err) {
       alert('Errore autenticazione: ' + err.message);
-    } finally {
+    } font
       setAuthLoading(false);
     }
   };
-
   const fetchBoards = async () => {
     if (!session?.user) return;
     try {
@@ -398,7 +408,7 @@ export default function App() {
 
         {/* FOOTER */}
         <footer className="text-center py-6 text-xs text-slate-400 font-medium border-t border-slate-100">
-          Doceo Kanban © {new Date().getFullYear()} — La piattaforma Kanban per la scuola moderna - creata da Paolo Giordani
+          Doceo Kanban © {new Date().getFullYear()} — La piattaforma Kanban per la scuola moderna - Creata da Paolo Giordani
         </footer>
 
         {/* MODAL AUTH (LOGIN / REGISTRAZIONE) */}
