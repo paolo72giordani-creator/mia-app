@@ -190,11 +190,13 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   };
 
   const handleSaveCardFromModal = (savedCard, isNew) => {
-    if (isNew) {
-      setCards((prev) => [...prev, savedCard]);
-    } else {
-      setCards((prev) => prev.map((c) => (c.id === savedCard.id ? savedCard : c)));
-    }
+    setCards((prev) => {
+      const exists = prev.some((c) => String(c.id) === String(savedCard.id));
+      if (exists) {
+        return prev.map((c) => (String(c.id) === String(savedCard.id) ? { ...c, ...savedCard } : c));
+      }
+      return [...prev, savedCard];
+    });
   };
 
   const handleDeleteCard = async (cardId, e) => {

@@ -92,89 +92,69 @@ export default function CardDetailModal({ card, columnId, isViewer = false, onCl
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSave = async () => {
-    if (isViewer) return;
-    if (!title.trim()) {
-      alert('Inserisci un titolo per la scheda.');
-      return;
-    }
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!title.trim() || isSaving) return;
 
-    setUploading(true);
+    setIsSaving(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUserId = session?.user?.id;
+      // 1. Usa sempre un ID univoco fisso per questa sessione di salvataggio
+      const currentCardId = card?.id || `card-${Date.now()}`;
 
-      if (!currentUserId) {
-        alert("Sessione utente non valida. Riapri l'applicazione.");
-        return;
+      const cardPayload = {
+        id: currentCardId,
+        column_id: String(columnId),
+        title: title.trim(),
+        description: description.trim(),
+        position: card ? card.position : Date.now()
+      };
+
+      // Upsert garantisce che se L'ID esiste viene aggiornata, altrimenti creata
+      const { data: savedCard, error: cardError } = await supabase
+        .from('cards')
+        .upsert([cardPayload])
+        .select()
+        .single();
+
+      if (cardError) throw cardError;
+
+      // 2. Caricamento file allegati
+      if (pendingFiles && pendingFiles.length > 0) {
+        for (const fileObj of pendingFiles) {
+          const fileExt = fileObj.file.name.split('.').pop();
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+          const filePath = `${currentCardId}/${fileName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('attachments')
+            .upload(filePath, fileObj.file);
+
+          if (uploadError) throw uploadError;
+
+          const { data: urlData } = supabase.storage
+            .from('attachments')
+            .getPublicUrl(filePath);
+
+          await supabase.from('attachments').insert([
+            {
+              card_id: currentCardId,
+              file_name: fileObj.file.name,
+              file_url: urlData.publicUrl
+            }
+          ]);
+        }
       }
 
-      if (isNew) {
-        const newCardPayload = {
-          id: `card-${Date.now()}`,
-          user_id: currentUserId,
-          column_id: String(columnId),
-          title: title.trim(),
-          description: description.trim(),
-          position: 0
-        };
-
-        const { data: createdCard, error } = await supabase
-          .from('cards')
-          .insert([newCardPayload])
-          .select();
-
-        if (error) throw error;
-        const newCard = createdCard[0];
-
-        const uploadedAttachments = [];
-        if (pendingFiles.length > 0) {
-          for (const file of pendingFiles) {
-            const fileExt = file.name.split('.').pop();
-            const filePath = `${newCard.id}/${Date.now()}_${file.name}`;
-
-            const { error: uploadErr } = await supabase.storage
-              .from('card-attachments')
-              .upload(filePath, file);
-
-            if (!uploadErr) {
-              const { data: publicUrlData } = supabase.storage
-                .from('card-attachments')
-                .getPublicUrl(filePath);
-
-              const newAttachment = {
-                id: `att-${Date.now()}-${Math.random()}`,
-                card_id: newCard.id,
-                user_id: currentUserId,
-                file_name: file.name,
-                file_url: publicUrlData.publicUrl
-              };
-
-              const { data: attData } = await supabase
-                .from('attachments')
-                .insert([newAttachment])
-                .select();
-
-              if (attData) uploadedAttachments.push(attData[0]);
-            }
-          }
-        }
-
-        onSaveCard({ ...newCard, attachments: uploadedAttachments }, true);
-      } else {
-        const { error } = await supabase
-          .from('cards')
-          .update({ title, description })
-          .eq('id', card.id);
-
-        if (error) throw error;
-        onSaveCard({ ...card, title, description, attachments }, false);
+      // Chiudiamo la finestra senza forzare l'inserimento manuale nello stato
+      // (ci penserà il canale Realtime di Supabase o il refetch automatico)
+      if (onSaveCard) {
+        onSaveCard(savedCard, !card);
       }
       onClose();
     } catch (err) {
-      alert('Errore salvataggio: ' + err.message);
+      alert('Errore durante il salvataggio: ' + err.message);
     } finally {
-      setUploading(false);
+      setIsSaving(false);
     }
   };
 
@@ -278,6 +258,7 @@ export default function CardDetailModal({ card, columnId, isViewer = false, onCl
         <div className="flex justify-between items-center pt-3 border-t">
           {!isViewer && !isNew ? (
             <button
+              type="button"
               onClick={() => {
                 if (window.confirm('Cancellare questa scheda?')) onDeleteCard(card.id);
               }}
@@ -289,14 +270,32 @@ export default function CardDetailModal({ card, columnId, isViewer = false, onCl
 
           <div className="flex gap-2">
             {isViewer ? (
-              <button onClick={onClose} className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-1.5 rounded font-bold">
+              <button 
+                type="button" 
+                onClick={onClose} 
+                className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-1.5 rounded font-bold"
+              >
                 Chiudi
               </button>
             ) : (
               <>
-                <button onClick={onClose} className="border px-3 py-1.5 rounded text-slate-600 font-medium">Annulla</button>
-                <button onClick={handleSave} disabled={uploading} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded font-bold">
-                  {uploading ? 'Salvataggio...' : isNew ? 'Crea Scheda' : 'Salva'}
+                <button 
+                  type="button" 
+                  onClick={onClose} 
+                  disabled={isSaving} 
+                  className="border px-3 py-1.5 rounded text-slate-600 font-medium"
+                >
+                  Annulla
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleSave} 
+                  disabled={isSaving} 
+                  className={`bg-blue-600 text-white px-4 py-1.5 rounded font-bold transition ${
+                    isSaving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'
+                  }`}
+                >
+                  {isSaving ? 'Salvataggio in corso...' : isNew ? 'Crea Scheda' : 'Salva'}
                 </button>
               </>
             )}
