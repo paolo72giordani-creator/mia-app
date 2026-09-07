@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import BoardView from './components/BoardView';
 import ShareModal from './components/ShareModal';
+import CreateBoardModal from './components/CreateBoardModal';
 
 export default function App() {
   const [session, setSession] = useState(null);
   const [boards, setBoards] = useState([]);
   const [activeBoard, setActiveBoard] = useState(null);
-  const [newBoardTitle, setNewBoardTitle] = useState('');
   const [isCreatingBoard, setIsCreatingBoard] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
@@ -139,7 +139,6 @@ export default function App() {
     try {
       const boardId = `board-${Date.now()}`;
 
-      // 1. Inserisce la bacheca
       const { error: boardErr } = await supabase.from('boards').insert([
         {
           id: boardId,
@@ -150,7 +149,6 @@ export default function App() {
       ]);
       if (boardErr) throw boardErr;
 
-      // 2. Se il template include colonne, le crea automaticamente
       if (template.columns && template.columns.length > 0) {
         const columnsToInsert = template.columns.map((col, idx) => ({
           id: `col-${Date.now()}-${idx}`,
@@ -352,25 +350,16 @@ export default function App() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {/* CARD NUOVA BACHECA */}
-<div 
-  onClick={() => setIsCreatingBoard(true)}
-  className="aspect-square bg-white border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-4 flex flex-col justify-center items-center cursor-pointer transition shadow-sm group"
->
-  <span className="text-3xl text-blue-600 group-hover:scale-110 transition">+</span>
-  <span className="font-extrabold text-sm text-blue-600">Nuova Bacheca</span>
-</div>
-
-{/* MODAL CREAZIONE BACHECA CON TEMPLATE */}
-{isCreatingBoard && (
-  <CreateBoardModal
-    onClose={() => setIsCreatingBoard(false)}
-    onCreate={handleCreateBoardWithTemplate}
-  />
-)}
+            {/* CARD 1: NUOVA BACHECA QUADRATA */}
+            <div
+              onClick={() => setIsCreatingBoard(true)}
+              className="aspect-square bg-white border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-4 flex flex-col justify-center items-center cursor-pointer transition shadow-sm group"
+            >
+              <span className="text-3xl text-blue-600 group-hover:scale-110 transition">+</span>
+              <span className="font-extrabold text-sm text-blue-600">Nuova Bacheca</span>
             </div>
 
-            {/* LISTA BACHECHE SALVATE TRASCINABILI CON EDIT TITOLO */}
+            {/* LISTA BACHECHE SALVATE TRASCINABILI */}
             {boards.map((board, index) => {
               const isBeingDragged = draggedBoardIndex === index;
               const isEditingThisBoard = editingBoardId === board.id;
@@ -454,6 +443,14 @@ export default function App() {
             })}
           </div>
         </div>
+      )}
+
+      {/* MODAL CREAZIONE BACHECA CON TEMPLATE */}
+      {isCreatingBoard && (
+        <CreateBoardModal
+          onClose={() => setIsCreatingBoard(false)}
+          onCreate={handleCreateBoardWithTemplate}
+        />
       )}
 
       {isShareModalOpen && activeBoard && (
