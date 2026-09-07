@@ -581,11 +581,12 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                     );
                   })}
 
-                  {/* ANTEPRIMA IN FONDO ALLA COLONNA */}
-                  {isTargetCardCol && draggedCard && (!dragOverCardId || dragOverCardColId === col.id) && (
+                  {/* ANTEPRIMA IN FONDO: MOSTRATA SOLO SE NON SI STA TRASCINANDO SOPRA UN'ALTRA SCHEDA */}
+                  {isTargetCardCol && draggedCard && !dragOverCardId && (
                     <div 
                       onDragOver={(e) => {
                         e.preventDefault();
+                        e.stopPropagation();
                         setDragOverCardColId(col.id);
                         setDragOverCardId(null);
                       }}
