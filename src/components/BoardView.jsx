@@ -417,7 +417,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   : ''
               }`}
             >
-              {/* HEADER COLONNA - LIMPIDO CON PIÙ SPAZIO */}
+              {/* 1. HEADER COLONNA: PULITO E SPAZIOSO */}
               <div className={`p-3 flex justify-between items-center text-white ${colBgColor} ${!isViewer && !isEditingThisCol ? 'cursor-grab active:cursor-grabbing' : ''}`}>
                 {!isEditingThisCol ? (
                   <h3 className="font-bold text-base flex items-center gap-1.5 flex-1 pr-2">
@@ -451,6 +451,57 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   {colCards.length}
                 </span>
               </div>
+
+              {/* 2. BARRA AZIONI SOTTO IL TITOLO DELLA COLONNA */}
+              {!isViewer && (
+                <div className="bg-slate-100/90 border-b border-slate-300/70 px-3 py-1 flex items-center justify-end gap-1 relative">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingColId(col.id);
+                      setEditingColName(col.name);
+                    }}
+                    title="Rinomina colonna"
+                    className="text-slate-600 hover:text-blue-600 p-1 hover:bg-white rounded text-xs transition"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveColorPickerColId(isPickerOpen ? null : col.id);
+                    }}
+                    title="Cambia colore colonna"
+                    className="text-slate-600 hover:text-blue-600 p-1 hover:bg-white rounded text-xs transition"
+                  >
+                    🎨
+                  </button>
+                  <button
+                    onClick={(e) => handleDeleteColumn(col.id, col.name, e)}
+                    title="Elimina colonna"
+                    className="text-slate-400 hover:text-red-600 p-1 hover:bg-white rounded text-xs transition font-bold"
+                  >
+                    🗑️
+                  </button>
+
+                  {/* POPUP SELETTORE COLORE SOTTO LA BARRA STRUMENTI */}
+                  {isPickerOpen && (
+                    <div className="absolute right-2 top-8 bg-white border border-slate-200 rounded-xl p-2 shadow-xl z-30 flex gap-1.5">
+                      {availableColors.map((c) => (
+                        <button
+                          key={c.value}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleChangeColumnColor(col.id, c.value);
+                          }}
+                          className={`w-6 h-6 rounded-full border border-black/10 transition hover:scale-110 ${c.value}`}
+                          title={c.label}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* SCHEDE DELLA COLONNA */}
               <div className="p-2.5 min-h-[100px]">
@@ -520,67 +571,17 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   )}
                 </div>
 
-                {/* AREA AZIONI IN BASSO: + SCHEDA E PULSANTI AZIONE COLONNA */}
+                {/* 3. PULSANTE TRATTEGGIATO IN FONDO PER AGGIUNGERE SCHEDA */}
                 {!isViewer && (
-                  <div className="pt-2 border-t border-slate-300/60 mt-3 flex items-center justify-between gap-1.5">
-                    <button
-                      onClick={() => {
-                        setModalCard(null);
-                        setModalColId(col.id);
-                      }}
-                      className="flex-1 py-1.5 px-2.5 rounded-lg border border-dashed border-slate-300 bg-white hover:border-blue-400 text-slate-700 hover:text-blue-600 font-bold text-xs transition flex items-center justify-center gap-1 shadow-sm"
-                    >
-                      <span>+</span> Aggiungi scheda
-                    </button>
-
-                    <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 shadow-sm relative">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingColId(col.id);
-                          setEditingColName(col.name);
-                        }}
-                        title="Rinomina colonna"
-                        className="text-slate-500 hover:text-blue-600 p-1 hover:bg-slate-100 rounded text-xs transition"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveColorPickerColId(isPickerOpen ? null : col.id);
-                        }}
-                        title="Cambia colore colonna"
-                        className="text-slate-500 hover:text-blue-600 p-1 hover:bg-slate-100 rounded text-xs transition"
-                      >
-                        🎨
-                      </button>
-                      <button
-                        onClick={(e) => handleDeleteColumn(col.id, col.name, e)}
-                        title="Elimina colonna"
-                        className="text-slate-400 hover:text-red-600 p-1 hover:bg-red-50 rounded text-xs transition font-bold"
-                      >
-                        🗑️
-                      </button>
-
-                      {/* POPUP SELETTORE COLORE POSIZIONATO IN BASSO */}
-                      {isPickerOpen && (
-                        <div className="absolute right-0 bottom-9 bg-white border border-slate-200 rounded-xl p-2 shadow-xl z-30 flex gap-1.5">
-                          {availableColors.map((c) => (
-                            <button
-                              key={c.value}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleChangeColumnColor(col.id, c.value);
-                              }}
-                              className={`w-6 h-6 rounded-full border border-black/10 transition hover:scale-110 ${c.value}`}
-                              title={c.label}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <button
+                    onClick={() => {
+                      setModalCard(null);
+                      setModalColId(col.id);
+                    }}
+                    className="w-full py-2 px-3 rounded-lg border border-dashed border-slate-300 bg-white hover:border-blue-400 text-slate-600 hover:text-blue-600 font-semibold text-xs transition flex items-center justify-center gap-1.5 shadow-sm mt-2"
+                  >
+                    <span>+</span> Aggiungi scheda
+                  </button>
                 )}
               </div>
             </div>
