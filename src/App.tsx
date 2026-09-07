@@ -4,6 +4,17 @@ import BoardView from './components/BoardView';
 import ShareModal from './components/ShareModal';
 import CreateBoardModal from './components/CreateBoardModal';
 
+// Palette Colori Pastello stile NotebookLM
+const PASTEL_BG_CLASSES = [
+  'bg-emerald-50/80 border-emerald-100 hover:border-emerald-200',
+  'bg-sky-50/80 border-sky-100 hover:border-sky-200',
+  'bg-rose-50/80 border-rose-100 hover:border-rose-200',
+  'bg-amber-50/80 border-amber-100 hover:border-amber-200',
+  'bg-purple-50/80 border-purple-100 hover:border-purple-200',
+  'bg-teal-50/80 border-teal-100 hover:border-teal-200',
+  'bg-indigo-50/80 border-indigo-100 hover:border-indigo-200'
+];
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [boards, setBoards] = useState([]);
@@ -17,11 +28,12 @@ export default function App() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Rinomina bacheca in Dashboard
+  // Menu contestuale 3 pallini & Rinomina
+  const [openMenuBoardId, setOpenMenuBoardId] = useState(null);
   const [editingBoardId, setEditingBoardId] = useState(null);
   const [editingBoardTitle, setEditingBoardTitle] = useState('');
 
-  // Drag & drop bacheche con anteprima visiva
+  // Drag & drop bacheche
   const [draggedBoardIndex, setDraggedBoardIndex] = useState(null);
 
   useEffect(() => {
@@ -194,7 +206,8 @@ export default function App() {
   };
 
   const handleDeleteBoard = async (boardId, boardTitle, e) => {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
+    setOpenMenuBoardId(null);
     if (!window.confirm(`Sei sicuro di voler eliminare definitivamente la bacheca "${boardTitle}"?`)) return;
 
     try {
@@ -249,9 +262,9 @@ export default function App() {
   if (!session) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 text-xs">
-        <div className="bg-white border rounded-xl max-w-sm w-full p-6 shadow-xl">
+        <div className="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 shadow-xl">
           <div className="flex items-center gap-3 mb-6 justify-center">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-xl shadow-md shadow-blue-500/20">
+            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-md shadow-blue-500/20">
               DK
             </div>
             <h1 className="text-xl font-black text-slate-900">
@@ -307,7 +320,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 p-6 text-slate-800">
+    <div className="min-h-screen bg-[#fcfcfd] p-6 text-slate-800" onClick={() => setOpenMenuBoardId(null)}>
       {activeBoard ? (
         <BoardView
           activeBoard={activeBoard}
@@ -325,9 +338,9 @@ export default function App() {
       ) : (
         <div className="max-w-6xl mx-auto">
           {/* HEADER DASHBOARD */}
-          <div className="bg-white p-4 rounded-xl border shadow-sm mb-6 flex justify-between items-center">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm mb-8 flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-base shadow-md shadow-blue-500/20 tracking-tighter">
+              <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-base shadow-md shadow-blue-500/20 tracking-tighter">
                 DK
               </div>
               <div>
@@ -342,27 +355,33 @@ export default function App() {
 
             <button
               onClick={handleLogout}
-              className="bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
+              className="bg-slate-50 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5"
               title="Disconnetti account"
             >
               <span>🚪</span> Esci
             </button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {/* CARD 1: NUOVA BACHECA QUADRATA */}
+          <h2 className="text-xl font-extrabold text-slate-900 mb-4 px-1">Le mie bacheche</h2>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
+            {/* CARD 1: CREA NUOVA BACHECA (STILE NOTEBOOKLM) */}
             <div
               onClick={() => setIsCreatingBoard(true)}
-              className="aspect-square bg-white border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-4 flex flex-col justify-center items-center cursor-pointer transition shadow-sm group"
+              className="aspect-[4/3] bg-white border border-slate-200 hover:border-slate-300 rounded-2xl p-5 flex flex-col justify-center items-center cursor-pointer transition-all shadow-sm hover:shadow-md group"
             >
-              <span className="text-3xl text-blue-600 group-hover:scale-110 transition">+</span>
-              <span className="font-extrabold text-sm text-blue-600">Nuova Bacheca</span>
+              <div className="w-12 h-12 bg-blue-50 group-hover:bg-blue-100 rounded-full flex items-center justify-center mb-3 transition">
+                <span className="text-2xl text-blue-600 font-bold">+</span>
+              </div>
+              <span className="font-bold text-sm text-slate-800">Crea nuova bacheca</span>
             </div>
 
-            {/* LISTA BACHECHE SALVATE TRASCINABILI */}
+            {/* LISTA BACHECHE PASTELLO */}
             {boards.map((board, index) => {
               const isBeingDragged = draggedBoardIndex === index;
               const isEditingThisBoard = editingBoardId === board.id;
+              const isMenuOpen = openMenuBoardId === board.id;
+              const pastelStyle = PASTEL_BG_CLASSES[index % PASTEL_BG_CLASSES.length];
 
               return (
                 <div
@@ -374,17 +393,61 @@ export default function App() {
                   onClick={() => {
                     if (!isEditingThisBoard) setActiveBoard(board);
                   }}
-                  className={`aspect-square border rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing relative flex flex-col justify-between ${
-                    isBeingDragged
-                      ? 'opacity-30 border-2 border-dashed border-blue-500 scale-95 bg-blue-50/50'
-                      : board.isOwner
-                      ? 'bg-white border-slate-200 hover:border-blue-400'
-                      : 'bg-indigo-50/40 border-indigo-200 hover:border-indigo-400'
+                  className={`aspect-[4/3] border rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing relative flex flex-col justify-between ${pastelStyle} ${
+                    isBeingDragged ? 'opacity-30 border-2 border-dashed border-blue-500 scale-95' : ''
                   }`}
                 >
+                  {/* PARTE SUPERIORE CARD: ICONA + MENU 3 PALLINI */}
                   <div className="flex justify-between items-start gap-1">
+                    <div className="text-2xl">
+                      {board.isOwner ? '📘' : '👥'}
+                    </div>
+
+                    {board.isOwner && (
+                      <div className="relative">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuBoardId(isMenuOpen ? null : board.id);
+                          }}
+                          className="text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-white/60 transition"
+                          title="Opzioni bacheca"
+                        >
+                          ⋮
+                        </button>
+
+                        {/* MENU CONTESTUALE DROP-DOWN */}
+                        {isMenuOpen && (
+                          <div 
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute right-0 top-7 bg-white border border-slate-200 rounded-xl p-1 shadow-xl z-20 w-32 text-xs"
+                          >
+                            <button
+                              onClick={() => {
+                                setEditingBoardId(board.id);
+                                setEditingBoardTitle(board.title);
+                                setOpenMenuBoardId(null);
+                              }}
+                              className="w-full text-left px-3 py-1.5 hover:bg-slate-100 rounded-lg text-slate-700 font-medium flex items-center gap-2"
+                            >
+                              ✏️ Rinomina
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteBoard(board.id, board.title, e)}
+                              className="w-full text-left px-3 py-1.5 hover:bg-red-50 text-red-600 font-medium rounded-lg flex items-center gap-2"
+                            >
+                              🗑️ Elimina
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* TITOLO ED EDITING */}
+                  <div className="my-auto">
                     {!isEditingThisBoard ? (
-                      <h3 className="font-extrabold text-lg text-slate-900 leading-snug line-clamp-3 flex-1">
+                      <h3 className="font-bold text-base text-slate-900 leading-snug line-clamp-2">
                         {board.title}
                       </h3>
                     ) : (
@@ -396,47 +459,21 @@ export default function App() {
                         onKeyDown={(e) => e.key === 'Enter' && handleRenameBoard(board.id)}
                         onClick={(e) => e.stopPropagation()}
                         autoFocus
-                        className="w-full border border-blue-500 rounded px-2 py-1 text-sm font-bold text-slate-900 focus:outline-none"
+                        className="w-full border border-blue-500 rounded px-2 py-1 text-sm font-bold text-slate-900 focus:outline-none bg-white"
                       />
-                    )}
-
-                    {board.isOwner && !isEditingThisBoard && (
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingBoardId(board.id);
-                            setEditingBoardTitle(board.title);
-                          }}
-                          title="Rinomina bacheca"
-                          className="text-slate-300 hover:text-blue-600 transition p-0.5 rounded hover:bg-blue-50 text-sm font-bold"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          onClick={(e) => handleDeleteBoard(board.id, board.title, e)}
-                          title="Elimina bacheca"
-                          className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-base font-bold"
-                        >
-                          🗑️
-                        </button>
-                      </div>
                     )}
                   </div>
 
-                  <div>
-                    <p className="text-[10px] text-slate-500 truncate mb-1" title={board.ownerEmail}>
-                      Proprietario: {board.ownerEmail}
-                    </p>
-                    <span
-                      className={`inline-block text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider border ${
-                        board.isOwner
-                          ? 'bg-blue-100 text-blue-700 border-blue-200'
-                          : 'bg-purple-100 text-purple-700 border-purple-200'
-                      }`}
-                    >
-                      {board.isOwner ? 'Proprietario' : `Condivisa (${board.role})`}
+                  {/* SOTTO-TESTO STILE METADATI NotebookLM */}
+                  <div className="text-[11px] text-slate-500 font-medium truncate pt-2 border-t border-black/5 flex items-center justify-between">
+                    <span className="truncate">
+                      {board.isOwner ? 'Personale' : `Da ${board.ownerEmail?.split('@')[0]}`}
                     </span>
+                    {!board.isOwner && (
+                      <span className="text-[10px] bg-white/80 px-1.5 py-0.5 rounded border border-slate-200">
+                        {board.role}
+                      </span>
+                    )}
                   </div>
                 </div>
               );
