@@ -11,6 +11,10 @@ export default function App() {
   const [isCreatingBoard, setIsCreatingBoard] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
+  // Drag & Drop States per le bacheche
+  const [draggedBoardIndex, setDraggedBoardIndex] = useState(null);
+  const [dragOverBoardIndex, setDragOverBoardIndex] = useState(null);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -32,13 +36,16 @@ export default function App() {
     try {
       const userEmail = session.user.email.toLowerCase();
 
+      // 1. Bacheche proprietarie ordinate per position
       const { data: owned, error: ownedErr } = await supabase
         .from('boards_with_owners')
         .select('*')
-        .eq('user_id', session.user.id);
+        .eq('user_id', session.user.id)
+        .order('position', { ascending: true });
 
       if (ownedErr) throw ownedErr;
 
+      // 2. Inviti per user_id o email
       const { data: memberEntries, error: memberErr } = await supabase
         .from('board_members')
         .select('board_id, role, invited_email');
@@ -58,7 +65,8 @@ export default function App() {
         const { data: shared, error: sharedErr } = await supabase
           .from('boards_with_owners')
           .select('*')
-          .in('id', boardIds);
+          .in('id', boardIds)
+          .order('position', { ascending: true });
 
         if (!sharedErr && shared) {
           sharedList = shared.map((board) => {
@@ -95,7 +103,8 @@ export default function App() {
       const newBoard = {
         id: `board-${Date.now()}`,
         user_id: session.user.id,
-        title: newBoardTitle.trim()
+        title: newBoardTitle.trim(),
+        position: boards.length
       };
 
       const { error } = await supabase.from('boards').insert([newBoard]);
@@ -121,6 +130,49 @@ export default function App() {
       if (activeBoard?.id === boardId) setActiveBoard(null);
     } catch (err) {
       alert('Errore eliminazione bacheca: ' + err.message);
+    }
+  };
+
+  // DRAG & DROP HANDLERS PER LE BACHECHE
+  const handleBoardDragStart = (e, index) => {
+    e.stopPropagation();
+    setDraggedBoardIndex(index);
+  };
+
+  const handleBoardDragOver = (e, index) => {
+    e.preventDefault();
+    if (draggedBoardIndex === null || draggedBoardIndex === index) return;
+    setDragOverBoardIndex(index);
+  };
+
+  const handleBoardDrop = async (e, dropIndex) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (draggedBoardIndex === null || draggedBoardIndex === dropIndex) {
+      setDraggedBoardIndex(null);
+      setDragOverBoardIndex(null);
+      return;
+    }
+
+    const reordered = [...boards];
+    const [movedBoard] = reordered.splice(draggedBoardIndex, 1);
+    reordered.splice(dropIndex, 0, movedBoard);
+
+    setBoards(reordered);
+    setDraggedBoardIndex(null);
+    setDragOverBoardIndex(null);
+
+    // Salva l'ordine aggiornato su Supabase
+    try {
+      for (let i = 0; i < reordered.length; i++) {
+        await supabase
+          .from('boards')
+          .update({ position: i })
+          .eq('id', reordered[i].id);
+      }
+    } catch (err) {
+      console.error('Errore salvataggio posizione bacheche:', err);
     }
   };
 
@@ -205,48 +257,61 @@ export default function App() {
               )}
             </div>
 
-            {/* CARD BACHECHE SALVATE (CON STILI DIFFERENZIATI PER LE CONDIVISE) */}
-            {boards.map((board) => (
-              <div
-                key={board.id}
-                onClick={() => setActiveBoard(board)}
-                className={`aspect-square border rounded-xl p-4 shadow-sm hover:shadow-md transition cursor-pointer relative flex flex-col justify-between ${
-                  board.isOwner
-                    ? 'bg-white border-slate-200 hover:border-blue-400'
-                    : 'bg-indigo-50/40 border-indigo-200 hover:border-indigo-400'
-                }`}
-              >
-                <div className="flex justify-between items-start gap-1">
-                  <h3 className="font-extrabold text-lg text-slate-900 leading-snug line-clamp-3">
-                    {board.title}
-                  </h3>
-                  {board.isOwner && (
-                    <button
-                      onClick={(e) => handleDeleteBoard(board.id, board.title, e)}
-                      title="Elimina bacheca"
-                      className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-base font-bold flex-shrink-0"
-                    >
-                      🗑️
-                    </button>
-                  )}
-                </div>
+            {/* LISTA BACHECHE TRASCINABILI */}
+            {boards.map((board, index) => {
+              const isBeingDragged = draggedBoardIndex === index;
+              const isDragOver = dragOverBoardIndex === index;
 
-                <div>
-                  <p className="text-[10px] text-slate-500 truncate mb-1" title={board.ownerEmail}>
-                    Proprietario: {board.ownerEmail}
-                  </p>
-                  <span
-                    className={`inline-block text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider border ${
-                      board.isOwner
-                        ? 'bg-blue-100 text-blue-700 border-blue-200'
-                        : 'bg-purple-100 text-purple-700 border-purple-200'
-                    }`}
-                  >
-                    {board.isOwner ? 'Proprietario' : `Condivisa (${board.role})`}
-                  </span>
+              return (
+                <div
+                  key={board.id}
+                  draggable
+                  onDragStart={(e) => handleBoardDragStart(e, index)}
+                  onDragOver={(e) => handleBoardDragOver(e, index)}
+                  onDrop={(e) => handleBoardDrop(e, index)}
+                  onClick={() => setActiveBoard(board)}
+                  className={`aspect-square border rounded-xl p-4 shadow-sm hover:shadow-md transition cursor-grab active:cursor-grabbing relative flex flex-col justify-between ${
+                    isBeingDragged
+                      ? 'opacity-30 border-dashed border-blue-500 scale-95'
+                      : isDragOver
+                      ? 'ring-2 ring-blue-500 border-blue-400 bg-blue-50/60'
+                      : board.isOwner
+                      ? 'bg-white border-slate-200 hover:border-blue-400'
+                      : 'bg-indigo-50/40 border-indigo-200 hover:border-indigo-400'
+                  }`}
+                >
+                  <div className="flex justify-between items-start gap-1">
+                    <h3 className="font-extrabold text-lg text-slate-900 leading-snug line-clamp-3">
+                      {board.title}
+                    </h3>
+                    {board.isOwner && (
+                      <button
+                        onClick={(e) => handleDeleteBoard(board.id, board.title, e)}
+                        title="Elimina bacheca"
+                        className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-base font-bold flex-shrink-0"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] text-slate-500 truncate mb-1" title={board.ownerEmail}>
+                      Proprietario: {board.ownerEmail}
+                    </p>
+                    <span
+                      className={`inline-block text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider border ${
+                        board.isOwner
+                          ? 'bg-blue-100 text-blue-700 border-blue-200'
+                          : 'bg-purple-100 text-purple-700 border-purple-200'
+                      }`}
+                    >
+                      {board.isOwner ? 'Proprietario' : `Condivisa (${board.role})`}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
