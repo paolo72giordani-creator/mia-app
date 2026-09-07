@@ -9,13 +9,13 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
   const isViewer = activeBoard?.role === 'viewer';
 
+  // Rinomina bacheca
+  const [isEditingBoardTitle, setIsEditingBoardTitle] = useState(false);
+  const [boardTitleInput, setBoardTitleInput] = useState('');
+
   // Rinomina colonna
   const [editingColId, setEditingColId] = useState(null);
   const [editingColName, setEditingColName] = useState('');
-  
-  //Rinomina bacheca
-  const [isEditingBoardTitle, setIsEditingBoardTitle] = useState(false);
-  const [boardTitleInput, setBoardTitleInput] = useState('');
 
   const [modalCard, setModalCard] = useState(null);
   const [modalColId, setModalColId] = useState(null);
@@ -86,6 +86,25 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
       }
     } catch (err) {
       console.error('Errore recupero dati bacheca:', err.message);
+    }
+  };
+
+  const handleSaveBoardTitle = async () => {
+    if (isViewer || !boardTitleInput.trim()) {
+      setIsEditingBoardTitle(false);
+      return;
+    }
+    const newTitle = boardTitleInput.trim();
+    try {
+      setIsEditingBoardTitle(false);
+      if (onBoardTitleChange) onBoardTitleChange(newTitle);
+
+      await supabase
+        .from('boards')
+        .update({ title: newTitle })
+        .eq('id', activeBoard.id);
+    } catch (err) {
+      console.error('Errore rinomina bacheca:', err);
     }
   };
 
@@ -271,117 +290,97 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
       console.error('Errore salvataggio ordine colonne:', err);
     }
   };
-  
-  const handleSaveBoardTitle = async () => {
-  if (isViewer || !boardTitleInput.trim()) {
-    setIsEditingBoardTitle(false);
-    return;
-  }
-  const newTitle = boardTitleInput.trim();
-  try {
-    setIsEditingBoardTitle(false);
-    if (onBoardTitleChange) onBoardTitleChange(newTitle);
-
-    await supabase
-      .from('boards')
-      .update({ title: newTitle })
-      .eq('id', activeBoard.id);
-  } catch (err) {
-    console.error('Errore rinomina bacheca:', err);
-  }
-};
 
   return (
     <div>
-      {/* BARRA SUPERIORE UNIFORMATA CON EDIT TITOLO */}
-<div className="flex justify-between items-center mb-5 bg-white p-4 rounded-xl border shadow-sm">
-  <div className="flex items-center gap-4">
-    <div 
-      onClick={onBack}
-      className="w-10 h-10 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center justify-center text-white font-black text-base shadow-md shadow-blue-500/20 tracking-tighter flex-shrink-0 transition cursor-pointer"
-      title="Torna alla Dashboard"
-    >
-      DK
-    </div>
-
-    <div>
-      <div className="flex items-center gap-2">
-        {!isEditingBoardTitle ? (
-          <h1 
-            onClick={() => {
-              if (!isViewer && activeBoard?.isOwner) {
-                setIsEditingBoardTitle(true);
-                setBoardTitleInput(activeBoard.title);
-              }
-            }}
-            className={`text-lg font-extrabold text-slate-900 leading-tight flex items-center gap-1.5 ${
-              !isViewer && activeBoard?.isOwner ? 'cursor-pointer hover:text-blue-600' : ''
-            }`}
-            title={!isViewer && activeBoard?.isOwner ? 'Clicca per rinominare la bacheca' : ''}
+      {/* BARRA SUPERIORE */}
+      <div className="flex justify-between items-center mb-5 bg-white p-4 rounded-xl border shadow-sm">
+        <div className="flex items-center gap-4">
+          <div 
+            onClick={onBack}
+            className="w-10 h-10 bg-blue-600 hover:bg-blue-700 rounded-lg flex items-center justify-center text-white font-black text-base shadow-md shadow-blue-500/20 tracking-tighter flex-shrink-0 transition cursor-pointer"
+            title="Torna alla Dashboard"
           >
-            <span>{activeBoard?.title}</span>
-            {!isViewer && activeBoard?.isOwner && (
-              <span className="text-xs text-slate-300 hover:text-blue-600 font-normal">✏️</span>
-            )}
-          </h1>
-        ) : (
-          <input
-            type="text"
-            value={boardTitleInput}
-            onChange={(e) => setBoardTitleInput(e.target.value)}
-            onBlur={handleSaveBoardTitle}
-            onKeyDown={(e) => e.key === 'Enter' && handleSaveBoardTitle()}
-            autoFocus
-            className="border border-blue-500 rounded px-2 py-0.5 text-base font-extrabold text-slate-900 focus:outline-none"
-          />
-        )}
+            DK
+          </div>
 
-        {isViewer && (
-          <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-300 font-bold">
-            👁️ Sola Lettura
-          </span>
-        )}
+          <div>
+            <div className="flex items-center gap-2">
+              {!isEditingBoardTitle ? (
+                <h1 
+                  onClick={() => {
+                    if (!isViewer && activeBoard?.isOwner) {
+                      setIsEditingBoardTitle(true);
+                      setBoardTitleInput(activeBoard.title);
+                    }
+                  }}
+                  className={`text-lg font-extrabold text-slate-900 leading-tight flex items-center gap-1.5 ${
+                    !isViewer && activeBoard?.isOwner ? 'cursor-pointer hover:text-blue-600' : ''
+                  }`}
+                  title={!isViewer && activeBoard?.isOwner ? 'Clicca per rinominare la bacheca' : ''}
+                >
+                  <span>{activeBoard?.title}</span>
+                  {!isViewer && activeBoard?.isOwner && (
+                    <span className="text-xs text-slate-300 hover:text-blue-600 font-normal">✏️</span>
+                  )}
+                </h1>
+              ) : (
+                <input
+                  type="text"
+                  value={boardTitleInput}
+                  onChange={(e) => setBoardTitleInput(e.target.value)}
+                  onBlur={handleSaveBoardTitle}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSaveBoardTitle()}
+                  autoFocus
+                  className="border border-blue-500 rounded px-2 py-0.5 text-base font-extrabold text-slate-900 focus:outline-none"
+                />
+              )}
+
+              {isViewer && (
+                <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-300 font-bold">
+                  👁️ Sola Lettura
+                </span>
+              )}
+            </div>
+
+            <p className="text-[11px] text-slate-500 font-medium flex items-center gap-2">
+              <span>Utente: {currentUser?.email}</span>
+              {!activeBoard?.isOwner && (
+                <>
+                  <span className="text-slate-300">•</span>
+                  <span>Proprietario: {activeBoard?.ownerEmail}</span>
+                </>
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onBack}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3.5 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 shadow-sm"
+          >
+            <span>←</span> Dashboard
+          </button>
+
+          {activeBoard?.isOwner && (
+            <button
+              onClick={onOpenShare}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs shadow-sm transition"
+            >
+              Condividi
+            </button>
+          )}
+
+          <button
+            onClick={onLogout}
+            className="bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
+            title="Disconnetti account"
+          >
+            <span>🚪</span> Esci
+          </button>
+        </div>
       </div>
-
-      <p className="text-[11px] text-slate-500 font-medium flex items-center gap-2">
-        <span>Utente: {currentUser?.email}</span>
-        {!activeBoard?.isOwner && (
-          <>
-            <span className="text-slate-300">•</span>
-            <span>Proprietario: {activeBoard?.ownerEmail}</span>
-          </>
-        )}
-      </p>
-    </div>
-  </div>
-
-  {/* PULSANTI DI AZIONE */}
-  <div className="flex items-center gap-2">
-    <button
-      onClick={onBack}
-      className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3.5 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 shadow-sm"
-    >
-      <span>←</span> Dashboard
-    </button>
-
-    {activeBoard?.isOwner && (
-      <button
-        onClick={onOpenShare}
-        className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs shadow-sm transition"
-      >
-        Condividi
-      </button>
-    )}
-
-    <button
-      onClick={onLogout}
-      className="bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
-      title="Disconnetti account"
-    >
-      <span>🚪</span> Esci
-    </button>
-  </div>
-</div>
 
       {/* AREA COLONNE KANBAN */}
       <div className="flex gap-4 overflow-x-auto pb-6 items-start">
@@ -410,7 +409,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                 if (draggedCard) handleCardDrop(e, col.id);
               }}
               onDragEnd={handleColDragEnd}
-              className={`w-72 border rounded-xl overflow-hidden flex-shrink-0 shadow-sm transition-all duration-200 bg-slate-200/70 border-slate-300/70 ${
+              className={`w-72 border rounded-xl overflow-hidden flex-shrink-0 shadow-sm transition-all duration-200 bg-slate-200/70 border-slate-300/70 relative ${
                 isColumnBeingDragged
                   ? 'border-2 border-dashed border-blue-500 opacity-60 scale-95'
                   : isTargetCardCol
@@ -418,10 +417,10 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   : ''
               }`}
             >
-              {/* HEADER COLONNA CON EDIT TITOLO */}
-              <div className={`p-3 flex justify-between items-center text-white relative ${colBgColor} ${!isViewer && !isEditingThisCol ? 'cursor-grab active:cursor-grabbing' : ''}`}>
+              {/* HEADER COLONNA - LIMPIDO CON PIÙ SPAZIO */}
+              <div className={`p-3 flex justify-between items-center text-white ${colBgColor} ${!isViewer && !isEditingThisCol ? 'cursor-grab active:cursor-grabbing' : ''}`}>
                 {!isEditingThisCol ? (
-                  <h3 className="font-bold text-base flex items-center gap-1.5 truncate flex-1 mr-2">
+                  <h3 className="font-bold text-base flex items-center gap-1.5 flex-1 pr-2">
                     {!isViewer && <span className="opacity-60 text-sm flex-shrink-0">⋮⋮</span>}
                     <span 
                       onClick={() => {
@@ -430,7 +429,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                           setEditingColName(col.name);
                         }
                       }}
-                      className={`${!isViewer ? 'cursor-pointer hover:underline' : ''} truncate`}
+                      className={`${!isViewer ? 'cursor-pointer hover:underline' : ''} leading-snug break-words`}
                       title={!isViewer ? 'Clicca per rinominare' : ''}
                     >
                       {col.name}
@@ -444,64 +443,13 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                     onBlur={() => handleRenameColumn(col.id)}
                     onKeyDown={(e) => e.key === 'Enter' && handleRenameColumn(col.id)}
                     autoFocus
-                    className="w-full bg-white text-slate-900 font-bold text-sm px-2 py-1 rounded focus:outline-none mr-2"
+                    className="w-full bg-white text-slate-900 font-bold text-sm px-2 py-1 rounded focus:outline-none"
                   />
                 )}
 
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <span className="text-xs bg-white/20 text-white font-bold px-2 py-0.5 rounded-full border border-white/20">
-                    {colCards.length}
-                  </span>
-
-                  {!isViewer && !isEditingThisCol && (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingColId(col.id);
-                          setEditingColName(col.name);
-                        }}
-                        title="Rinomina colonna"
-                        className="text-white/80 hover:text-white hover:bg-white/20 transition p-1 rounded text-xs"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveColorPickerColId(isPickerOpen ? null : col.id);
-                        }}
-                        title="Cambia colore colonna"
-                        className="text-white/80 hover:text-white hover:bg-white/20 transition p-1 rounded text-xs"
-                      >
-                        🎨
-                      </button>
-                      <button
-                        onClick={(e) => handleDeleteColumn(col.id, col.name, e)}
-                        title="Elimina colonna"
-                        className="text-white/80 hover:text-white hover:bg-white/20 transition p-1 rounded font-bold text-xs"
-                      >
-                        🗑️
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                {isPickerOpen && !isViewer && (
-                  <div className="absolute right-3 top-11 bg-white border border-slate-200 rounded-xl p-2 shadow-xl z-20 flex gap-1.5">
-                    {availableColors.map((c) => (
-                      <button
-                        key={c.value}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleChangeColumnColor(col.id, c.value);
-                        }}
-                        className={`w-6 h-6 rounded-full border border-black/10 transition hover:scale-110 ${c.value}`}
-                        title={c.label}
-                      />
-                    ))}
-                  </div>
-                )}
+                <span className="text-xs bg-white/20 text-white font-bold px-2 py-0.5 rounded-full border border-white/20 flex-shrink-0">
+                  {colCards.length}
+                </span>
               </div>
 
               {/* SCHEDE DELLA COLONNA */}
@@ -572,16 +520,67 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   )}
                 </div>
 
+                {/* AREA AZIONI IN BASSO: + SCHEDA E PULSANTI AZIONE COLONNA */}
                 {!isViewer && (
-                  <button
-                    onClick={() => {
-                      setModalCard(null);
-                      setModalColId(col.id);
-                    }}
-                    className="w-full py-2 px-3 rounded-lg border border-dashed border-slate-300 bg-white hover:border-blue-400 text-slate-600 hover:text-blue-600 font-semibold text-xs transition flex items-center justify-center gap-1.5 shadow-sm mt-2"
-                  >
-                    <span>+</span> Aggiungi scheda
-                  </button>
+                  <div className="pt-2 border-t border-slate-300/60 mt-3 flex items-center justify-between gap-1.5">
+                    <button
+                      onClick={() => {
+                        setModalCard(null);
+                        setModalColId(col.id);
+                      }}
+                      className="flex-1 py-1.5 px-2.5 rounded-lg border border-dashed border-slate-300 bg-white hover:border-blue-400 text-slate-700 hover:text-blue-600 font-bold text-xs transition flex items-center justify-center gap-1 shadow-sm"
+                    >
+                      <span>+</span> Aggiungi scheda
+                    </button>
+
+                    <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 shadow-sm relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingColId(col.id);
+                          setEditingColName(col.name);
+                        }}
+                        title="Rinomina colonna"
+                        className="text-slate-500 hover:text-blue-600 p-1 hover:bg-slate-100 rounded text-xs transition"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveColorPickerColId(isPickerOpen ? null : col.id);
+                        }}
+                        title="Cambia colore colonna"
+                        className="text-slate-500 hover:text-blue-600 p-1 hover:bg-slate-100 rounded text-xs transition"
+                      >
+                        🎨
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteColumn(col.id, col.name, e)}
+                        title="Elimina colonna"
+                        className="text-slate-400 hover:text-red-600 p-1 hover:bg-red-50 rounded text-xs transition font-bold"
+                      >
+                        🗑️
+                      </button>
+
+                      {/* POPUP SELETTORE COLORE POSIZIONATO IN BASSO */}
+                      {isPickerOpen && (
+                        <div className="absolute right-0 bottom-9 bg-white border border-slate-200 rounded-xl p-2 shadow-xl z-30 flex gap-1.5">
+                          {availableColors.map((c) => (
+                            <button
+                              key={c.value}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleChangeColumnColor(col.id, c.value);
+                              }}
+                              className={`w-6 h-6 rounded-full border border-black/10 transition hover:scale-110 ${c.value}`}
+                              title={c.label}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
