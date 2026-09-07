@@ -55,7 +55,7 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
     `;
 
     try {
-      const verifiedBrevoSender = 'paolo.giordani@gmail.com';
+      const verifiedBrevoSender = 'paolo72.giordani@gmail.com';
 
       const response = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
