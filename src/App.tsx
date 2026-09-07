@@ -129,12 +129,14 @@ export default function App() {
           isOwner: true,
           role: 'owner',
           ownerEmail: b.owner_email,
+          icon: b.icon || '📘',
           position: b.position ?? 0
         })),
         ...(sharedList || []).map((b) => ({
           ...b,
           isOwner: false,
           ownerEmail: b.owner_email,
+          icon: b.icon || '📚',
           position: b.position ?? 0
         }))
       ];
@@ -153,7 +155,6 @@ export default function App() {
       const userEmail = session.user.email;
       const boardIcon = template.icon || '📘';
 
-      // 1. Inserisce la bacheca nel database includendo l'icona del template
       const { error: boardErr } = await supabase.from('boards').insert([
         {
           id: boardId,
@@ -165,7 +166,6 @@ export default function App() {
       ]);
       if (boardErr) throw boardErr;
 
-      // 2. Se il template include colonne, le crea automaticamente
       if (template.columns && template.columns.length > 0) {
         const columnsToInsert = template.columns.map((col, idx) => ({
           id: `col-${Date.now()}-${idx}`,
@@ -277,6 +277,10 @@ export default function App() {
     }
   };
 
+  // Divisione delle bacheche personali e condivise
+  const myBoards = boards.filter((b) => b.isOwner);
+  const sharedBoards = boards.filter((b) => !b.isOwner);
+
   if (!session) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 text-xs">
@@ -354,9 +358,9 @@ export default function App() {
           }}
         />
       ) : (
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-6xl mx-auto space-y-10">
           {/* HEADER DASHBOARD */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm mb-8 flex justify-between items-center">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex justify-between items-center">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-base shadow-md shadow-blue-500/20 tracking-tighter">
                 DK
@@ -380,52 +384,53 @@ export default function App() {
             </button>
           </div>
 
-          <h2 className="text-xl font-extrabold text-slate-900 mb-4 px-1">Le mie bacheche</h2>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
-            {/* CARD CREA NUOVA BACHECA */}
-            <div
-              onClick={() => setIsCreatingBoard(true)}
-              className="aspect-[4/3] bg-white border border-slate-200 hover:border-slate-300 rounded-2xl p-5 flex flex-col justify-center items-center cursor-pointer transition-all shadow-sm hover:shadow-md group"
-            >
-              <div className="w-12 h-12 bg-blue-50 group-hover:bg-blue-100 rounded-full flex items-center justify-center mb-3 transition">
-                <span className="text-2xl text-blue-600 font-bold">+</span>
-              </div>
-              <span className="font-bold text-sm text-slate-800">Crea nuova bacheca</span>
+          {/* SEZIONE 1: LE MIE BACHECHE */}
+          <section>
+            <div className="flex items-center gap-2 mb-4 px-1">
+              <h2 className="text-xl font-extrabold text-slate-900">Le mie bacheche</h2>
+              <span className="text-xs bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded-full border border-slate-200">
+                {myBoards.length}
+              </span>
             </div>
 
-            {/* LISTA BACHECHE CON ICONE E BADGE CONDIVISIONE */}
-            {boards.map((board, index) => {
-              const isBeingDragged = draggedBoardIndex === index;
-              const isEditingThisBoard = editingBoardId === board.id;
-              const isMenuOpen = openMenuBoardId === board.id;
-              const pastelStyle = PASTEL_BG_CLASSES[index % PASTEL_BG_CLASSES.length];
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
+              {/* CARD CREA NUOVA BACHECA */}
+              <div
+                onClick={() => setIsCreatingBoard(true)}
+                className="aspect-[4/3] bg-white border border-slate-200 hover:border-blue-400 rounded-2xl p-5 flex flex-col justify-center items-center cursor-pointer transition-all shadow-sm hover:shadow-md group"
+              >
+                <div className="w-12 h-12 bg-blue-50 group-hover:bg-blue-100 rounded-full flex items-center justify-center mb-3 transition">
+                  <span className="text-2xl text-blue-600 font-bold">+</span>
+                </div>
+                <span className="font-bold text-sm text-slate-800">Crea nuova bacheca</span>
+              </div>
 
-              // Icona del template o predefinita
-              // Icona salvata nel database oppure fallback
-const boardIcon = board.icon || (board.isOwner ? '📘' : '👥');
+              {/* LISTA BACHECHE PERSONALI */}
+              {myBoards.map((board, index) => {
+                const globalIndex = boards.findIndex((b) => b.id === board.id);
+                const isBeingDragged = draggedBoardIndex === globalIndex;
+                const isEditingThisBoard = editingBoardId === board.id;
+                const isMenuOpen = openMenuBoardId === board.id;
+                const pastelStyle = PASTEL_BG_CLASSES[globalIndex % PASTEL_BG_CLASSES.length];
 
-              return (
-                <div
-                  key={board.id}
-                  draggable={!isEditingThisBoard}
-                  onDragStart={(e) => handleBoardDragStart(e, index)}
-                  onDragOver={(e) => handleBoardDragOver(e, index)}
-                  onDragEnd={handleBoardDragEnd}
-                  onClick={() => {
-                    if (!isEditingThisBoard) setActiveBoard(board);
-                  }}
-                  className={`aspect-[4/3] border rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing relative flex flex-col justify-between ${pastelStyle} ${
-                    isBeingDragged ? 'opacity-30 border-2 border-dashed border-blue-500 scale-95' : ''
-                  }`}
-                >
-                  {/* ICONA E MENU 3 PALLINI */}
-                  <div className="flex justify-between items-start gap-1">
-                    <div className="text-2xl">
-                      {boardIcon}
-                    </div>
+                return (
+                  <div
+                    key={board.id}
+                    draggable={!isEditingThisBoard}
+                    onDragStart={(e) => handleBoardDragStart(e, globalIndex)}
+                    onDragOver={(e) => handleBoardDragOver(e, globalIndex)}
+                    onDragEnd={handleBoardDragEnd}
+                    onClick={() => {
+                      if (!isEditingThisBoard) setActiveBoard(board);
+                    }}
+                    className={`aspect-[4/3] border rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing relative flex flex-col justify-between ${pastelStyle} ${
+                      isBeingDragged ? 'opacity-30 border-2 border-dashed border-blue-500 scale-95' : ''
+                    }`}
+                  >
+                    {/* ICONA E MENU 3 PALLINI */}
+                    <div className="flex justify-between items-start gap-1">
+                      <div className="text-2xl">{board.icon || '📘'}</div>
 
-                    {board.isOwner && (
                       <div className="relative">
                         <button
                           onClick={(e) => {
@@ -439,7 +444,7 @@ const boardIcon = board.icon || (board.isOwner ? '📘' : '👥');
                         </button>
 
                         {isMenuOpen && (
-                          <div 
+                          <div
                             onClick={(e) => e.stopPropagation()}
                             className="absolute right-0 top-7 bg-white border border-slate-200 rounded-xl p-1 shadow-xl z-20 w-32 text-xs"
                           >
@@ -462,52 +467,92 @@ const boardIcon = board.icon || (board.isOwner ? '📘' : '👥');
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
+                    </div>
 
-                  {/* TITOLO ED EDITING */}
-                  <div className="my-auto">
-                    {!isEditingThisBoard ? (
-                      <h3 className="font-bold text-base text-slate-900 leading-snug line-clamp-2">
-                        {board.title}
-                      </h3>
-                    ) : (
-                      <input
-                        type="text"
-                        value={editingBoardTitle}
-                        onChange={(e) => setEditingBoardTitle(e.target.value)}
-                        onBlur={() => handleRenameBoard(board.id)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleRenameBoard(board.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        autoFocus
-                        className="w-full border border-blue-500 rounded px-2 py-1 text-sm font-bold text-slate-900 focus:outline-none bg-white"
-                      />
-                    )}
-                  </div>
+                    {/* TITOLO ED EDITING */}
+                    <div className="my-auto">
+                      {!isEditingThisBoard ? (
+                        <h3 className="font-bold text-base text-slate-900 leading-snug line-clamp-2">
+                          {board.title}
+                        </h3>
+                      ) : (
+                        <input
+                          type="text"
+                          value={editingBoardTitle}
+                          onChange={(e) => setEditingBoardTitle(e.target.value)}
+                          onBlur={() => handleRenameBoard(board.id)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleRenameBoard(board.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          autoFocus
+                          className="w-full border border-blue-500 rounded px-2 py-1 text-sm font-bold text-slate-900 focus:outline-none bg-white"
+                        />
+                      )}
+                    </div>
 
-                  {/* METADATI E BADGE DI CONDIVISIONE */}
-                  <div className="text-[11px] text-slate-500 font-medium truncate pt-2 border-t border-black/5 flex items-center justify-between">
-                    {board.isOwner ? (
+                    {/* METADATI */}
+                    <div className="text-[11px] text-slate-500 font-medium truncate pt-2 border-t border-black/5 flex items-center justify-between">
                       <span className="truncate">Personale</span>
-                    ) : (
-                      <div className="flex items-center gap-1.5 truncate text-indigo-900">
-                        <span>🔗</span>
-                        <span className="truncate">
-                          {board.ownerEmail?.split('@')[0]}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* SEZIONE 2: BACHECHE CONDIVISE CON ME */}
+          {sharedBoards.length > 0 && (
+            <section className="pt-4 border-t border-slate-200/70">
+              <div className="flex items-center gap-2 mb-4 px-1">
+                <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                  <span>👥</span> Condivise con me
+                </h2>
+                <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full border border-indigo-200">
+                  {sharedBoards.length}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
+                {sharedBoards.map((board, index) => {
+                  const globalIndex = boards.findIndex((b) => b.id === board.id);
+                  const isEditingThisBoard = editingBoardId === board.id;
+                  const pastelStyle = PASTEL_BG_CLASSES[globalIndex % PASTEL_BG_CLASSES.length];
+
+                  return (
+                    <div
+                      key={board.id}
+                      onClick={() => {
+                        if (!isEditingThisBoard) setActiveBoard(board);
+                      }}
+                      className={`aspect-[4/3] border-2 border-indigo-200/80 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer relative flex flex-col justify-between ${pastelStyle}`}
+                    >
+                      {/* ICONA E BADGE PROPRIETARIO */}
+                      <div className="flex justify-between items-start gap-1">
+                        <div className="text-2xl">{board.icon || '📚'}</div>
+                        <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-full font-bold shadow-sm">
+                          {board.role === 'editor' ? 'Editor' : 'Viewer'}
                         </span>
                       </div>
-                    )}
 
-                    {!board.isOwner && (
-                      <span className="text-[10px] bg-indigo-100/80 text-indigo-800 px-1.5 py-0.5 rounded border border-indigo-200/80 font-semibold flex-shrink-0">
-                        {board.role}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                      {/* TITOLO */}
+                      <div className="my-auto">
+                        <h3 className="font-bold text-base text-slate-900 leading-snug line-clamp-2">
+                          {board.title}
+                        </h3>
+                      </div>
+
+                      {/* METADATI CONDIVISIONE */}
+                      <div className="text-[11px] text-indigo-950 font-semibold truncate pt-2 border-t border-indigo-200/60 flex items-center gap-1.5">
+                        <span className="text-xs">🔗</span>
+                        <span className="truncate">
+                          Da: {board.ownerEmail ? board.ownerEmail.split('@')[0] : 'Collega'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
         </div>
       )}
 
