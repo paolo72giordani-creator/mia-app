@@ -27,8 +27,9 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
 
   const sendBrevoEmail = async (targetEmail, isRegistered) => {
     const brevoApiKey = import.meta.env.VITE_BREVO_API_KEY;
+
     if (!brevoApiKey) {
-      console.warn('VITE_BREVO_API_KEY non trovata nelle variabili d’ambiente.');
+      alert('ATTENZIONE: VITE_BREVO_API_KEY non è configurata nelle variabili d’ambiente!');
       return;
     }
 
@@ -64,25 +65,36 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
       `;
 
     try {
-      await fetch('https://api.brevo.com/v3/smtp/email', {
+      // INSERISCI QUI L'EMAIL DEL TUO ACCOUNT BREVO
+      const verifiedBrevoSender = 'paolo72.giordani@gmail.com';
+
+      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
           'api-key': brevoApiKey
         },
-        // Sostituisci la sezione del body della fetch con questa:
-body: JSON.stringify({
-  // IMPORTANTE: 'email' deve essere l'email con cui sei registrato su Brevo (o un mittente verificato su Brevo)
-  sender: { name: 'Doceo Kanban', email: 'tua_email_registrata_su_brevo@gmail.com' },
-  replyTo: { email: currentUserEmail },
-  to: [{ email: targetEmail }],
-  subject: subject,
-  htmlContent: htmlContent
-})
+        body: JSON.stringify({
+          sender: { name: 'Doceo Kanban', email: verifiedBrevoSender },
+          replyTo: { email: currentUserEmail },
+          to: [{ email: targetEmail }],
+          subject: subject,
+          htmlContent: htmlContent
+        })
       });
+
+      const resData = await response.json();
+
+      if (!response.ok) {
+        console.error('Errore da Brevo API:', resData);
+        alert(`Impossibile inviare la mail tramite Brevo: ${resData.message || JSON.stringify(resData)}`);
+      } else {
+        console.log('Email inviata con successo via Brevo:', resData);
+      }
     } catch (err) {
-      console.error('Errore durante l\'invio email con Brevo:', err);
+      console.error('Errore di rete durante l\'invio email:', err);
+      alert('Errore di connessione verso il servizio email Brevo.');
     }
   };
 
@@ -105,14 +117,14 @@ body: JSON.stringify({
 
       if (error) throw error;
 
-      // 2. Verifica se l'utente esiste già nella lista dei membri o del sistema
+      // 2. Verifica se l'utente esiste già nella lista dei membri
       const isAlreadyMember = members.some(m => m.invited_email?.toLowerCase() === emailToInvite);
 
       // 3. Invio email transazionale tramite Brevo
       await sendBrevoEmail(emailToInvite, isAlreadyMember);
 
       setInviteEmail('');
-      alert(`Invito inviato con successo a ${emailToInvite}!`);
+      alert(`Condivisione salvata! Verificato invio email a ${emailToInvite}`);
       fetchMembers();
     } catch (err) {
       alert('Errore durante l\'invito: ' + err.message);
@@ -188,7 +200,7 @@ body: JSON.stringify({
           </div>
         </form>
 
-        {/* LISTA MEMBRI INVITA TRAMITE EMAIL */}
+        {/* LISTA MEMBRI */}
         <div>
           <h3 className="text-xs font-bold text-slate-700 mb-2">
             Membri con accesso ({members.length})
