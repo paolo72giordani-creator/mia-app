@@ -56,7 +56,7 @@ export default function App() {
     if (session) fetchBoards();
   }, [session]);
 
-  const handleAuth = async (e) => {
+const handleAuth = async (e) => {
     e.preventDefault();
     if (!authEmail.trim() || !authPassword.trim()) return;
 
@@ -90,7 +90,7 @@ export default function App() {
       }
     } catch (err) {
       alert('Errore autenticazione: ' + err.message);
-    } font
+    } finally {
       setAuthLoading(false);
     }
   };
