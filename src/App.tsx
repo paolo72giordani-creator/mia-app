@@ -17,8 +17,6 @@ const PASTEL_PALETTE = [
 
 const AVAILABLE_ICONS = ['📄', '📘', '📚', '🏫', '👥', '💡', '🎨', '🧠', '🔬', '🌍', '📐', '🎯'];
 
-const [errorMessage, setErrorMessage] = useState('');
-
 export default function App() {
   const [session, setSession] = useState(null);
   const [boards, setBoards] = useState([]);
@@ -32,6 +30,7 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Menu contestuale 3 pallini & Personalizzazione
   const [openMenuBoardId, setOpenMenuBoardId] = useState(null);
@@ -58,7 +57,7 @@ export default function App() {
     if (session) fetchBoards();
   }, [session]);
 
-const handleAuth = async (e) => {
+  const handleAuth = async (e) => {
     e.preventDefault();
     if (!authEmail.trim() || !authPassword.trim()) return;
 
@@ -90,7 +89,6 @@ const handleAuth = async (e) => {
         });
 
         if (error) {
-          // Gestione personalizzata dell'errore credenziali
           if (error.message.includes('Invalid login credentials')) {
             throw new Error('Email o password non corrette. Se non possiedi ancora un account, puoi registrarti dalla scheda "Registrati".');
           }
@@ -352,6 +350,7 @@ const handleAuth = async (e) => {
             <button
               onClick={() => {
                 setIsSignUp(false);
+                setErrorMessage('');
                 setIsAuthModalOpen(true);
               }}
               className="text-xs font-bold text-slate-700 hover:text-blue-600 px-4 py-2 transition"
@@ -361,6 +360,7 @@ const handleAuth = async (e) => {
             <button
               onClick={() => {
                 setIsSignUp(true);
+                setErrorMessage('');
                 setIsAuthModalOpen(true);
               }}
               className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition shadow-md shadow-blue-500/20"
@@ -377,17 +377,18 @@ const handleAuth = async (e) => {
           </span>
 
           <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-900 max-w-3xl leading-tight mb-6">
-            Pianifica, collabora e condividi la tua didattica con <span className="text-blue-600">Doceo Kanban</span>
+            Pianifica, collabora e condividi la tua didattica in <span className="text-blue-600">stile NotebookLM</span>
           </h1>
 
           <p className="text-base sm:text-lg text-slate-600 max-w-2xl mb-8 leading-relaxed font-medium">
-            Doceo Kanban trasforma la gestione delle tue lezioni, consigli di classe e progetti di gruppo in un’esperienza visiva pulita e collaborativa.
+            Doceo Kanban trasforma la gestione delle tue lezioni, consigli di classe e progetti di gruppo in un’esperienza visiva pulita, moderna e in tempo reale.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 w-full max-w-xs sm:max-w-none">
             <button
               onClick={() => {
                 setIsSignUp(true);
+                setErrorMessage('');
                 setIsAuthModalOpen(true);
               }}
               className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm px-8 py-3.5 rounded-2xl transition shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2"
@@ -420,51 +421,80 @@ const handleAuth = async (e) => {
 
         {/* FOOTER */}
         <footer className="text-center py-6 text-xs text-slate-400 font-medium border-t border-slate-100">
-          Doceo Kanban © {new Date().getFullYear()} — La piattaforma Kanban per la scuola moderna - Creata da Paolo Giordani
+          Doceo Kanban © {new Date().getFullYear()} — La piattaforma Kanban per la scuola moderna
         </footer>
 
-        {/* MODAL AUTH (LOGIN / REGISTRAZIONE) */}
+        {/* MODAL AUTH CON SELETTORE A TAB E BANNER ERRORE */}
         {isAuthModalOpen && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 shadow-2xl relative">
               <button
-                onClick={() => setIsAuthModalOpen(false)}
+                onClick={() => {
+                  setIsAuthModalOpen(false);
+                  setErrorMessage('');
+                }}
                 className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 font-bold"
               >
                 ✕
               </button>
 
-              <div className="flex items-center gap-3 mb-6 justify-center">
+              <div className="flex items-center gap-3 mb-5 justify-center">
                 <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-md shadow-blue-500/20">
                   DK
                 </div>
-                <h2 className="text-xl font-black text-slate-900">
-                  {isSignUp ? 'Registrati' : 'Accedi'}
-                </h2>
               </div>
-			  
-			  {/* BANNER DI ERRORE PERSONALIZZATO */}
-  {errorMessage && (
-    <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-xl mb-4 font-medium leading-relaxed flex items-start gap-2">
-      <span className="text-base leading-none">⚠️</span>
-      <div>
-        <p>{errorMessage}</p>
-        {!isSignUp && (
-          <button
-            type="button"
-            onClick={() => {
-              setIsSignUp(true);
-              setErrorMessage('');
-            }}
-            className="text-blue-600 underline font-bold mt-1 block"
-          >
-            Passa a Registrati →
-          </button>
-        )}
-      </div>
-    </div>
-  )}
 
+              {/* TAB SWITCHER (ACCEDI / REGISTRATI) */}
+              <div className="flex bg-slate-100 p-1 rounded-xl mb-5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSignUp(false);
+                    setErrorMessage('');
+                  }}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${
+                    !isSignUp ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Accedi
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSignUp(true);
+                    setErrorMessage('');
+                  }}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${
+                    isSignUp ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Registrati
+                </button>
+              </div>
+
+              {/* BANNER ERRORE GRAFICO */}
+              {errorMessage && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-xl mb-4 font-medium leading-relaxed flex items-start gap-2">
+                  <span className="text-base leading-none">⚠️</span>
+                  <div>
+                    <p>{errorMessage}</p>
+                    {!isSignUp && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsSignUp(true);
+                          setErrorMessage('');
+                        }}
+                        className="text-blue-600 underline font-bold mt-1 block"
+                      >
+                        Passa a Registrati →
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* FORM DI AUTENTICAZIONE */}
               <form onSubmit={handleAuth} className="space-y-3">
                 <div>
                   <label className="block text-slate-600 font-bold text-xs mb-1">Email</label>
@@ -498,15 +528,6 @@ const handleAuth = async (e) => {
                   {authLoading ? 'Elaborazione...' : isSignUp ? 'Crea Account' : 'Accedi'}
                 </button>
               </form>
-
-              <div className="mt-4 text-center pt-3 border-t border-slate-100">
-                <button
-                  onClick={() => setIsSignUp(!isSignUp)}
-                  className="text-blue-600 hover:underline font-bold text-xs"
-                >
-                  {isSignUp ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati'}
-                </button>
-              </div>
             </div>
           </div>
         )}
