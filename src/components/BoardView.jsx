@@ -9,6 +9,10 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
   const isViewer = activeBoard?.role === 'viewer';
 
+  // Rinomina colonna
+  const [editingColId, setEditingColId] = useState(null);
+  const [editingColName, setEditingColName] = useState('');
+
   const [modalCard, setModalCard] = useState(null);
   const [modalColId, setModalColId] = useState(null);
   const [activeColorPickerColId, setActiveColorPickerColId] = useState(null);
@@ -28,13 +32,11 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     { label: 'Viola', value: 'bg-purple-600' }
   ];
 
-  // CARICAMENTO E ASCOLTO IN TEMPO REALE (BIDIREZIONALE)
   useEffect(() => {
     if (!activeBoard) return;
 
     fetchBoardData();
 
-    // Sottoscrizione globale ai cambiamenti di colonne e schede
     const channel = supabase
       .channel(`board-realtime-${activeBoard.id}`)
       .on(
@@ -83,7 +85,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-
   const handleAddColumn = async () => {
     if (isViewer || !newColumnName.trim()) return;
     try {
@@ -101,6 +102,27 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
       setNewColumnName('');
     } catch (err) {
       alert(err.message);
+    }
+  };
+
+  const handleRenameColumn = async (columnId) => {
+    if (isViewer || !editingColName.trim()) {
+      setEditingColId(null);
+      return;
+    }
+    const updatedName = editingColName.trim();
+    try {
+      setColumns((prev) =>
+        prev.map((c) => (c.id === columnId ? { ...c, name: updatedName } : c))
+      );
+      setEditingColId(null);
+
+      await supabase
+        .from('columns')
+        .update({ name: updatedName })
+        .eq('id', columnId);
+    } catch (err) {
+      console.error('Errore rinomina colonna:', err);
     }
   };
 
@@ -248,72 +270,69 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
   return (
     <div>
-     {/* BARRA SUPERIORE UNIFORMATA */}
-<div className="flex justify-between items-center mb-5 bg-white p-4 rounded-xl border shadow-sm">
-  <div className="flex items-center gap-4">
-    {/* LOGO E TITOLO CON FUNZIONE HOME / DASHBOARD */}
-    <div 
-      onClick={onBack}
-      className="flex items-center gap-3 cursor-pointer group"
-      title="Torna alla Dashboard"
-    >
-      <div className="w-10 h-10 bg-blue-600 group-hover:bg-blue-700 rounded-lg flex items-center justify-center text-white font-black text-base shadow-md shadow-blue-500/20 tracking-tighter flex-shrink-0 transition">
-        DK
-      </div>
+      {/* BARRA SUPERIORE UNIFORMATA */}
+      <div className="flex justify-between items-center mb-5 bg-white p-4 rounded-xl border shadow-sm">
+        <div className="flex items-center gap-4">
+          <div 
+            onClick={onBack}
+            className="flex items-center gap-3 cursor-pointer group"
+            title="Torna alla Dashboard"
+          >
+            <div className="w-10 h-10 bg-blue-600 group-hover:bg-blue-700 rounded-lg flex items-center justify-center text-white font-black text-base shadow-md shadow-blue-500/20 tracking-tighter flex-shrink-0 transition">
+              DK
+            </div>
 
-      <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg font-extrabold text-slate-900 group-hover:text-blue-600 transition leading-tight">
-            {activeBoard?.title}
-          </h1>
-          {isViewer && (
-            <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-300 font-bold">
-              👁️ Sola Lettura
-            </span>
-          )}
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-extrabold text-slate-900 group-hover:text-blue-600 transition leading-tight">
+                  {activeBoard?.title}
+                </h1>
+                {isViewer && (
+                  <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-300 font-bold">
+                    👁️ Sola Lettura
+                  </span>
+                )}
+              </div>
+
+              <p className="text-[11px] text-slate-500 font-medium flex items-center gap-2">
+                <span>Utente: {currentUser?.email}</span>
+                {!activeBoard?.isOwner && (
+                  <>
+                    <span className="text-slate-300">•</span>
+                    <span>Proprietario: {activeBoard?.ownerEmail}</span>
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* UTENTE E PROPRIETARIO */}
-        <p className="text-[11px] text-slate-500 font-medium flex items-center gap-2">
-          <span>Utente: {currentUser?.email}</span>
-          {!activeBoard?.isOwner && (
-            <>
-              <span className="text-slate-300">•</span>
-              <span>Proprietario: {activeBoard?.ownerEmail}</span>
-            </>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onBack}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3.5 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 shadow-sm"
+          >
+            <span>←</span> Dashboard
+          </button>
+
+          {activeBoard?.isOwner && (
+            <button
+              onClick={onOpenShare}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs shadow-sm transition"
+            >
+              Condividi
+            </button>
           )}
-        </p>
+
+          <button
+            onClick={onLogout}
+            className="bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
+            title="Disconnetti account"
+          >
+            <span>🚪</span> Esci
+          </button>
+        </div>
       </div>
-    </div>
-  </div>
-
-  {/* PULSANTI DI AZIONE */}
-  <div className="flex items-center gap-2">
-    <button
-      onClick={onBack}
-      className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3.5 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 shadow-sm"
-    >
-      <span>←</span> Dashboard
-    </button>
-
-    {activeBoard?.isOwner && (
-      <button
-        onClick={onOpenShare}
-        className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs shadow-sm transition"
-      >
-        Condividi
-      </button>
-    )}
-
-    <button
-      onClick={onLogout}
-      className="bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
-      title="Disconnetti account"
-    >
-      <span>🚪</span> Esci
-    </button>
-  </div>
-</div>
 
       {/* AREA COLONNE KANBAN */}
       <div className="flex gap-4 overflow-x-auto pb-6 items-start">
@@ -323,11 +342,12 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           const isColumnBeingDragged = draggedColIndex === colIdx;
           const colBgColor = col.color || 'bg-blue-600';
           const isPickerOpen = activeColorPickerColId === col.id;
+          const isEditingThisCol = editingColId === col.id;
 
           return (
             <div
               key={col.id}
-              draggable={!isViewer && !draggedCard}
+              draggable={!isViewer && !draggedCard && !isEditingThisCol}
               onDragStart={(e) => handleColDragStart(e, colIdx)}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -349,20 +369,54 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   : ''
               }`}
             >
-              {/* HEADER COLONNA */}
-              <div className={`p-3 flex justify-between items-center text-white relative ${colBgColor} ${!isViewer ? 'cursor-grab active:cursor-grabbing' : ''}`}>
-                <h3 className="font-bold text-base flex items-center gap-1.5 truncate">
-                  {!isViewer && <span className="opacity-60 text-sm flex-shrink-0">⋮⋮</span>}
-                  <span className="truncate">{col.name}</span>
-                </h3>
+              {/* HEADER COLONNA CON EDIT TITOLO */}
+              <div className={`p-3 flex justify-between items-center text-white relative ${colBgColor} ${!isViewer && !isEditingThisCol ? 'cursor-grab active:cursor-grabbing' : ''}`}>
+                {!isEditingThisCol ? (
+                  <h3 className="font-bold text-base flex items-center gap-1.5 truncate flex-1 mr-2">
+                    {!isViewer && <span className="opacity-60 text-sm flex-shrink-0">⋮⋮</span>}
+                    <span 
+                      onClick={() => {
+                        if (!isViewer) {
+                          setEditingColId(col.id);
+                          setEditingColName(col.name);
+                        }
+                      }}
+                      className={`${!isViewer ? 'cursor-pointer hover:underline' : ''} truncate`}
+                      title={!isViewer ? 'Clicca per rinominare' : ''}
+                    >
+                      {col.name}
+                    </span>
+                  </h3>
+                ) : (
+                  <input
+                    type="text"
+                    value={editingColName}
+                    onChange={(e) => setEditingColName(e.target.value)}
+                    onBlur={() => handleRenameColumn(col.id)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleRenameColumn(col.id)}
+                    autoFocus
+                    className="w-full bg-white text-slate-900 font-bold text-sm px-2 py-1 rounded focus:outline-none mr-2"
+                  />
+                )}
 
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span className="text-xs bg-white/20 text-white font-bold px-2 py-0.5 rounded-full border border-white/20">
                     {colCards.length}
                   </span>
 
-                  {!isViewer && (
+                  {!isViewer && !isEditingThisCol && (
                     <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingColId(col.id);
+                          setEditingColName(col.name);
+                        }}
+                        title="Rinomina colonna"
+                        className="text-white/80 hover:text-white hover:bg-white/20 transition p-1 rounded text-xs"
+                      >
+                        ✏️
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();

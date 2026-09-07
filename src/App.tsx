@@ -17,8 +17,8 @@ export default function App() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
 
+  // Drag & drop bacheche con anteprima visiva in tempo reale
   const [draggedBoardIndex, setDraggedBoardIndex] = useState(null);
-  const [dragOverBoardIndex, setDragOverBoardIndex] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -171,6 +171,7 @@ export default function App() {
     setActiveBoard(null);
   };
 
+  // DRAG & DROP BACHECHE CON DYNAMIC ANTEPRIMA VISIVA IN TEMPO REALE
   const handleBoardDragStart = (e, index) => {
     e.stopPropagation();
     setDraggedBoardIndex(index);
@@ -179,33 +180,27 @@ export default function App() {
   const handleBoardDragOver = (e, index) => {
     e.preventDefault();
     if (draggedBoardIndex === null || draggedBoardIndex === index) return;
-    setDragOverBoardIndex(index);
-  };
 
-  const handleBoardDrop = async (e, dropIndex) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (draggedBoardIndex === null || draggedBoardIndex === dropIndex) {
-      setDraggedBoardIndex(null);
-      setDragOverBoardIndex(null);
-      return;
-    }
-
+    // Scambia dinamicamente l'array in memoria per mostrare l'anteprima prima del rilascio
     const reordered = [...boards];
     const [movedBoard] = reordered.splice(draggedBoardIndex, 1);
-    reordered.splice(dropIndex, 0, movedBoard);
+    reordered.splice(index, 0, movedBoard);
 
+    setDraggedBoardIndex(index);
     setBoards(reordered);
-    setDraggedBoardIndex(null);
-    setDragOverBoardIndex(null);
+  };
 
+  const handleBoardDragEnd = async () => {
+    if (draggedBoardIndex === null) return;
+    setDraggedBoardIndex(null);
+
+    // Salva il nuovo ordine delle bacheche su Supabase
     try {
-      for (let i = 0; i < reordered.length; i++) {
+      for (let i = 0; i < boards.length; i++) {
         await supabase
           .from('boards')
           .update({ position: i })
-          .eq('id', reordered[i].id);
+          .eq('id', boards[i].id);
       }
     } catch (err) {
       console.error('Errore salvataggio posizione bacheche:', err);
@@ -218,7 +213,7 @@ export default function App() {
         <div className="bg-white border rounded-xl max-w-sm w-full p-6 shadow-xl">
           <div className="flex items-center gap-3 mb-6 justify-center">
             <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-xl shadow-md shadow-blue-500/20">
-              D
+              DK
             </div>
             <h1 className="text-xl font-black text-slate-900">
               Doceo <span className="text-blue-600">Kanban</span>
@@ -277,38 +272,37 @@ export default function App() {
       {activeBoard ? (
         <BoardView
           activeBoard={activeBoard}
-    currentUser={session.user}
-    onBack={() => setActiveBoard(null)}
-    onOpenShare={() => setIsShareModalOpen(true)}
-    onLogout={handleLogout}
+          currentUser={session.user}
+          onBack={() => setActiveBoard(null)}
+          onOpenShare={() => setIsShareModalOpen(true)}
+          onLogout={handleLogout}
         />
       ) : (
         <div className="max-w-6xl mx-auto">
-{/* HEADER DASHBOARD */}
-<div className="bg-white p-4 rounded-xl border shadow-sm mb-6 flex justify-between items-center">
-  <div className="flex items-center gap-3">
-    {/* LOGO AGGIORNATO DK */}
-    <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-base shadow-md shadow-blue-500/20 tracking-tighter">
-      DK
-    </div>
-    <div>
-      <h1 className="text-lg font-extrabold text-slate-900 leading-tight">
-        Doceo <span className="text-blue-600">Kanban</span>
-      </h1>
-      <p className="text-[11px] text-slate-500 font-medium">
-        Utente: {session.user.email}
-      </p>
-    </div>
-  </div>
+          {/* HEADER DASHBOARD */}
+          <div className="bg-white p-4 rounded-xl border shadow-sm mb-6 flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-base shadow-md shadow-blue-500/20 tracking-tighter">
+                DK
+              </div>
+              <div>
+                <h1 className="text-lg font-extrabold text-slate-900 leading-tight">
+                  Doceo <span className="text-blue-600">Kanban</span>
+                </h1>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Utente: {session.user.email}
+                </p>
+              </div>
+            </div>
 
-  <button
-    onClick={handleLogout}
-    className="bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
-    title="Disconnetti account"
-  >
-    <span>🚪</span> Esci
-  </button>
-</div>
+            <button
+              onClick={handleLogout}
+              className="bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
+              title="Disconnetti account"
+            >
+              <span>🚪</span> Esci
+            </button>
+          </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {/* CARD 1: NUOVA BACHECA QUADRATA */}
@@ -350,10 +344,9 @@ export default function App() {
               )}
             </div>
 
-            {/* LISTA BACHECHE SALVATE */}
+            {/* LISTA BACHECHE SALVATE TRASCINABILI CON ANTEPRIMA */}
             {boards.map((board, index) => {
               const isBeingDragged = draggedBoardIndex === index;
-              const isDragOver = dragOverBoardIndex === index;
 
               return (
                 <div
@@ -361,13 +354,11 @@ export default function App() {
                   draggable
                   onDragStart={(e) => handleBoardDragStart(e, index)}
                   onDragOver={(e) => handleBoardDragOver(e, index)}
-                  onDrop={(e) => handleBoardDrop(e, index)}
+                  onDragEnd={handleBoardDragEnd}
                   onClick={() => setActiveBoard(board)}
-                  className={`aspect-square border rounded-xl p-4 shadow-sm hover:shadow-md transition cursor-grab active:cursor-grabbing relative flex flex-col justify-between ${
+                  className={`aspect-square border rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing relative flex flex-col justify-between ${
                     isBeingDragged
-                      ? 'opacity-30 border-dashed border-blue-500 scale-95'
-                      : isDragOver
-                      ? 'ring-2 ring-blue-500 border-blue-400 bg-blue-50/60'
+                      ? 'opacity-30 border-2 border-dashed border-blue-500 scale-95 bg-blue-50/50'
                       : board.isOwner
                       ? 'bg-white border-slate-200 hover:border-blue-400'
                       : 'bg-indigo-50/40 border-indigo-200 hover:border-indigo-400'
