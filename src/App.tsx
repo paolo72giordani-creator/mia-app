@@ -284,30 +284,31 @@ export default function App() {
         />
       ) : (
         <div className="max-w-6xl mx-auto">
-          {/* HEADER DASHBOARD */}
-          <div className="bg-white p-4 rounded-xl border shadow-sm mb-6 flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/20">
-                D
-              </div>
-              <div>
-                <h1 className="text-lg font-extrabold text-slate-900 leading-tight">
-                  Doceo <span className="text-blue-600">Kanban</span>
-                </h1>
-                <p className="text-[11px] text-slate-500 font-medium">
-                  Utente: {session.user.email}
-                </p>
-              </div>
-            </div>
+{/* HEADER DASHBOARD */}
+<div className="bg-white p-4 rounded-xl border shadow-sm mb-6 flex justify-between items-center">
+  <div className="flex items-center gap-3">
+    {/* LOGO AGGIORNATO DK */}
+    <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-base shadow-md shadow-blue-500/20 tracking-tighter">
+      DK
+    </div>
+    <div>
+      <h1 className="text-lg font-extrabold text-slate-900 leading-tight">
+        Doceo <span className="text-blue-600">Kanban</span>
+      </h1>
+      <p className="text-[11px] text-slate-500 font-medium">
+        Utente: {session.user.email}
+      </p>
+    </div>
+  </div>
 
-            <button
-              onClick={handleLogout}
-              className="bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
-              title="Disconnetti account"
-            >
-              <span>🚪</span> Esci
-            </button>
-          </div>
+  <button
+    onClick={handleLogout}
+    className="bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
+    title="Disconnetti account"
+  >
+    <span>🚪</span> Esci
+  </button>
+</div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {/* CARD 1: NUOVA BACHECA QUADRATA */}

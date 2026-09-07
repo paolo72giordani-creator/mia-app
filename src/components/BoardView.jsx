@@ -248,51 +248,62 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
   return (
     <div>
-      {/* BARRA SUPERIORE CON ESCI E PULSANTE BACK PULITO */}
-      <div className="flex justify-between items-center mb-5 bg-white p-3 rounded-xl border shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-sm shadow-sm">
-            D
-          </div>
-          <button 
-            onClick={onBack} 
-            className="text-slate-600 hover:text-blue-600 hover:bg-slate-100 p-1.5 rounded-lg transition font-bold text-base flex items-center justify-center"
-            title="Torna alle bacheche"
-          >
-            ←
-          </button>
-          <h2 className="font-bold text-base text-slate-800 flex items-center gap-2">
-            {activeBoard?.title}
-            <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border">
-              Proprietario: {activeBoard?.ownerEmail}
-            </span>
-            {isViewer && (
-              <span className="text-xs bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-300 font-semibold">
-                👁️ Sola Lettura
-              </span>
-            )}
-          </h2>
-        </div>
+      {/* BARRA SUPERIORE UNIFORMATA */}
+<div className="flex justify-between items-center mb-5 bg-white p-4 rounded-xl border shadow-sm">
+  <div className="flex items-center gap-4">
+    {/* LOGO DK */}
+    <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-base shadow-md shadow-blue-500/20 tracking-tighter flex-shrink-0">
+      DK
+    </div>
 
-        {/* PULSANTI CONDIVIDI ED ESCI */}
-        <div className="flex items-center gap-2">
-          {activeBoard?.isOwner && (
-            <button
-              onClick={onOpenShare}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-medium text-xs shadow-sm transition"
-            >
-              Condividi
-            </button>
-          )}
-          <button
-            onClick={onLogout}
-            className="bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
-            title="Disconnetti account"
-          >
-            <span>🚪</span> Esci
-          </button>
-        </div>
+    <div>
+      <div className="flex items-center gap-2">
+        <h1 className="text-lg font-extrabold text-slate-900 leading-tight">
+          {activeBoard?.title}
+        </h1>
+        {isViewer && (
+          <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-300 font-bold">
+            👁️ Sola Lettura
+          </span>
+        )}
       </div>
+
+      {/* SOTTO-TESTO: PROPRIETARIO SE CONDIVISA, ALTRIMENTI UTENTE CORRENTE */}
+      <p className="text-[11px] text-slate-500 font-medium">
+        {!activeBoard?.isOwner
+          ? `Proprietario: ${activeBoard?.ownerEmail}`
+          : `Utente: ${currentUser?.email}`}
+      </p>
+    </div>
+  </div>
+
+  {/* PULSANTI DI AZIONE: DASHBOARD EVIDENTE, CONDIVIDI ED ESCI */}
+  <div className="flex items-center gap-2">
+    <button
+      onClick={onBack}
+      className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3.5 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 shadow-sm"
+    >
+      <span>←</span> Dashboard
+    </button>
+
+    {activeBoard?.isOwner && (
+      <button
+        onClick={onOpenShare}
+        className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-bold text-xs shadow-sm transition"
+      >
+        Condividi
+      </button>
+    )}
+
+    <button
+      onClick={onLogout}
+      className="bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
+      title="Disconnetti account"
+    >
+      <span>🚪</span> Esci
+    </button>
+  </div>
+</div>
 
       {/* AREA COLONNE KANBAN */}
       <div className="flex gap-4 overflow-x-auto pb-6 items-start">
