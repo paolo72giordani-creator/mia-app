@@ -69,7 +69,7 @@ const TEACHING_TEMPLATES = [
     description: 'Valutazione di testi scritti, temi e analisi del testo.',
     columns: [
       { name: 'Aderenza alla traccia & Contenuto', color: 'bg-blue-600' },
-      { name: 'Correttezza Ortopassaggio & Grammatica', color: 'bg-rose-600' },
+      { name: 'Correttezza grammaticale', color: 'bg-rose-600' },
       { name: 'Sintassi & Lessico', color: 'bg-amber-600' },
       { name: 'Coerenza & Struttura', color: 'bg-emerald-600' }
     ]
