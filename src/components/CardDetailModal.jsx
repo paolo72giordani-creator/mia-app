@@ -78,15 +78,17 @@ export default function CardDetailModal({
           const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
           const filePath = `${currentCardId}/${fileName}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from('attachments')
-            .upload(filePath, fileObj.file);
+          // Upload del file su 'card-attachments'
+const { error: uploadError } = await supabase.storage
+  .from('card-attachments') // <--- CAMBIATO QUI
+  .upload(filePath, fileObj.file);
 
-          if (uploadError) throw uploadError;
+if (uploadError) throw uploadError;
 
-          const { data: urlData } = supabase.storage
-            .from('attachments')
-            .getPublicUrl(filePath);
+// Recupero URL pubblico da 'card-attachments'
+const { data: urlData } = supabase.storage
+  .from('card-attachments') // <--- CAMBIATO QUI
+  .getPublicUrl(filePath);
 
           await supabase.from('attachments').insert([
             {
