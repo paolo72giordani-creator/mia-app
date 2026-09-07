@@ -374,6 +374,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           </div>
         </div>
 
+{/* GRUPPO PULSANTI ALLINEATI A DESTRA */}
         <div className="flex items-center gap-2">
           <button
             onClick={onBack}
@@ -392,6 +393,14 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           )}
 
           <button
+            onClick={() => exportBoardToWord(activeBoard.title, columns, cards)}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3.5 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 shadow-sm"
+            title="Scarica bacheca in formato Word"
+          >
+            <span>📝</span> Esporta in Word
+          </button>
+
+          <button
             onClick={onLogout}
             className="bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 hover:border-red-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
             title="Disconnetti account"
@@ -400,43 +409,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           </button>
         </div>
 		
-		{/* PULSANTE ESPORTA / STAMPA */}
-<div className="relative no-print">
-  <button
-    onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
-    className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3.5 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 shadow-sm"
-  >
-    <span>🖨️</span> Esporta / Stampa
-  </button>
-
-  {isExportMenuOpen && (
-    <div 
-      onClick={(e) => e.stopPropagation()}
-      className="absolute right-0 top-9 bg-white border border-slate-200 rounded-xl p-1 shadow-2xl z-40 w-44 text-xs text-slate-800"
-    >
-      <button
-        onClick={() => {
-          setIsExportMenuOpen(false);
-          window.print(); // Stampa nativa o Salvataggio in PDF
-        }}
-        className="w-full text-left px-3 py-2 hover:bg-slate-100 rounded-lg font-medium flex items-center gap-2"
-      >
-        📄 Stampa o Salva PDF
-      </button>
-
-      <button
-        onClick={() => {
-          setIsExportMenuOpen(false);
-          exportBoardToWord(activeBoard.title, columns, cards);
-        }}
-        className="w-full text-left px-3 py-2 hover:bg-slate-100 rounded-lg font-medium flex items-center gap-2 border-t border-slate-100"
-      >
-        📝 Esporta per Word (.doc)
-      </button>
-    </div>
-  )}
-</div>
-
+		
       </div>
 
       {/* AREA COLONNE KANBAN */}
