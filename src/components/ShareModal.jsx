@@ -71,12 +71,15 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
           'Content-Type': 'application/json',
           'api-key': brevoApiKey
         },
-        body: JSON.stringify({
-          sender: { name: 'Doceo Kanban', email: 'paolo72.giordani@gmail.com' },
-          to: [{ email: targetEmail }],
-          subject: subject,
-          htmlContent: htmlContent
-        })
+        // Sostituisci la sezione del body della fetch con questa:
+body: JSON.stringify({
+  // IMPORTANTE: 'email' deve essere l'email con cui sei registrato su Brevo (o un mittente verificato su Brevo)
+  sender: { name: 'Doceo Kanban', email: 'tua_email_registrata_su_brevo@gmail.com' },
+  replyTo: { email: currentUserEmail },
+  to: [{ email: targetEmail }],
+  subject: subject,
+  htmlContent: htmlContent
+})
       });
     } catch (err) {
       console.error('Errore durante l\'invio email con Brevo:', err);
