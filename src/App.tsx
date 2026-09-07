@@ -15,7 +15,6 @@ const PASTEL_PALETTE = [
   { label: 'Indaco', value: 'bg-indigo-50/80 border-indigo-100 hover:border-indigo-200' }
 ];
 
-// Emoji disponibili per personalizzare le bacheche
 const AVAILABLE_ICONS = ['📄', '📘', '📚', '🏫', '👥', '💡', '🎨', '🧠', '🔬', '🌍', '📐', '🎯'];
 
 export default function App() {
@@ -25,17 +24,18 @@ export default function App() {
   const [isCreatingBoard, setIsCreatingBoard] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
-  // Auth form state
+  // Landing Page & Auth Modal State
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
 
-  // Menu contestuale 3 pallini & Rinomina / Popovers
+  // Menu contestuale 3 pallini & Personalizzazione
   const [openMenuBoardId, setOpenMenuBoardId] = useState(null);
   const [editingBoardId, setEditingBoardId] = useState(null);
   const [editingBoardTitle, setEditingBoardTitle] = useState('');
-  const [activePicker, setActivePicker] = useState(null); // { boardId, type: 'icon' | 'color' }
+  const [activePicker, setActivePicker] = useState(null);
 
   // Drag & drop bacheche
   const [draggedBoardIndex, setDraggedBoardIndex] = useState(null);
@@ -76,6 +76,7 @@ export default function App() {
         });
         if (error) throw error;
       }
+      setIsAuthModalOpen(false);
     } catch (err) {
       alert('Errore autenticazione: ' + err.message);
     } finally {
@@ -310,66 +311,166 @@ export default function App() {
   const myBoards = boards.filter((b) => b.isOwner);
   const sharedBoards = boards.filter((b) => !b.isOwner);
 
+  // LANDING PAGE PER UTENTI NON AUTENTICATI
   if (!session) {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 text-xs">
-        <div className="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 shadow-xl">
-          <div className="flex items-center gap-3 mb-6 justify-center">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-md shadow-blue-500/20">
+      <div className="min-h-screen bg-[#fcfcfd] text-slate-900 font-sans flex flex-col justify-between">
+        {/* NAVBAR LANDING */}
+        <header className="max-w-6xl w-full mx-auto p-6 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/20">
               DK
             </div>
-            <h1 className="text-xl font-black text-slate-900">
+            <span className="text-xl font-black tracking-tight">
               Doceo <span className="text-blue-600">Kanban</span>
-            </h1>
+            </span>
           </div>
 
-          <form onSubmit={handleAuth} className="space-y-3">
-            <div>
-              <label className="block text-slate-600 font-semibold mb-1">Email</label>
-              <input
-                type="email"
-                required
-                value={authEmail}
-                onChange={(e) => setAuthEmail(e.target.value)}
-                placeholder="nome@esempio.com"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-slate-600 font-semibold mb-1">Password</label>
-              <input
-                type="password"
-                required
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
+          <div className="flex items-center gap-3">
             <button
-              type="submit"
-              disabled={authLoading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition shadow-sm mt-2"
+              onClick={() => {
+                setIsSignUp(false);
+                setIsAuthModalOpen(true);
+              }}
+              className="text-xs font-bold text-slate-700 hover:text-blue-600 px-4 py-2 transition"
             >
-              {authLoading ? 'Elaborazione...' : isSignUp ? 'Registrati' : 'Accedi'}
+              Accedi
             </button>
-          </form>
-
-          <div className="mt-4 text-center pt-3 border-t">
             <button
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-blue-600 hover:underline font-semibold text-xs"
+              onClick={() => {
+                setIsSignUp(true);
+                setIsAuthModalOpen(true);
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition shadow-md shadow-blue-500/20"
             >
-              {isSignUp ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati'}
+              Inizia Gratis
             </button>
           </div>
-        </div>
+        </header>
+
+        {/* HERO SECTION */}
+        <main className="max-w-5xl mx-auto px-6 py-12 text-center flex-1 flex flex-col items-center justify-center">
+          <span className="bg-blue-50 text-blue-700 border border-blue-100 font-extrabold text-[11px] px-3.5 py-1.5 rounded-full mb-6 inline-flex items-center gap-1.5">
+            ✨ La piattaforma didattica per organizzare bacheche e lezioni
+          </span>
+
+          <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-slate-900 max-w-3xl leading-tight mb-6">
+            Pianifica, collabora e condividi la tua didattica in <span className="text-blue-600">stile NotebookLM</span>
+          </h1>
+
+          <p className="text-base sm:text-lg text-slate-600 max-w-2xl mb-8 leading-relaxed font-medium">
+            Doceo Kanban trasforma la gestione delle tue lezioni, consigli di classe e progetti di gruppo in un’esperienza visiva pulita, moderna e in tempo reale.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 w-full max-w-xs sm:max-w-none">
+            <button
+              onClick={() => {
+                setIsSignUp(true);
+                setIsAuthModalOpen(true);
+              }}
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm px-8 py-3.5 rounded-2xl transition shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2"
+            >
+              Crea la tua bacheca 🚀
+            </button>
+          </div>
+
+          {/* ANTEPRIMA MOCKUP CARDS PASTEL */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 w-full max-w-4xl text-left">
+            <div className="bg-emerald-50/90 border border-emerald-100 rounded-2xl p-5 shadow-sm">
+              <div className="text-3xl mb-3">📚</div>
+              <h3 className="font-extrabold text-base mb-1">Unità Didattica</h3>
+              <p className="text-xs text-slate-600 font-medium">Organizza gli argomenti, le verifiche e i materiali didattici della settimana.</p>
+            </div>
+
+            <div className="bg-sky-50/90 border border-sky-100 rounded-2xl p-5 shadow-sm">
+              <div className="text-3xl mb-3">👥</div>
+              <h3 className="font-extrabold text-base mb-1">Lavoro di Gruppo</h3>
+              <p className="text-xs text-slate-600 font-medium">Assegna compiti e monitora l'avanzamento degli studenti in tempo reale.</p>
+            </div>
+
+            <div className="bg-amber-50/90 border border-amber-100 rounded-2xl p-5 shadow-sm">
+              <div className="text-3xl mb-3">🏫</div>
+              <h3 className="font-extrabold text-base mb-1">Consiglio di Classe</h3>
+              <p className="text-xs text-slate-600 font-medium">Condividi note, verbali e programmazioni con i colleghi del plesso.</p>
+            </div>
+          </div>
+        </main>
+
+        {/* FOOTER */}
+        <footer className="text-center py-6 text-xs text-slate-400 font-medium border-t border-slate-100">
+          Doceo Kanban © {new Date().getFullYear()} — La piattaforma Kanban per la scuola moderna
+        </footer>
+
+        {/* MODAL AUTH (LOGIN / REGISTRAZIONE) */}
+        {isAuthModalOpen && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 shadow-2xl relative">
+              <button
+                onClick={() => setIsAuthModalOpen(false)}
+                className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 font-bold"
+              >
+                ✕
+              </button>
+
+              <div className="flex items-center gap-3 mb-6 justify-center">
+                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-xl shadow-md shadow-blue-500/20">
+                  DK
+                </div>
+                <h2 className="text-xl font-black text-slate-900">
+                  {isSignUp ? 'Registrati' : 'Accedi'}
+                </h2>
+              </div>
+
+              <form onSubmit={handleAuth} className="space-y-3">
+                <div>
+                  <label className="block text-slate-600 font-bold text-xs mb-1">Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    placeholder="nome@scuola.it"
+                    className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-600 font-bold text-xs mb-1">Password</label>
+                  <input
+                    type="password"
+                    required
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl transition shadow-md shadow-blue-500/20 text-xs mt-2"
+                >
+                  {authLoading ? 'Elaborazione...' : isSignUp ? 'Crea Account' : 'Accedi'}
+                </button>
+              </form>
+
+              <div className="mt-4 text-center pt-3 border-t border-slate-100">
+                <button
+                  onClick={() => setIsSignUp(!isSignUp)}
+                  className="text-blue-600 hover:underline font-bold text-xs"
+                >
+                  {isSignUp ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
+  // DASHBOARD PER UTENTI LOGGATI
   return (
     <div 
       className="min-h-screen bg-[#fcfcfd] p-6 text-slate-800" 
@@ -441,13 +542,11 @@ export default function App() {
               </div>
 
               {/* LISTA BACHECHE PERSONALI */}
-              {myBoards.map((board, index) => {
+              {myBoards.map((board) => {
                 const globalIndex = boards.findIndex((b) => b.id === board.id);
                 const isBeingDragged = draggedBoardIndex === globalIndex;
                 const isEditingThisBoard = editingBoardId === board.id;
                 const isMenuOpen = openMenuBoardId === board.id;
-                
-                // Usa il colore personalizzato salvato oppure quello predefinito della palette
                 const pastelStyle = board.color || PASTEL_PALETTE[globalIndex % PASTEL_PALETTE.length].value;
 
                 return (
@@ -464,7 +563,6 @@ export default function App() {
                       isBeingDragged ? 'opacity-30 border-2 border-dashed border-blue-500 scale-95' : ''
                     }`}
                   >
-                    {/* ICONA E MENU 3 PALLINI */}
                     <div className="flex justify-between items-start gap-1">
                       <div className="text-2xl">{board.icon || '📄'}</div>
 
@@ -481,7 +579,6 @@ export default function App() {
                           ⋮
                         </button>
 
-                        {/* MENU CONTESTUALE */}
                         {isMenuOpen && (
                           <div
                             onClick={(e) => e.stopPropagation()}
@@ -521,7 +618,6 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* PICKER ICONE */}
                         {activePicker?.boardId === board.id && activePicker.type === 'icon' && (
                           <div 
                             onClick={(e) => e.stopPropagation()}
@@ -539,7 +635,6 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* PICKER COLORI PASTELLO */}
                         {activePicker?.boardId === board.id && activePicker.type === 'color' && (
                           <div 
                             onClick={(e) => e.stopPropagation()}
@@ -558,7 +653,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* TITOLO ED EDITING */}
                     <div className="my-auto">
                       {!isEditingThisBoard ? (
                         <h3 className="font-bold text-base text-slate-900 leading-snug line-clamp-2">
@@ -578,7 +672,6 @@ export default function App() {
                       )}
                     </div>
 
-                    {/* METADATI */}
                     <div className="text-[11px] text-slate-500 font-medium truncate pt-2 border-t border-black/5 flex items-center justify-between">
                       <span className="truncate">Personale</span>
                     </div>
@@ -614,7 +707,6 @@ export default function App() {
                       }}
                       className={`aspect-[4/3] border-2 border-indigo-200/80 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer relative flex flex-col justify-between ${pastelStyle}`}
                     >
-                      {/* ICONA E BADGE PROPRIETARIO */}
                       <div className="flex justify-between items-start gap-1">
                         <div className="text-2xl">{board.icon || '📚'}</div>
                         <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-full font-bold shadow-sm">
@@ -622,14 +714,12 @@ export default function App() {
                         </span>
                       </div>
 
-                      {/* TITOLO */}
                       <div className="my-auto">
                         <h3 className="font-bold text-base text-slate-900 leading-snug line-clamp-2">
                           {board.title}
                         </h3>
                       </div>
 
-                      {/* METADATI CONDIVISIONE */}
                       <div className="text-[11px] text-indigo-950 font-semibold truncate pt-2 border-t border-indigo-200/60 flex items-center gap-1.5">
                         <span className="text-xs">🔗</span>
                         <span className="truncate">
