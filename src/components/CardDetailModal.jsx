@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-
-
 
 export default function CardDetailModal({
   card,
   columnId,
-  currentUser, // <--- Ricevuto qui
+  currentUser,
   isViewer,
   onClose,
   onSaveCard,
@@ -18,20 +16,22 @@ export default function CardDetailModal({
   const [attachments, setAttachments] = useState(card?.attachments || []);
   const [pendingFiles, setPendingFiles] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
-  
-  // Recupera gli allegati dal database all'apertura del modal
+
+  // Recupera gli allegati SOLO se la scheda esiste già (non è nuova)
   useEffect(() => {
-    if (card?.id) {
-      fetchAttachments();
+    if (card && card.id) {
+      fetchAttachments(card.id);
+    } else {
+      setAttachments([]);
     }
   }, [card]);
 
-  const fetchAttachments = async () => {
+  const fetchAttachments = async (cardId) => {
     try {
       const { data, error } = await supabase
         .from('attachments')
         .select('*')
-        .eq('card_id', card.id);
+        .eq('card_id', String(cardId));
 
       if (!error && data) {
         setAttachments(data);
@@ -70,7 +70,7 @@ export default function CardDetailModal({
 
     setIsSaving(true);
     try {
-      // Recupera l'ID dell'utente loggato
+      // 1. Recupera ID utente in modo sicuro
       const { data: authData } = await supabase.auth.getUser();
       const userId = authData?.user?.id || currentUser?.id;
 
@@ -78,7 +78,7 @@ export default function CardDetailModal({
 
       const cardPayload = {
         id: currentCardId,
-        user_id: userId, // <--- INCLUSO USER_ID PER IL CONSTRAINT NOT-NULL
+        user_id: userId,
         column_id: String(columnId),
         title: title.trim(),
         description: description.trim(),
@@ -93,24 +93,22 @@ export default function CardDetailModal({
 
       if (cardError) throw cardError;
 
-      // Caricamento allegati in sospeso su Storage
+      // 2. Carica gli allegati sul bucket 'card-attachments'
       if (pendingFiles && pendingFiles.length > 0) {
         for (const fileObj of pendingFiles) {
           const fileExt = fileObj.file.name.split('.').pop();
           const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
           const filePath = `${currentCardId}/${fileName}`;
 
-          // Upload del file su 'card-attachments'
-const { error: uploadError } = await supabase.storage
-  .from('card-attachments') // <--- CAMBIATO QUI
-  .upload(filePath, fileObj.file);
+          const { error: uploadError } = await supabase.storage
+            .from('card-attachments')
+            .upload(filePath, fileObj.file);
 
-if (uploadError) throw uploadError;
+          if (uploadError) throw uploadError;
 
-// Recupero URL pubblico da 'card-attachments'
-const { data: urlData } = supabase.storage
-  .from('card-attachments') // <--- CAMBIATO QUI
-  .getPublicUrl(filePath);
+          const { data: urlData } = supabase.storage
+            .from('card-attachments')
+            .getPublicUrl(filePath);
 
           await supabase.from('attachments').insert([
             {
@@ -160,7 +158,7 @@ const { data: urlData } = supabase.storage
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Es. Verifica scritta di Storia"
-              className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-blue-500 font-medium"
+              className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-blue-500 font-medium text-slate-800"
             />
           </div>
 
@@ -174,7 +172,7 @@ const { data: urlData } = supabase.storage
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Aggiungi dettagli, istruzioni o appunti..."
-              className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-blue-500 font-medium resize-none"
+              className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-blue-500 font-medium resize-none text-slate-800"
             />
           </div>
 
@@ -184,8 +182,8 @@ const { data: urlData } = supabase.storage
               Allegati
             </label>
 
-            {/* Lista allegati salvati */}
-            {attachments.length > 0 && (
+            {/* Liste allegati salvati */}
+            {attachments && attachments.length > 0 && (
               <div className="space-y-1.5 mb-2">
                 {attachments.map((att) => (
                   <div
@@ -215,7 +213,7 @@ const { data: urlData } = supabase.storage
             )}
 
             {/* Lista file in attesa di caricamento */}
-            {pendingFiles.length > 0 && (
+            {pendingFiles && pendingFiles.length > 0 && (
               <div className="space-y-1.5 mb-2">
                 {pendingFiles.map((pf) => (
                   <div
@@ -240,7 +238,7 @@ const { data: urlData } = supabase.storage
               </div>
             )}
 
-            {/* Pulsante aggiungi file */}
+            {/* Pulsante caricamento file */}
             {!isViewer && (
               <label className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-xs px-3 py-1.5 rounded-xl cursor-pointer transition mt-1">
                 <span>+ Carica File</span>
