@@ -60,16 +60,54 @@ const TEACHING_TEMPLATES = [
       { name: 'Approvato / Concluso', color: 'bg-emerald-600' }
     ]
   },
+
+  /* TEMPLATE SPECIFICI PER GRIGLIE DI VALUTAZIONE */
   {
-    id: 'evaluation',
-    name: 'Verifiche & Valutazione',
-    icon: '🎯',
-    description: 'Traccia la preparazione delle verifiche, le correzioni e i recuperi.',
+    id: 'rubric_italiano',
+    name: 'Griglia Valutazione: Italiano (Produzione/Comprende)',
+    icon: '✍️',
+    description: 'Valutazione di testi scritti, temi e analisi del testo.',
     columns: [
-      { name: 'Da Preparare / Stampare', color: 'bg-rose-600' },
-      { name: 'Somministrate / Da Correggere', color: 'bg-amber-600' },
-      { name: 'Voti Registrati', color: 'bg-blue-600' },
-      { name: 'Attività di Recupero', color: 'bg-purple-600' }
+      { name: 'Aderenza alla traccia & Contenuto', color: 'bg-blue-600' },
+      { name: 'Correttezza Ortopassaggio & Grammatica', color: 'bg-rose-600' },
+      { name: 'Sintassi & Lessico', color: 'bg-amber-600' },
+      { name: 'Coerenza & Struttura', color: 'bg-emerald-600' }
+    ]
+  },
+  {
+    id: 'rubric_matematica',
+    name: 'Griglia Valutazione: Matematica / STEM',
+    icon: '📐',
+    description: 'Correzione e valutazione di problemi, equazioni e prove pratiche.',
+    columns: [
+      { name: 'Comprensione del problema', color: 'bg-sky-600' },
+      { name: 'Applicazione di formule/procedimenti', color: 'bg-indigo-600' },
+      { name: 'Accuratezza dei calcoli', color: 'bg-amber-600' },
+      { name: 'Argomentazione & Rappresentazione', color: 'bg-emerald-600' }
+    ]
+  },
+  {
+    id: 'rubric_lingue',
+    name: 'Griglia Valutazione: Lingue Straniere',
+    icon: '🌍',
+    description: 'Criteri per prove scritte e orali secondo il quadro QCER.',
+    columns: [
+      { name: 'Fluency & Pronuncia', color: 'bg-teal-600' },
+      { name: 'Vocabolario & Registro', color: 'bg-blue-600' },
+      { name: 'Grammatica & Struttura', color: 'bg-purple-600' },
+      { name: 'Comprensione & Interazione', color: 'bg-emerald-600' }
+    ]
+  },
+  {
+    id: 'rubric_umanistiche',
+    name: 'Griglia Valutazione: Storia & Filosofia / Umanistiche',
+    icon: '🏛️',
+    description: 'Valutazione dell argomentazione storica, concettuale e delle fonti.',
+    columns: [
+      { name: 'Conoscenza dei fatti/concetti', color: 'bg-slate-600' },
+      { name: 'Uso del lessico specifico', color: 'bg-indigo-600' },
+      { name: 'Capacità di sintesi & Contestualizzazione', color: 'bg-amber-600' },
+      { name: 'Rielaborazione critica', color: 'bg-emerald-600' }
     ]
   }
 ];
@@ -108,7 +146,7 @@ export default function CreateBoardModal({ onClose, onCreate }) {
             <input
               type="text"
               required
-              placeholder="Es. Storia 3A - Risorgimento italiano"
+              placeholder="Es. Griglia Temi 3A / Verifica Algebra"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:border-blue-500 font-medium"
@@ -118,7 +156,7 @@ export default function CreateBoardModal({ onClose, onCreate }) {
           {/* SELEZIONE TEMPLATES */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-2">
-              Scegli un modello didattico
+              Scegli un modello didattico o una griglia
             </label>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-1">
