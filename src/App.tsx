@@ -151,17 +151,21 @@ export default function App() {
     try {
       const boardId = `board-${Date.now()}`;
       const userEmail = session.user.email;
+      const boardIcon = template.icon || '📘';
 
+      // 1. Inserisce la bacheca nel database includendo l'icona del template
       const { error: boardErr } = await supabase.from('boards').insert([
         {
           id: boardId,
           user_id: session.user.id,
           title: title,
+          icon: boardIcon,
           position: boards.length
         }
       ]);
       if (boardErr) throw boardErr;
 
+      // 2. Se il template include colonne, le crea automaticamente
       if (template.columns && template.columns.length > 0) {
         const columnsToInsert = template.columns.map((col, idx) => ({
           id: `col-${Date.now()}-${idx}`,
@@ -179,7 +183,7 @@ export default function App() {
         id: boardId,
         user_id: session.user.id,
         title: title,
-        icon: template.icon,
+        icon: boardIcon,
         isOwner: true,
         role: 'owner',
         ownerEmail: userEmail,
@@ -398,7 +402,8 @@ export default function App() {
               const pastelStyle = PASTEL_BG_CLASSES[index % PASTEL_BG_CLASSES.length];
 
               // Icona del template o predefinita
-              const boardIcon = board.icon || (board.isOwner ? '📘' : '📚');
+              // Icona salvata nel database oppure fallback
+const boardIcon = board.icon || (board.isOwner ? '📘' : '👥');
 
               return (
                 <div
