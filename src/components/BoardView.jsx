@@ -205,6 +205,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
+  // --- GESTIONE DRAG & DROP SCHEDE ---
   const handleCardDragStart = (e, card) => {
     if (isViewer) return;
     e.stopPropagation();
@@ -218,6 +219,13 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     e.stopPropagation();
     setDragOverCardColId(targetCard.column_id);
     setDragOverCardId(targetCard.id);
+  };
+
+  const handleCardDragEnd = () => {
+    // Reset di sicurezza se la scheda viene rilasciata fuori area valida
+    setDraggedCard(null);
+    setDragOverCardColId(null);
+    setDragOverCardId(null);
   };
 
   const handleCardDrop = async (e, targetColumnId) => {
@@ -256,6 +264,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
+  // --- GESTIONE DRAG & DROP COLONNE ---
   const handleColDragStart = (e, index) => {
     if (isViewer) return;
     setDraggedColIndex(index);
@@ -292,7 +301,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   };
 
   return (
-    <div>
+    <div onDragOver={(e) => e.preventDefault()} onDrop={handleCardDragEnd}>
       {/* BARRA SUPERIORE */}
       <div className="flex justify-between items-center mb-5 bg-white p-4 rounded-xl border shadow-sm">
         <div className="flex items-center gap-4">
@@ -417,7 +426,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                   : ''
               }`}
             >
-              {/* 1. HEADER COLONNA: PULITO E SPAZIOSO */}
+              {/* HEADER COLONNA */}
               <div className={`p-3 flex justify-between items-center text-white ${colBgColor} ${!isViewer && !isEditingThisCol ? 'cursor-grab active:cursor-grabbing' : ''}`}>
                 {!isEditingThisCol ? (
                   <h3 className="font-bold text-base flex items-center gap-1.5 flex-1 pr-2">
@@ -452,7 +461,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                 </span>
               </div>
 
-              {/* 2. BARRA AZIONI SOTTO IL TITOLO DELLA COLONNA */}
+              {/* BARRA STRUMENTI SOTTO L'HEADER */}
               {!isViewer && (
                 <div className="bg-slate-100/90 border-b border-slate-300/70 px-3 py-1 flex items-center justify-end gap-1 relative">
                   <button
@@ -484,7 +493,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                     🗑️
                   </button>
 
-                  {/* POPUP SELETTORE COLORE SOTTO LA BARRA STRUMENTI */}
                   {isPickerOpen && (
                     <div className="absolute right-2 top-8 bg-white border border-slate-200 rounded-xl p-2 shadow-xl z-30 flex gap-1.5">
                       {availableColors.map((c) => (
@@ -504,7 +512,15 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
               )}
 
               {/* SCHEDE DELLA COLONNA */}
-              <div className="p-2.5 min-h-[100px]">
+              <div 
+                className="p-2.5 min-h-[120px]"
+                onDragOver={(e) => {
+                  if (draggedCard) {
+                    e.preventDefault();
+                    setDragOverCardColId(col.id);
+                  }
+                }}
+              >
                 <div className="space-y-2.5 mb-2">
                   {colCards.map((card) => {
                     const cardDetails = card.description || card.details;
@@ -523,6 +539,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                           draggable={!isViewer}
                           onDragStart={(e) => handleCardDragStart(e, card)}
                           onDragOver={(e) => handleCardDragOverCard(e, card)}
+                          onDragEnd={handleCardDragEnd}
                           onClick={() => {
                             setModalCard(card);
                             setModalColId(col.id);
@@ -564,25 +581,33 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                     );
                   })}
 
-                  {isTargetCardCol && draggedCard && !dragOverCardId && (
-                    <div className="border-2 border-dashed border-blue-500 bg-blue-50/90 rounded-lg p-3 text-center text-blue-700 text-xs font-bold shadow-inner">
+                  {/* ANTEPRIMA IN FONDO ALLA COLONNA */}
+                  {isTargetCardCol && draggedCard && (!dragOverCardId || dragOverCardColId === col.id) && (
+                    <div 
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOverCardColId(col.id);
+                        setDragOverCardId(null);
+                      }}
+                      className="border-2 border-dashed border-blue-500 bg-blue-50/90 rounded-lg p-3 text-center text-blue-700 text-xs font-bold shadow-inner my-1"
+                    >
                       📍 Rilascia qui in fondo
                     </div>
                   )}
                 </div>
 
-                {/* PULSANTE TRATTEGGIATO IN FONDO CON SFONDO GRIGIO PIÙ SCURO */}
-{!isViewer && (
-  <button
-    onClick={() => {
-      setModalCard(null);
-      setModalColId(col.id);
-    }}
-    className="w-full py-2 px-3 rounded-lg border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-blue-700 font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm mt-2"
-  >
-    <span>+</span> Aggiungi scheda
-  </button>
-)}
+                {/* PULSANTE TRATTEGGIATO IN FONDO */}
+                {!isViewer && (
+                  <button
+                    onClick={() => {
+                      setModalCard(null);
+                      setModalColId(col.id);
+                    }}
+                    className="w-full py-2 px-3 rounded-lg border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-blue-700 font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm mt-2"
+                  >
+                    <span>+</span> Aggiungi scheda
+                  </button>
+                )}
               </div>
             </div>
           );
