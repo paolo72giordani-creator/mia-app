@@ -78,10 +78,10 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
       if (cols && cols.length > 0) {
         const colIds = cols.map((c) => String(c.id));
         const { data: crds, error: cardErr } = await supabase
-          .from('cards')
-          .select('*, attachments(*)')
-          .in('column_id', colIds)
-          .order('position', { ascending: true });
+    .from('cards')
+    .select('*, attachments(*)')
+    .in('column_id', colIds)
+    .order('position', { ascending: true });
 
         if (cardErr) throw cardErr;
         setCards(crds || []);
@@ -189,14 +189,9 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  const handleSaveCardFromModal = (savedCard, isNew) => {
-    setCards((prev) => {
-      const exists = prev.some((c) => String(c.id) === String(savedCard.id));
-      if (exists) {
-        return prev.map((c) => (String(c.id) === String(savedCard.id) ? { ...c, ...savedCard } : c));
-      }
-      return [...prev, savedCard];
-    });
+const handleSaveCardFromModal = (savedCard, isNew) => {
+    // Ricarica i dati della bacheca per mostrare subito gli allegati salvati
+    fetchBoardData();
   };
 
   const handleDeleteCard = async (cardId, e) => {

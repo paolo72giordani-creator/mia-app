@@ -18,6 +18,28 @@ export default function CardDetailModal({
   const [attachments, setAttachments] = useState(card?.attachments || []);
   const [pendingFiles, setPendingFiles] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Recupera gli allegati dal database all'apertura del modal
+  useEffect(() => {
+    if (card?.id) {
+      fetchAttachments();
+    }
+  }, [card]);
+
+  const fetchAttachments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('attachments')
+        .select('*')
+        .eq('card_id', card.id);
+
+      if (!error && data) {
+        setAttachments(data);
+      }
+    } catch (err) {
+      console.error('Errore recupero allegati:', err);
+    }
+  };
 
   const handleFileChange = (e) => {
     if (!e.target.files || e.target.files.length === 0) return;
