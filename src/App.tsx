@@ -205,12 +205,16 @@ export default function App() {
               )}
             </div>
 
-            {/* CARD BACHECHE SALVATE CON TITOLO PIÙ GRANDE */}
+            {/* CARD BACHECHE SALVATE */}
             {boards.map((board) => (
               <div
                 key={board.id}
                 onClick={() => setActiveBoard(board)}
-                className="aspect-square bg-white border rounded-xl p-4 shadow-sm hover:shadow-md transition cursor-pointer relative flex flex-col justify-between"
+                className={`aspect-square border rounded-xl p-4 shadow-sm hover:shadow-md transition cursor-pointer relative flex flex-col justify-between ${
+                  board.isOwner
+                    ? 'bg-white border-slate-200 hover:border-blue-400'
+                    : 'bg-indigo-50/40 border-indigo-200 hover:border-indigo-400'
+                }`}
               >
                 <div className="flex justify-between items-start gap-1">
                   <h3 className="font-extrabold text-lg text-slate-900 leading-snug line-clamp-3">
@@ -232,18 +236,17 @@ export default function App() {
                     Proprietario: {board.ownerEmail}
                   </p>
                   <span
-                    className={`inline-block text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
-                      board.isOwner ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-800'
+                    className={`inline-block text-[9px] px-2 py-0.5 rounded font-bold uppercase tracking-wider border ${
+                      board.isOwner
+                        ? 'bg-blue-100 text-blue-700 border-blue-200'
+                        : 'bg-purple-100 text-purple-700 border-purple-200'
                     }`}
                   >
-                    {board.isOwner ? 'Proprietario' : board.role}
+                    {board.isOwner ? 'Proprietario' : `Condivisa (${board.role})`}
                   </span>
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      )}
 
       {isShareModalOpen && activeBoard && (
         <ShareModal

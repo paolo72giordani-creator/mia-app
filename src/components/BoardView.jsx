@@ -237,7 +237,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
   return (
     <div>
-      {/* HEADER BACHECA */}
+     {/* BARRA SUPERIORE */}
       <div className="flex justify-between items-center mb-5 bg-white p-3 rounded-xl border shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-sm shadow-sm">
@@ -258,8 +258,13 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
             )}
           </h2>
         </div>
-        {!isViewer && (
-          <button onClick={onOpenShare} className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-medium text-xs shadow-sm">
+
+        {/* MOSTRA IL PULSANTE CONDIVIDI SOLO SE L'UTENTE È IL PROPRIETARIO */}
+        {activeBoard?.isOwner && (
+          <button
+            onClick={onOpenShare}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg font-medium text-xs shadow-sm transition"
+          >
             Condividi
           </button>
         )}
