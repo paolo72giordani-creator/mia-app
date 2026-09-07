@@ -57,12 +57,12 @@ export default function App() {
     if (session) fetchBoards();
   }, [session]);
 
-  const handleAuth = async (e) => {
+const handleAuth = async (e) => {
     e.preventDefault();
     if (!authEmail.trim() || !authPassword.trim()) return;
 
     setAuthLoading(true);
-    setErrorMessage(''); // Reset messaggi di errore precedenti
+    setErrorMessage('');
 
     try {
       if (isSignUp) {
@@ -74,7 +74,7 @@ export default function App() {
         if (error) throw error;
 
         if (data?.user && data?.user?.identities?.length === 0) {
-          setErrorMessage('Questa email risulta già registrata. Effettua l\'accesso dalla scheda "Accedi".');
+          setErrorMessage('Questa email risulta già registrata. Seleziona la scheda "Accedi" in alto per entrare.');
           setIsSignUp(false);
           setAuthLoading(false);
           return;
@@ -90,7 +90,7 @@ export default function App() {
 
         if (error) {
           if (error.message.includes('Invalid login credentials')) {
-            throw new Error('Email o password non corrette. Se non possiedi ancora un account, puoi registrarti dalla scheda "Registrati".');
+            throw new Error('Email o password non corrette. Se non possiedi ancora un account, passa alla scheda "Registrati".');
           }
           throw error;
         }
@@ -472,25 +472,11 @@ export default function App() {
                 </button>
               </div>
 
-              {/* BANNER ERRORE GRAFICO */}
+              {/* BANNER ERRORE GRAFICO PULITO */}
               {errorMessage && (
-                <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-xl mb-4 font-medium leading-relaxed flex items-start gap-2">
+                <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-xl mb-4 font-medium leading-relaxed flex items-center gap-2">
                   <span className="text-base leading-none">⚠️</span>
-                  <div>
-                    <p>{errorMessage}</p>
-                    {!isSignUp && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsSignUp(true);
-                          setErrorMessage('');
-                        }}
-                        className="text-blue-600 underline font-bold mt-1 block"
-                      >
-                        Passa a Registrati →
-                      </button>
-                    )}
-                  </div>
+                  <p className="flex-1">{errorMessage}</p>
                 </div>
               )}
 
