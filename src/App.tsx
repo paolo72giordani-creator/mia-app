@@ -17,6 +17,8 @@ const PASTEL_PALETTE = [
 
 const AVAILABLE_ICONS = ['📄', '📘', '📚', '🏫', '👥', '💡', '🎨', '🧠', '🔬', '🌍', '📐', '🎯'];
 
+const [errorMessage, setErrorMessage] = useState('');
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [boards, setBoards] = useState([]);
@@ -61,6 +63,8 @@ const handleAuth = async (e) => {
     if (!authEmail.trim() || !authPassword.trim()) return;
 
     setAuthLoading(true);
+    setErrorMessage(''); // Reset messaggi di errore precedenti
+
     try {
       if (isSignUp) {
         const { data, error } = await supabase.auth.signUp({
@@ -70,26 +74,33 @@ const handleAuth = async (e) => {
         
         if (error) throw error;
 
-        // Se Supabase restituisce identità vuote, l'utente esiste già
         if (data?.user && data?.user?.identities?.length === 0) {
-          alert('Questa email è già registrata! Passaggio automatico al Login...');
+          setErrorMessage('Questa email risulta già registrata. Effettua l\'accesso dalla scheda "Accedi".');
           setIsSignUp(false);
           setAuthLoading(false);
           return;
         }
 
-        alert('Registrazione completata! Controlla la tua email o effettua il login.');
+        alert('Registrazione completata! Ora puoi effettuare l\'accesso con le tue credenziali.');
         setIsSignUp(false);
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email: authEmail.trim(),
           password: authPassword
         });
-        if (error) throw error;
+
+        if (error) {
+          // Gestione personalizzata dell'errore credenziali
+          if (error.message.includes('Invalid login credentials')) {
+            throw new Error('Email o password non corrette. Se non possiedi ancora un account, puoi registrarti dalla scheda "Registrati".');
+          }
+          throw error;
+        }
+
         setIsAuthModalOpen(false);
       }
     } catch (err) {
-      alert('Errore autenticazione: ' + err.message);
+      setErrorMessage(err.message);
     } finally {
       setAuthLoading(false);
     }
@@ -431,6 +442,28 @@ const handleAuth = async (e) => {
                   {isSignUp ? 'Registrati' : 'Accedi'}
                 </h2>
               </div>
+			  
+			  {/* BANNER DI ERRORE PERSONALIZZATO */}
+  {errorMessage && (
+    <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-xl mb-4 font-medium leading-relaxed flex items-start gap-2">
+      <span className="text-base leading-none">⚠️</span>
+      <div>
+        <p>{errorMessage}</p>
+        {!isSignUp && (
+          <button
+            type="button"
+            onClick={() => {
+              setIsSignUp(true);
+              setErrorMessage('');
+            }}
+            className="text-blue-600 underline font-bold mt-1 block"
+          >
+            Passa a Registrati →
+          </button>
+        )}
+      </div>
+    </div>
+  )}
 
               <form onSubmit={handleAuth} className="space-y-3">
                 <div>
