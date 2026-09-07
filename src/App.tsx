@@ -143,7 +143,7 @@ export default function App() {
         />
       ) : (
         <div className="max-w-6xl mx-auto">
-          {/* HEADER DASHBOARD CON LOGO E TITOLO BRAND */}
+          {/* HEADER DASHBOARD */}
           <div className="bg-white p-4 rounded-xl border shadow-sm mb-6 flex justify-between items-center">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white font-black text-lg shadow-md shadow-blue-500/20">
@@ -205,7 +205,7 @@ export default function App() {
               )}
             </div>
 
-            {/* CARD BACHECHE SALVATE */}
+            {/* CARD BACHECHE SALVATE (CON STILI DIFFERENZIATI PER LE CONDIVISE) */}
             {boards.map((board) => (
               <div
                 key={board.id}
@@ -247,6 +247,9 @@ export default function App() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
 
       {isShareModalOpen && activeBoard && (
         <ShareModal
