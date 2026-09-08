@@ -67,6 +67,52 @@ export default function CardDetailModal({
     }
   };
 
+  // NUOVA FUNZIONE: Cancella sia i file dallo Storage che la scheda
+  const handleDeleteCardWithAttachments = async () => {
+    if (!card?.id || isSaving) return;
+    if (!window.confirm('Cancellare questa scheda e tutti i suoi allegati?')) return;
+
+    setIsSaving(true);
+    try {
+      // 1. Recupera gli allegati per estrarre i path dei file
+      const { data: atts } = await supabase
+        .from('attachments')
+        .select('*')
+        .eq('card_id', card.id);
+
+      // 2. Rimuovi i file dal bucket Storage
+      if (atts && atts.length > 0) {
+        const filePaths = atts
+          .map((att) => {
+            if (att.file_url) {
+              const parts = att.file_url.split('/card-attachments/');
+              return parts.length > 1 ? parts[1] : null;
+            }
+            return null;
+          })
+          .filter(Boolean);
+
+        if (filePaths.length > 0) {
+          await supabase.storage.from('card-attachments').remove(filePaths);
+        }
+
+        // 3. Cancella i record dalla tabella attachments
+        await supabase.from('attachments').delete().eq('card_id', card.id);
+      }
+
+      // 4. Cancella la scheda vera e propria
+      if (onDeleteCard) {
+        await onDeleteCard(card.id);
+      }
+
+      onClose();
+    } catch (err) {
+      alert("Errore durante l'eliminazione: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSave = async (e) => {
     if (e) e.preventDefault();
     if (!title.trim() || isSaving) return;
@@ -115,7 +161,6 @@ export default function CardDetailModal({
             .from('card-attachments')
             .getPublicUrl(filePath);
 
-          // CORREZIONE FONDAMENTALE: Inclusi id e user_id (richiesti dai vincoli DB)
           const { data: attData, error: attError } = await supabase
             .from('attachments')
             .insert([
@@ -278,10 +323,9 @@ export default function CardDetailModal({
             {!isViewer && !isNew ? (
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm('Cancellare questa scheda?')) onDeleteCard(card.id);
-                }}
-                className="text-red-500 hover:underline text-xs font-medium"
+                onClick={handleDeleteCardWithAttachments}
+                disabled={isSaving}
+                className="text-red-500 hover:underline text-xs font-medium disabled:opacity-50"
               >
                 Elimina Scheda
               </button>
