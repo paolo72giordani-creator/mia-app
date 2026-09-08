@@ -17,7 +17,6 @@ export default function CardDetailModal({
   const [pendingFiles, setPendingFiles] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Carica gli allegati salvati su Supabase ogni volta che il componente si apre o il card cambia
   useEffect(() => {
     if (card && card.id) {
       if (card.attachments && Array.isArray(card.attachments)) {
@@ -67,29 +66,39 @@ export default function CardDetailModal({
     }
   };
 
+  // FUNZIONE ELIMINAZIONE COMPLETA (FILE STORAGE + RECORD DATABASE)
   const handleDeleteCardWithAttachments = async () => {
-    if (!card?.id) return;
-    
-    console.log("=== LOG TEST CANCELLAZIONE ===");
-    const folderPath = String(card.id);
+    if (!card?.id || isSaving) return;
+    if (!window.confirm('Cancellare questa scheda e tutti i suoi allegati?')) return;
 
-    // 1. Elenca i file
-    const { data: files, error: listErr } = await supabase.storage
-      .from('card-attachments')
-      .list(folderPath);
+    setIsSaving(true);
+    try {
+      const folderPath = String(card.id);
 
-    console.log("1. Risultato list():", { files, listErr });
-
-    if (files && files.length > 0) {
-      const paths = files.map(f => `${folderPath}/${f.name}`);
-      console.log("2. Tentativo remove con paths:", paths);
-
-      // 2. Tenta la cancellazione
-      const { data: delData, error: delErr } = await supabase.storage
+      // 1. Individua i file nello Storage
+      const { data: files } = await supabase.storage
         .from('card-attachments')
-        .remove(paths);
+        .list(folderPath);
 
-      console.log("3. Risultato remove():", { delData, delErr });
+      if (files && files.length > 0) {
+        const paths = files.map((f) => `${folderPath}/${f.name}`);
+        // 2. Elimina i file dallo Storage
+        await supabase.storage.from('card-attachments').remove(paths);
+      }
+
+      // 3. Elimina le righe dalla tabella attachments
+      await supabase.from('attachments').delete().eq('card_id', folderPath);
+
+      // 4. Invoca l'eliminazione della scheda genitore
+      if (onDeleteCard) {
+        await onDeleteCard(card.id);
+      }
+
+      onClose();
+    } catch (err) {
+      alert("Errore durante l'eliminazione: " + err.message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -163,7 +172,6 @@ export default function CardDetailModal({
         }
       }
 
-      // Costruisce l'oggetto scheda aggiornato includendo tutti gli allegati
       const completeCard = {
         ...savedCard,
         attachments: [...attachments, ...newlyUploadedAttachments]
@@ -231,7 +239,6 @@ export default function CardDetailModal({
               Allegati
             </label>
 
-            {/* Allegati salvati su Supabase */}
             {attachments && attachments.length > 0 && (
               <div className="space-y-1.5 mb-2">
                 {attachments.map((att) => (
@@ -261,7 +268,6 @@ export default function CardDetailModal({
               </div>
             )}
 
-            {/* File in attesa di salvataggio */}
             {pendingFiles && pendingFiles.length > 0 && (
               <div className="space-y-1.5 mb-2">
                 {pendingFiles.map((pf) => (
@@ -284,7 +290,6 @@ export default function CardDetailModal({
               </div>
             )}
 
-            {/* Bottone Seleziona File */}
             {!isViewer && (
               <label className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-bold text-xs px-3 py-1.5 rounded-xl cursor-pointer transition mt-1">
                 <span>+ Carica File</span>
