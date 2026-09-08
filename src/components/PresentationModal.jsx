@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 
+// Mappa per associare le classi Tailwind dei colori colonna ai relativi stili di background per i temi
+const colorMap = {
+  'bg-blue-600': { bg: 'bg-blue-600', text: 'text-white' },
+  'bg-slate-800': { bg: 'bg-slate-800', text: 'text-white' },
+  'bg-indigo-600': { bg: 'bg-indigo-600', text: 'text-white' },
+  'bg-emerald-600': { bg: 'bg-emerald-600', text: 'text-white' },
+  'bg-amber-600': { bg: 'bg-amber-600', text: 'text-white' },
+  'bg-rose-600': { bg: 'bg-rose-600', text: 'text-white' },
+  'bg-purple-600': { bg: 'bg-purple-600', text: 'text-white' }
+};
+
 export default function PresentationModal({
   cards = [],
   onClose,
@@ -48,6 +59,9 @@ export default function PresentationModal({
   const handleIncreaseFont = () => setFontSize((prev) => Math.min(prev + 2, 40));
   const handleDecreaseFont = () => setFontSize((prev) => Math.max(prev - 2, 14));
 
+  // Determina il colore dello sfondo del badge colonna
+  const columnBgClass = currentCard.columnColor || 'bg-blue-600';
+
   return (
     <div
       className={`fixed inset-0 flex flex-col justify-between p-6 z-50 font-sans transition-colors duration-300 ${
@@ -59,14 +73,10 @@ export default function PresentationModal({
       {/* HEADER SLIDE SHOW */}
       <div className="flex justify-between items-center max-w-5xl w-full mx-auto">
         <div className="flex items-center gap-3">
-          {/* BADGE NOME COLONNA ADATTIVO */}
+          {/* BADGE NOME COLONNA CON COLORE REALE DELLA COLONNA */}
           {currentCard.columnName && (
             <span
-              className={`text-xs font-black px-3.5 py-1.5 rounded-full shadow-sm flex items-center gap-1.5 border ${
-                isDarkMode
-                  ? 'bg-blue-600/90 text-white border-white/20'
-                  : 'bg-white text-slate-900 border-slate-300/80 shadow-slate-200'
-              }`}
+              className={`text-xs font-black px-3.5 py-1.5 rounded-full shadow-md flex items-center gap-1.5 border border-white/20 text-white ${columnBgClass}`}
             >
               <span>📋</span>
               <span className="truncate max-w-[200px] sm:max-w-xs">{currentCard.columnName}</span>
@@ -239,17 +249,13 @@ export default function PresentationModal({
         )}
       </div>
 
-      {/* FOOTER BARRA NAVIGAZIONE */}
+      {/* FOOTER BARRA NAVIGAZIONE CON ENTRAMBI I PULSANTI BLU */}
       <div className="flex justify-between items-center max-w-xl w-full mx-auto pt-4">
         <button
           type="button"
           onClick={handlePrev}
           disabled={currentIndex === 0}
-          className={`font-extrabold text-sm px-5 py-2.5 rounded-2xl transition border flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed disabled:opacity-20 ${
-            isDarkMode
-              ? 'bg-white/10 hover:bg-white/20 border-white/10 text-white'
-              : 'bg-white hover:bg-slate-200 border-slate-300 text-slate-800 shadow-sm'
-          }`}
+          className="bg-blue-600 hover:bg-blue-500 disabled:opacity-20 text-white font-extrabold text-sm px-6 py-2.5 rounded-2xl transition shadow-lg shadow-blue-600/30 flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed"
         >
           ← Precedente
         </button>
