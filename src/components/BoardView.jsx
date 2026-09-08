@@ -171,20 +171,58 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-  const handleDeleteColumn = async (columnId, colName, e) => {
-    if (e) e.stopPropagation();
-    setOpenColMenuId(null);
-    if (isViewer) return;
-    if (!window.confirm(`Sei sicuro di voler eliminare la colonna "${colName}" e tutte le sue schede?`)) return;
+  const handleDeleteColumn = async (columnId) => {
+    if (!columnId) return;
+    if (!window.confirm('Cancellare questa colonna, tutte le sue schede e i relativi allegati?')) return;
 
     try {
-      await supabase.from('cards').delete().eq('column_id', String(columnId));
-      const { error } = await supabase.from('columns').delete().eq('id', columnId);
-      if (error) throw error;
+      const colIdStr = String(columnId);
 
-      setColumns((prev) => prev.filter((c) => c.id !== columnId));
-      setCards((prev) => prev.filter((c) => String(c.column_id) !== String(columnId)));
+      // 1. Recupera tutte le schede appartenenti a questa colonna
+      const { data: colCards, error: cardsErr } = await supabase
+        .from('cards')
+        .select('id')
+        .eq('column_id', colIdStr);
+
+      if (cardsErr) console.error('Errore recupero schede della colonna:', cardsErr);
+
+      // 2. Per ogni scheda trovata, elimina i relativi file dallo Storage
+      if (colCards && colCards.length > 0) {
+        for (const card of colCards) {
+          const folderPath = String(card.id);
+
+          // Elenca i file nello Storage per la scheda corrente
+          const { data: files } = await supabase.storage
+            .from('card-attachments')
+            .list(folderPath);
+
+          if (files && files.length > 0) {
+            const paths = files.map((f) => `${folderPath}/${f.name}`);
+            await supabase.storage.from('card-attachments').remove(paths);
+          }
+
+          // Cancella le righe collegate nella tabella attachments
+          await supabase.from('attachments').delete().eq('card_id', folderPath);
+        }
+
+        // 3. Cancella le schede della colonna dal DB
+        const cardIds = colCards.map((c) => c.id);
+        await supabase.from('cards').delete().in('id', cardIds);
+      }
+
+      // 4. Cancella la colonna vera e propria dal DB
+      const { error: colDeleteErr } = await supabase
+        .from('columns')
+        .delete()
+        .eq('id', colIdStr);
+
+      if (colDeleteErr) throw colDeleteErr;
+
+      // 5. Aggiorna lo stato locale della UI
+      setColumns((prev) => prev.filter((c) => String(c.id) !== colIdStr));
+
     } catch (err) {
+      console.error('Errore eliminazione colonna:', err);
       alert('Errore eliminazione colonna: ' + err.message);
     }
   };
