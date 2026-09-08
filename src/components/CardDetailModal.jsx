@@ -68,71 +68,28 @@ export default function CardDetailModal({
   };
 
   const handleDeleteCardWithAttachments = async () => {
-    if (!card?.id || isSaving) return;
-    if (!window.confirm('Cancellare questa scheda e tutti i suoi allegati?')) return;
+    if (!card?.id) return;
+    
+    console.log("=== LOG TEST CANCELLAZIONE ===");
+    const folderPath = String(card.id);
 
-    setIsSaving(true);
-    try {
-      const currentCardId = String(card.id);
+    // 1. Elenca i file
+    const { data: files, error: listErr } = await supabase.storage
+      .from('card-attachments')
+      .list(folderPath);
 
-      // A. Recupera tutti i file memorizzati nel DB per questa scheda
-      const { data: dbAttachments } = await supabase
-        .from('attachments')
-        .select('file_url')
-        .eq('card_id', currentCardId);
+    console.log("1. Risultato list():", { files, listErr });
 
-      const filesToDelete = [];
+    if (files && files.length > 0) {
+      const paths = files.map(f => `${folderPath}/${f.name}`);
+      console.log("2. Tentativo remove con paths:", paths);
 
-      // Estrae i path dai file memorizzati
-      if (dbAttachments && dbAttachments.length > 0) {
-        dbAttachments.forEach((att) => {
-          if (att.file_url) {
-            const parts = att.file_url.split('/card-attachments/');
-            if (parts.length > 1) {
-              filesToDelete.push(decodeURIComponent(parts[1]));
-            }
-          }
-        });
-      }
-
-      // B. Recupera anche eventuali altri file presenti nella cartella dello storage
-      const { data: storageFiles } = await supabase.storage
+      // 2. Tenta la cancellazione
+      const { data: delData, error: delErr } = await supabase.storage
         .from('card-attachments')
-        .list(currentCardId);
+        .remove(paths);
 
-      if (storageFiles && storageFiles.length > 0) {
-        storageFiles.forEach((f) => {
-          const path = `${currentCardId}/${f.name}`;
-          if (!filesToDelete.includes(path)) {
-            filesToDelete.push(path);
-          }
-        });
-      }
-
-      // C. Elimina i file dallo Storage
-      if (filesToDelete.length > 0) {
-        const { error: storageErr } = await supabase.storage
-          .from('card-attachments')
-          .remove(filesToDelete);
-
-        if (storageErr) {
-          console.error('Errore Storage Remove:', storageErr.message);
-        }
-      }
-
-      // D. Elimina le righe dal DB
-      await supabase.from('attachments').delete().eq('card_id', currentCardId);
-
-      // E. Elimina la scheda
-      if (onDeleteCard) {
-        await onDeleteCard(card.id);
-      }
-
-      onClose();
-    } catch (err) {
-      alert("Errore durante l'eliminazione: " + err.message);
-    } finally {
-      setIsSaving(false);
+      console.log("3. Risultato remove():", { delData, delErr });
     }
   };
 
