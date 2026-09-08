@@ -61,8 +61,6 @@ export default function CardDetailModal({
     if (!window.confirm(`Eliminare l'allegato "${attachment.file_name}"?`)) return;
 
     try {
-      // 1. Estraiamo il path del file nello Storage dall'URL o da card_id
-      // L'URL pubblico ha una struttura tipo: .../card-attachments/card-123/123_abc.doc
       let filePath = '';
       if (attachment.file_url) {
         const urlParts = attachment.file_url.split('/card-attachments/');
@@ -71,12 +69,11 @@ export default function CardDetailModal({
         }
       }
 
-      // Se non riusciamo ad estrarlo dall'URL, usiamo card.id e il nome salvato su Storage
       if (!filePath && card?.id) {
         filePath = `${card.id}/${attachment.file_name}`;
       }
 
-      // 2. Elimina il file fisico dallo Storage Supabase
+      // 1. Elimina il file fisicamente dallo Storage Supabase
       if (filePath) {
         const { error: storageErr } = await supabase.storage
           .from('card-attachments')
@@ -87,7 +84,7 @@ export default function CardDetailModal({
         }
       }
 
-      // 3. Elimina il record dalla tabella 'attachments' nel database
+      // 2. Elimina il record dalla tabella 'attachments'
       const { error: dbErr } = await supabase
         .from('attachments')
         .delete()
@@ -95,8 +92,19 @@ export default function CardDetailModal({
 
       if (dbErr) throw dbErr;
 
-      // 4. Aggiorna lo stato locale per rimuoverlo dalla lista a schermo
-      setAttachments((prev) => prev.filter((a) => a.id !== attachment.id));
+      // 3. Calcola la nuova lista allegati
+      const updatedAttachments = attachments.filter((a) => a.id !== attachment.id);
+      setAttachments(updatedAttachments);
+
+      // 4. AGGIORNAMENTO ISTANTANEO DEL PADRE (BoardView)
+      // Mantiene la preview della card e il contatore allegati sempre sincronizzati
+      if (onSaveCard && card) {
+        const updatedCard = {
+          ...card,
+          attachments: updatedAttachments
+        };
+        onSaveCard(updatedCard, false);
+      }
 
     } catch (err) {
       console.error('Errore durante l\'eliminazione dell\'allegato:', err);
