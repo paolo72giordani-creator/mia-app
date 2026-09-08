@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import CardDetailModal from './CardDetailModal';
 import { exportBoardToWord } from '../utils/exportBoard';
 import PresentationModal from './PresentationModal';
+import ReactMarkdown from 'react-markdown';
 
 const availableColors = [
   { label: 'Blu', value: 'bg-blue-600' },
@@ -669,10 +670,10 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                           </div>
 
                           {cardDetails && (
-                            <p className="text-sm text-slate-600 line-clamp-3 mb-2 leading-relaxed">
-                              {cardDetails}
-                            </p>
-                          )}
+							<div className="text-sm text-slate-600 line-clamp-3 mb-2 leading-relaxed prose prose-slate max-w-none [&>p]:m-0">
+							<ReactMarkdown>{cardDetails}</ReactMarkdown>
+							</div>
+							)}
 
                           {card.attachments && card.attachments.length > 0 && (
                             <div className="flex justify-end pt-1.5 border-t border-slate-100">
