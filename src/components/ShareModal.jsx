@@ -6,6 +6,7 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
   const [inviteEmail, setInviteEmail] = useState('');
   const [selectedRole, setSelectedRole] = useState('editor');
   const [loading, setLoading] = useState(false);
+  const [roleUpdatedMsg, setRoleUpdatedMsg] = useState(false);
 
   useEffect(() => {
     if (activeBoard) fetchMembers();
@@ -37,6 +38,11 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
       setMembers((prev) =>
         prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m))
       );
+
+      // Mostra il badge di conferma per 2.5 secondi
+      setRoleUpdatedMsg(true);
+      setTimeout(() => setRoleUpdatedMsg(false), 2500);
+
     } catch (err) {
       console.error('Errore modifica ruolo:', err.message);
       alert('Errore durante l\'aggiornamento del ruolo: ' + err.message);
@@ -147,6 +153,8 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+        
+        {/* HEADER MODALE */}
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-black text-slate-900">
             Condividi "{activeBoard?.title}"
@@ -200,7 +208,7 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
           </div>
         </form>
 
-        {/* LISTA MEMBRI CON CAMBIO RUOLO DINAMICO */}
+        {/* LISTA MEMBRI CON RUOLO IN LINEA */}
         <div>
           <h3 className="text-xs font-bold text-slate-700 mb-2">
             Membri con accesso ({members.length})
@@ -213,18 +221,19 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
               members.map((m) => (
                 <div
                   key={m.id}
-                  className="flex justify-between items-center bg-slate-50 border p-2.5 rounded-lg text-xs"
+                  className="flex justify-between items-center bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs gap-2"
                 >
-                  <div className="truncate pr-2">
-                    <p className="font-bold text-slate-800 truncate mb-1">{m.invited_email}</p>
-                    
-                    {/* MENU A TENDINA PER MODIFICARE IL RUOLO */}
-                    <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2 truncate flex-1 min-w-0">
+                    <span className="font-bold text-slate-800 truncate" title={m.invited_email}>
+                      {m.invited_email}
+                    </span>
+
+                    <div className="flex items-center gap-1 shrink-0">
                       <span className="text-[10px] text-slate-400 font-medium">Ruolo:</span>
                       <select
                         value={m.role}
                         onChange={(e) => handleRoleChange(m.id, e.target.value)}
-                        className="text-[10px] font-bold text-slate-700 bg-white border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-blue-500 cursor-pointer"
+                        className="text-[11px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg px-2 py-0.5 focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm"
                       >
                         <option value="editor">Editor</option>
                         <option value="viewer">Viewer</option>
@@ -233,8 +242,9 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
                   </div>
 
                   <button
+                    type="button"
                     onClick={() => handleRemoveMember(m.id)}
-                    className="text-slate-400 hover:text-red-600 font-bold text-xs p-1"
+                    className="text-slate-400 hover:text-red-600 font-bold text-xs p-1 transition shrink-0"
                     title="Rimuovi accesso"
                   >
                     🗑️
@@ -244,6 +254,26 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
             )}
           </div>
         </div>
+
+        {/* FOOTER: MESSAGGIO DI CONFERMA + PULSANTE CHIUDI */}
+        <div className="mt-6 pt-3 border-t border-slate-100 flex justify-between items-center">
+          <div>
+            {roleUpdatedMsg && (
+              <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                ✓ Ruolo aggiornato!
+              </span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-4 py-2 rounded-xl transition"
+          >
+            Chiudi
+          </button>
+        </div>
+
       </div>
     </div>
   );
