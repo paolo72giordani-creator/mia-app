@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import ReactMarkdown from 'react-markdown'; // Importa ReactMarkdown
 
 export default function CardDetailModal({
   card,
@@ -231,6 +232,7 @@ export default function CardDetailModal({
         </h2>
 
         <form onSubmit={handleSave} className="space-y-4">
+          {/* TITOLO */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
               Titolo
@@ -246,36 +248,37 @@ export default function CardDetailModal({
             />
           </div>
 
+          {/* DESCRIZIONE (SINGOLO BLOCCO CORRETTO) */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
               Descrizione / Note
             </label>
-            <textarea
-              rows={4}
-              readOnly={isViewer}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Aggiungi dettagli, istruzioni o appunti..."
-              className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-blue-500 font-medium resize-none text-slate-800"
-            />
+
+            {!isViewer ? (
+              // MODALITÀ EDITING: Campo di testo modificabile
+              <>
+                <textarea
+                  rows={4}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Aggiungi dettagli, istruzioni o appunti..."
+                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-blue-500 font-medium resize-none text-slate-800"
+                />
+                <p className="text-[10px] text-slate-400 mt-1 font-medium">
+                  💡 Formattazione rapida: <strong>**grassetto**</strong>, <em>*corsivo*</em>, e - per le liste.
+                </p>
+              </>
+            ) : (
+              // MODALITÀ SOLA LETTURA (VIEWER): Mostra direttamente il Markdown formattato
+              <div className="w-full border border-slate-200 bg-slate-50 rounded-xl p-3 text-xs text-slate-800 max-h-40 overflow-y-auto leading-relaxed">
+                {description ? (
+                  <ReactMarkdown>{description}</ReactMarkdown>
+                ) : (
+                  <span className="text-slate-400 italic">Nessuna descrizione</span>
+                )}
+              </div>
+            )}
           </div>
-		  
-		  <div>
-  <label className="block text-xs font-bold text-slate-700 mb-1">
-    Descrizione / Note
-  </label>
-  <textarea
-    rows={4}
-    readOnly={isViewer}
-    value={description}
-    onChange={(e) => setDescription(e.target.value)}
-    placeholder="Aggiungi dettagli, istruzioni o appunti..."
-    className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-blue-500 font-medium resize-none text-slate-800"
-  />
-  <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1 font-medium">
-    💡 Formattazione rapida: <strong>**grassetto**</strong>, <em>*corsivo*</em>, e - per le liste.
-  </p>
-</div>
 
           {/* ALLEGATI */}
           <div>
