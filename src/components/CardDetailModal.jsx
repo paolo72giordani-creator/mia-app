@@ -56,17 +56,54 @@ export default function CardDetailModal({
     setPendingFiles((prev) => prev.filter((f) => f.id !== id));
   };
 
-  const handleRemoveAttachment = async (attachmentId) => {
+  const handleRemoveAttachment = async (attachment) => {
     if (isViewer) return;
+    if (!window.confirm(`Eliminare l'allegato "${attachment.file_name}"?`)) return;
+
     try {
-      await supabase.from('attachments').delete().eq('id', attachmentId);
-      setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+      // 1. Estraiamo il path del file nello Storage dall'URL o da card_id
+      // L'URL pubblico ha una struttura tipo: .../card-attachments/card-123/123_abc.doc
+      let filePath = '';
+      if (attachment.file_url) {
+        const urlParts = attachment.file_url.split('/card-attachments/');
+        if (urlParts.length > 1) {
+          filePath = decodeURIComponent(urlParts[1]);
+        }
+      }
+
+      // Se non riusciamo ad estrarlo dall'URL, usiamo card.id e il nome salvato su Storage
+      if (!filePath && card?.id) {
+        filePath = `${card.id}/${attachment.file_name}`;
+      }
+
+      // 2. Elimina il file fisico dallo Storage Supabase
+      if (filePath) {
+        const { error: storageErr } = await supabase.storage
+          .from('card-attachments')
+          .remove([filePath]);
+
+        if (storageErr) {
+          console.error('Errore rimozione da Storage:', storageErr.message);
+        }
+      }
+
+      // 3. Elimina il record dalla tabella 'attachments' nel database
+      const { error: dbErr } = await supabase
+        .from('attachments')
+        .delete()
+        .eq('id', attachment.id);
+
+      if (dbErr) throw dbErr;
+
+      // 4. Aggiorna lo stato locale per rimuoverlo dalla lista a schermo
+      setAttachments((prev) => prev.filter((a) => a.id !== attachment.id));
+
     } catch (err) {
+      console.error('Errore durante l\'eliminazione dell\'allegato:', err);
       alert('Errore eliminazione allegato: ' + err.message);
     }
   };
-
-  // FUNZIONE ELIMINAZIONE COMPLETA (FILE STORAGE + RECORD DATABASE)
+  
   const handleDeleteCardWithAttachments = async () => {
     if (!card?.id || isSaving) return;
     if (!window.confirm('Cancellare questa scheda e tutti i suoi allegati?')) return;
@@ -237,14 +274,15 @@ export default function CardDetailModal({
                       📎 {att.file_name}
                     </a>
                     {!isViewer && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveAttachment(att.id)}
-                        className="text-red-500 hover:text-red-700 font-bold ml-2"
-                      >
-                        ✕
-                      </button>
-                    )}
+  <button
+    type="button"
+    onClick={() => handleRemoveAttachment(att)} // <-- SOSTITUISCI CON att
+    className="text-red-500 hover:text-red-700 font-bold ml-2"
+    title="Elimina allegato"
+  >
+    ✕
+  </button>
+)}
                   </div>
                 ))}
               </div>
