@@ -67,40 +67,38 @@ export default function CardDetailModal({
     }
   };
 
-  // NUOVA FUNZIONE: Cancella sia i file dallo Storage che la scheda
+  // NUOVA FUNZIONE: Cancella sia la cartella Storage che la scheda
   const handleDeleteCardWithAttachments = async () => {
     if (!card?.id || isSaving) return;
     if (!window.confirm('Cancellare questa scheda e tutti i suoi allegati?')) return;
 
     setIsSaving(true);
     try {
-      // 1. Recupera gli allegati per estrarre i path dei file
-      const { data: atts } = await supabase
-        .from('attachments')
-        .select('*')
-        .eq('card_id', card.id);
+      const currentCardId = String(card.id);
 
-      // 2. Rimuovi i file dal bucket Storage
-      if (atts && atts.length > 0) {
-        const filePaths = atts
-          .map((att) => {
-            if (att.file_url) {
-              const parts = att.file_url.split('/card-attachments/');
-              return parts.length > 1 ? parts[1] : null;
-            }
-            return null;
-          })
-          .filter(Boolean);
+      // 1. Elenca tutti i file contenuti nella cartella di questa scheda nello Storage
+      const { data: fileList, error: listErr } = await supabase.storage
+        .from('card-attachments')
+        .list(currentCardId);
 
-        if (filePaths.length > 0) {
-          await supabase.storage.from('card-attachments').remove(filePaths);
+      if (!listErr && fileList && fileList.length > 0) {
+        // Costruisce i percorsi "card-id/nomefile"
+        const filesToRemove = fileList.map((f) => `${currentCardId}/${f.name}`);
+
+        // Rimuove i file fisici dal bucket
+        const { error: removeErr } = await supabase.storage
+          .from('card-attachments')
+          .remove(filesToRemove);
+
+        if (removeErr) {
+          console.error('Errore rimozione file da Storage:', removeErr.message);
         }
-
-        // 3. Cancella i record dalla tabella attachments
-        await supabase.from('attachments').delete().eq('card_id', card.id);
       }
 
-      // 4. Cancella la scheda vera e propria
+      // 2. Cancella i record dalla tabella attachments
+      await supabase.from('attachments').delete().eq('card_id', currentCardId);
+
+      // 3. Cancella la scheda vera e propria
       if (onDeleteCard) {
         await onDeleteCard(card.id);
       }
