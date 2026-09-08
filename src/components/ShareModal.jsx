@@ -25,6 +25,24 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
     }
   };
 
+  const handleRoleChange = async (memberId, newRole) => {
+    try {
+      const { error } = await supabase
+        .from('board_members')
+        .update({ role: newRole })
+        .eq('id', memberId);
+
+      if (error) throw error;
+
+      setMembers((prev) =>
+        prev.map((m) => (m.id === memberId ? { ...m, role: newRole } : m))
+      );
+    } catch (err) {
+      console.error('Errore modifica ruolo:', err.message);
+      alert('Errore durante l\'aggiornamento del ruolo: ' + err.message);
+    }
+  };
+
   const sendBrevoEmail = async (targetEmail) => {
     const brevoApiKey = import.meta.env.VITE_BREVO_API_KEY;
 
@@ -36,7 +54,6 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
     const subject = `Sei stato invitato alla bacheca "${activeBoard.title}" su Doceo Kanban`;
     const roleText = selectedRole === 'editor' ? 'Editor (Modifica)' : 'Visualizzatore (Sola lettura)';
 
-    // Testo unico e generico sia per utenti registrati che per i nuovi
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; padding: 24px; color: #1e293b; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 16px;">
         <h2 style="color: #0f172a; margin-top: 0;">Ciao! 👋</h2>
@@ -94,7 +111,6 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
     try {
       const emailToInvite = inviteEmail.trim().toLowerCase();
 
-      // Inserisci/Aggiorna il membro nella tabella board_members
       const { error } = await supabase.from('board_members').upsert([
         {
           board_id: activeBoard.id,
@@ -105,7 +121,6 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
 
       if (error) throw error;
 
-      // Invia l'email con il nuovo testo unificato
       await sendBrevoEmail(emailToInvite);
 
       setInviteEmail('');
@@ -185,7 +200,7 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
           </div>
         </form>
 
-        {/* LISTA MEMBRI */}
+        {/* LISTA MEMBRI CON CAMBIO RUOLO DINAMICO */}
         <div>
           <h3 className="text-xs font-bold text-slate-700 mb-2">
             Membri con accesso ({members.length})
@@ -201,8 +216,20 @@ export default function ShareModal({ activeBoard, currentUserEmail, onClose }) {
                   className="flex justify-between items-center bg-slate-50 border p-2.5 rounded-lg text-xs"
                 >
                   <div className="truncate pr-2">
-                    <p className="font-bold text-slate-800 truncate">{m.invited_email}</p>
-                    <span className="text-[10px] text-slate-500 capitalize">Ruolo: {m.role}</span>
+                    <p className="font-bold text-slate-800 truncate mb-1">{m.invited_email}</p>
+                    
+                    {/* MENU A TENDINA PER MODIFICARE IL RUOLO */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-slate-400 font-medium">Ruolo:</span>
+                      <select
+                        value={m.role}
+                        onChange={(e) => handleRoleChange(m.id, e.target.value)}
+                        className="text-[10px] font-bold text-slate-700 bg-white border border-slate-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-blue-500 cursor-pointer"
+                      >
+                        <option value="editor">Editor</option>
+                        <option value="viewer">Viewer</option>
+                      </select>
+                    </div>
                   </div>
 
                   <button
