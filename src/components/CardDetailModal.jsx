@@ -20,11 +20,9 @@ export default function CardDetailModal({
   // Carica gli allegati salvati su Supabase ogni volta che il componente si apre o il card cambia
   useEffect(() => {
     if (card && card.id) {
-      // Se la scheda ha già gli allegati passati tramite prop
       if (card.attachments && Array.isArray(card.attachments)) {
         setAttachments(card.attachments);
       }
-      // Effettua un fetch di sicurezza per sincronizzare eventuali nuovi allegati
       fetchAttachments(card.id);
     } else {
       setAttachments([]);
@@ -117,11 +115,14 @@ export default function CardDetailModal({
             .from('card-attachments')
             .getPublicUrl(filePath);
 
+          // CORREZIONE FONDAMENTALE: Inclusi id e user_id (richiesti dai vincoli DB)
           const { data: attData, error: attError } = await supabase
             .from('attachments')
             .insert([
               {
+                id: `att-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
                 card_id: currentCardId,
+                user_id: userId,
                 file_name: fileObj.file.name,
                 file_url: urlData.publicUrl
               }
@@ -129,7 +130,9 @@ export default function CardDetailModal({
             .select()
             .single();
 
-          if (!attError && attData) {
+          if (attError) throw attError;
+
+          if (attData) {
             newlyUploadedAttachments.push(attData);
           }
         }
