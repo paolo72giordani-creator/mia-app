@@ -32,6 +32,10 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Stato Privacy & Termini Legali
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+
   // Menu contestuale 3 pallini & Personalizzazione
   const [openMenuBoardId, setOpenMenuBoardId] = useState(null);
   const [editingBoardId, setEditingBoardId] = useState(null);
@@ -57,9 +61,15 @@ export default function App() {
     if (session) fetchBoards();
   }, [session]);
 
-const handleAuth = async (e) => {
+  const handleAuth = async (e) => {
     e.preventDefault();
     if (!authEmail.trim() || !authPassword.trim()) return;
+
+    // Controllo obbligatorio per la registrazione
+    if (isSignUp && !acceptTerms) {
+      setErrorMessage('È necessario accettare i Termini di Servizio e l\'Informativa sulla Privacy per registrarsi.');
+      return;
+    }
 
     setAuthLoading(true);
     setErrorMessage('');
@@ -550,6 +560,30 @@ const handleAuth = async (e) => {
                   />
                 </div>
 
+                {/* CHECKBOX PRIVACY (Mostrato solo in fase di Registrazione) */}
+                {isSignUp && (
+                  <div className="flex items-start gap-2 pt-1 text-[11px] text-slate-600">
+                    <input
+                      type="checkbox"
+                      id="privacyCheck"
+                      checked={acceptTerms}
+                      onChange={(e) => setAcceptTerms(e.target.checked)}
+                      className="mt-0.5 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <label htmlFor="privacyCheck" className="leading-tight">
+                      Accetto i{" "}
+                      <button
+                        type="button"
+                        onClick={() => setShowPrivacyModal(true)}
+                        className="text-blue-600 underline font-bold hover:text-blue-800"
+                      >
+                        Termini e la Privacy
+                      </button>
+                      {" "}e mi impegno a non caricare dati sensibili di minori.
+                    </label>
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   disabled={authLoading}
@@ -558,6 +592,47 @@ const handleAuth = async (e) => {
                   {authLoading ? 'Elaborazione...' : isSignUp ? 'Crea Account' : 'Accedi'}
                 </button>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODALE LEGALE & PRIVACY */}
+        {showPrivacyModal && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+            <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 shadow-2xl relative max-h-[80vh] flex flex-col">
+              <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                <h3 className="font-extrabold text-base text-slate-900">Note Legali & Privacy</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowPrivacyModal(false)}
+                  className="text-slate-400 hover:text-slate-600 font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="overflow-y-auto my-4 text-xs text-slate-600 space-y-3 pr-2 leading-relaxed">
+                <p><strong>1. Uso del Servizio:</strong> Doceo Kanban è una piattaforma didattica in fase sperimentale/beta. Il servizio è fornito per agevolare l'organizzazione delle lezioni e il lavoro collaborativo tra docenti.</p>
+                
+                <p><strong>2. Trattamento dei Dati (GDPR):</strong> L'indirizzo email viene raccolto unicamente per permettere l'accesso riservato. I dati e gli allegati caricati sono archiviati su infrastruttura cloud (Supabase) e non verranno mai ceduti a terzi.</p>
+
+                <p><strong>3. Tutela della Privacy degli Studenti:</strong> Gli utenti si impegnano a <strong>non inserire dati personali sensibili o identificativi di minori</strong> (es. cognomi completi, dati sanitari, certificazioni DSA/BES o verbali riservati). Si raccomanda l'uso di nomi di battesimo, sigle o codici anonimi.</p>
+
+                <p><strong>4. Responsabilità dei Contenuti:</strong> L'utente è l'unico responsabile dei file e dei testi inseriti nelle proprie bacheche, garantendo di possedere i diritti di utilizzo del materiale didattico caricato.</p>
+                
+                <p><strong>5. Cancellazione Dati:</strong> L'utente ha il diritto di eliminare in qualsiasi momento le proprie schede, bacheche e allegati, ottenendone la rimozione definitiva dai server.</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAcceptTerms(true);
+                  setShowPrivacyModal(false);
+                }}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-xs transition"
+              >
+                Ho compreso e accetto
+              </button>
             </div>
           </div>
         )}
