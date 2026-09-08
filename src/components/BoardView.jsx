@@ -694,7 +694,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 								  handleDeleteCard(card.id);
 								}
 							  }}
-							  className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1 rounded-lg transition"
+							  className="text-slate-500 hover:text-red-500 hover:bg-red-50 p-1 rounded-lg transition"
 							  title="Elimina scheda"
 							>
 							  <svg 
@@ -702,7 +702,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 								fill="none" 
 								viewBox="0 0 24 24" 
 								stroke="currentColor" 
-								strokeWidth="1.75"
+								strokeWidth="2"
 							  >
 								<path 
 								  strokeLinecap="round" 
