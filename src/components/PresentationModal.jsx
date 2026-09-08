@@ -1,28 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 
-// Mappa per associare le classi Tailwind dei colori colonna ai relativi stili di background per i temi
-const colorMap = {
-  'bg-blue-600': { bg: 'bg-blue-600', text: 'text-white' },
-  'bg-slate-800': { bg: 'bg-slate-800', text: 'text-white' },
-  'bg-indigo-600': { bg: 'bg-indigo-600', text: 'text-white' },
-  'bg-emerald-600': { bg: 'bg-emerald-600', text: 'text-white' },
-  'bg-amber-600': { bg: 'bg-amber-600', text: 'text-white' },
-  'bg-rose-600': { bg: 'bg-rose-600', text: 'text-white' },
-  'bg-purple-600': { bg: 'bg-purple-600', text: 'text-white' }
-};
-
 export default function PresentationModal({
   cards = [],
   onClose,
   onEditCard
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  
-  // Dimensione font di default impostata a 20px
   const [fontSize, setFontSize] = useState(20);
-
-  // Stato per il tema (default: scuro/cinema)
   const [isDarkMode, setIsDarkMode] = useState(true);
 
   const currentCard = cards[currentIndex];
@@ -59,7 +44,6 @@ export default function PresentationModal({
   const handleIncreaseFont = () => setFontSize((prev) => Math.min(prev + 2, 40));
   const handleDecreaseFont = () => setFontSize((prev) => Math.max(prev - 2, 14));
 
-  // Determina il colore dello sfondo del badge colonna
   const columnBgClass = currentCard.columnColor || 'bg-blue-600';
 
   return (
@@ -71,9 +55,8 @@ export default function PresentationModal({
       }`}
     >
       {/* HEADER SLIDE SHOW */}
-      <div className="flex justify-between items-center max-w-5xl w-full mx-auto">
+      <div className="flex justify-between items-center max-w-6xl w-full mx-auto">
         <div className="flex items-center gap-3">
-          {/* BADGE NOME COLONNA CON COLORE REALE DELLA COLONNA */}
           {currentCard.columnName && (
             <span
               className={`text-xs font-black px-3.5 py-1.5 rounded-full shadow-md flex items-center gap-1.5 border border-white/20 text-white ${columnBgClass}`}
@@ -92,7 +75,6 @@ export default function PresentationModal({
         </div>
 
         <div className="flex items-center gap-3">
-          {/* TOGGLE TEMA CHIARO / SCURO */}
           <button
             type="button"
             onClick={() => setIsDarkMode(!isDarkMode)}
@@ -106,7 +88,6 @@ export default function PresentationModal({
             {isDarkMode ? '☀️ Chiaro' : '🌙 Scuro'}
           </button>
 
-          {/* SELETTORE DIMENSIONE TESTO */}
           <div
             className={`flex items-center rounded-xl border p-0.5 ${
               isDarkMode
@@ -179,9 +160,9 @@ export default function PresentationModal({
         </div>
       </div>
 
-      {/* CONTENUTO CENTRALE SLIDE */}
+      {/* CONTENUTO CENTRALE SLIDE - ORA PIÙ LARGO (max-w-6xl) */}
       <div
-        className={`max-w-4xl w-full mx-auto my-auto border rounded-3xl p-8 shadow-2xl flex flex-col gap-6 relative overflow-hidden transition-colors duration-300 ${
+        className={`max-w-6xl w-full mx-auto my-auto border rounded-3xl p-8 sm:p-12 shadow-2xl flex flex-col gap-6 relative overflow-hidden transition-colors duration-300 ${
           isDarkMode
             ? 'bg-slate-900/90 border-slate-800'
             : 'bg-white border-slate-200 shadow-slate-300/50'
@@ -195,10 +176,10 @@ export default function PresentationModal({
           {currentCard.title}
         </h1>
 
-        {/* DESCRIZIONE RENDERIZZATA IN MARKDOWN CON FONT DINAMICO */}
+        {/* DESCRIZIONE RENDERIZZATA IN MARKDOWN */}
         {currentCard.description ? (
           <div
-            className={`leading-relaxed font-normal whitespace-pre-wrap max-h-[45vh] overflow-y-auto pr-2 ${
+            className={`leading-relaxed font-normal whitespace-pre-wrap max-h-[50vh] overflow-y-auto pr-4 ${
               isDarkMode ? 'text-slate-300' : 'text-slate-700'
             }`}
             style={{ fontSize: `${fontSize}px` }}
@@ -249,7 +230,7 @@ export default function PresentationModal({
         )}
       </div>
 
-      {/* FOOTER BARRA NAVIGAZIONE CON ENTRAMBI I PULSANTI BLU */}
+      {/* FOOTER BARRA NAVIGAZIONE */}
       <div className="flex justify-between items-center max-w-xl w-full mx-auto pt-4">
         <button
           type="button"
