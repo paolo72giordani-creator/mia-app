@@ -288,31 +288,56 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     e.preventDefault();
     e.stopPropagation();
 
-    let reordered = cards.filter((c) => c.id !== draggedCard.id);
-    const updatedDraggedCard = { ...draggedCard, column_id: String(targetColumnId) };
+    const targetColIdStr = String(targetColumnId);
 
+    // 1. Estraiamo tutte le schede che non fanno parte della colonna di destinazione
+    const otherCards = cards.filter(
+      (c) => String(c.column_id) !== targetColIdStr && c.id !== draggedCard.id
+    );
+
+    // 2. Prendiamo le schede attuali della colonna di destinazione (esclusa quella trascinata)
+    let targetColCards = cards.filter(
+      (c) => String(c.column_id) === targetColIdStr && c.id !== draggedCard.id
+    );
+
+    const updatedDraggedCard = { ...draggedCard, column_id: targetColIdStr };
+
+    // 3. Inseriamo la scheda trascinata nella posizione esatta del target di drop
     if (dragOverCardId) {
-      const dropIndex = reordered.findIndex((c) => c.id === dragOverCardId);
+      const dropIndex = targetColCards.findIndex((c) => c.id === dragOverCardId);
       if (dropIndex !== -1) {
-        reordered.splice(dropIndex, 0, updatedDraggedCard);
+        targetColCards.splice(dropIndex, 0, updatedDraggedCard);
       } else {
-        reordered.push(updatedDraggedCard);
+        targetColCards.push(updatedDraggedCard);
       }
     } else {
-      reordered.push(updatedDraggedCard);
+      // Se rilasciata nello spazio vuoto o in fondo alla colonna
+      targetColCards.push(updatedDraggedCard);
     }
 
-    setCards(reordered);
+    // 4. Ricalcoliamo l'indice 'position' ordinato per tutte le schede della colonna target
+    const reorderedTargetCards = targetColCards.map((card, idx) => ({
+      ...card,
+      position: idx
+    }));
+
+    // 5. Aggiorniamo lo stato locale con l'ordine corretto
+    setCards([...otherCards, ...reorderedTargetCards]);
     setDragOverCardColId(null);
     setDragOverCardId(null);
 
+    // 6. Salviamo le nuove posizioni su Supabase
     try {
-      await supabase
-        .from('cards')
-        .update({ column_id: String(targetColumnId) })
-        .eq('id', draggedCard.id);
+      const updates = reorderedTargetCards.map((card) =>
+        supabase
+          .from('cards')
+          .update({ column_id: card.column_id, position: card.position })
+          .eq('id', card.id)
+      );
+
+      await Promise.all(updates);
     } catch (err) {
-      console.error('Errore spostamento scheda:', err);
+      console.error('Errore durante il salvataggio dell\'ordine delle schede:', err);
       fetchBoardData();
     } finally {
       setDraggedCard(null);
