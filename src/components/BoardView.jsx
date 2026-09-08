@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import CardDetailModal from './CardDetailModal';
 import { exportBoardToWord } from '../utils/exportBoard';
+import PresentationModal from './PresentationModal';
 
 const availableColors = [
   { label: 'Blu', value: 'bg-blue-600' },
@@ -21,6 +22,8 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   const isViewer = activeBoard?.role === 'viewer';
   
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  
+  const [isPresenting, setIsPresenting] = useState(false);
 
   // Rinomina bacheca
   const [isEditingBoardTitle, setIsEditingBoardTitle] = useState(false);
@@ -78,10 +81,10 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
       if (cols && cols.length > 0) {
         const colIds = cols.map((c) => String(c.id));
         const { data: crds, error: cardErr } = await supabase
-    .from('cards')
-    .select('*, attachments(*)') // <--- Fondamentale per includere gli allegati salvati
-    .in('column_id', colIds)
-    .order('position', { ascending: true });
+          .from('cards')
+          .select('*, attachments(*)')
+          .in('column_id', colIds)
+          .order('position', { ascending: true });
 
         if (cardErr) throw cardErr;
         setCards(crds || []);
@@ -174,7 +177,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
   const handleDeleteColumn = async (columnId) => {
     if (!columnId) return;
 
-    // Messaggio chiaro di avvertimento
     const confirmMessage = 
       "⚠️ ATTENZIONE: Sei sicuro di voler eliminare questa colonna?\n\n" +
       "Verranno cancellate DEFINITIVAMENTE tutte le schede contenute al suo interno e tutti i file allegati collegate ad esse.";
@@ -184,7 +186,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     try {
       const colIdStr = String(columnId);
 
-      // 1. Recupera tutte le schede appartenenti a questa colonna
       const { data: colCards, error: cardsErr } = await supabase
         .from('cards')
         .select('id')
@@ -192,7 +193,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
       if (cardsErr) console.error('Errore recupero schede della colonna:', cardsErr);
 
-      // 2. Per ogni scheda trovata, elimina i relativi file dallo Storage
       if (colCards && colCards.length > 0) {
         for (const card of colCards) {
           const folderPath = String(card.id);
@@ -209,12 +209,10 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
           await supabase.from('attachments').delete().eq('card_id', folderPath);
         }
 
-        // 3. Cancella le schede della colonna dal DB
         const cardIds = colCards.map((c) => c.id);
         await supabase.from('cards').delete().in('id', cardIds);
       }
 
-      // 4. Cancella la colonna vera e propria dal DB
       const { error: colDeleteErr } = await supabase
         .from('columns')
         .delete()
@@ -222,7 +220,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
       if (colDeleteErr) throw colDeleteErr;
 
-      // 5. Aggiorna lo stato locale della UI
       setColumns((prev) => prev.filter((c) => String(c.id) !== colIdStr));
 
     } catch (err) {
@@ -231,8 +228,7 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     }
   };
 
-const handleSaveCardFromModal = async (savedCard, isNew) => {
-    // Forziamo un recupero completo dei dati aggiornati dal DB per includere gli allegati
+  const handleSaveCardFromModal = async (savedCard, isNew) => {
     await fetchBoardData();
   };
 
@@ -242,7 +238,6 @@ const handleSaveCardFromModal = async (savedCard, isNew) => {
     try {
       const folderPath = String(cardId);
 
-      // 1. Pulizia file dallo Storage 'card-attachments'
       const { data: files } = await supabase.storage
         .from('card-attachments')
         .list(folderPath);
@@ -252,15 +247,12 @@ const handleSaveCardFromModal = async (savedCard, isNew) => {
         await supabase.storage.from('card-attachments').remove(paths);
       }
 
-      // 2. Cancellazione record collegati nella tabella attachments
       await supabase.from('attachments').delete().eq('card_id', folderPath);
 
-      // 3. Cancellazione della scheda vera e propria dal database
       const { error } = await supabase.from('cards').delete().eq('id', cardId);
 
       if (error) throw error;
 
-      // 4. Aggiorna lo stato locale per rimuovere la scheda dalla UI
       setCards((prevCards) => prevCards.filter((c) => c.id !== cardId));
 
     } catch (err) {
@@ -432,7 +424,7 @@ const handleSaveCardFromModal = async (savedCard, isNew) => {
           </div>
         </div>
 
-{/* GRUPPO PULSANTI ALLINEATI A DESTRA */}
+        {/* GRUPPO PULSANTI ALLINEATI A DESTRA */}
         <div className="flex items-center gap-2">
           <button
             onClick={onBack}
@@ -451,6 +443,14 @@ const handleSaveCardFromModal = async (savedCard, isNew) => {
           )}
 
           <button
+            onClick={() => setIsPresenting(true)}
+            className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition shadow-sm flex items-center gap-1.5"
+            title="Modalità Proiezione LIM"
+          >
+            <span>▶️</span> Presenta
+          </button>
+
+          <button
             onClick={() => exportBoardToWord(activeBoard.title, columns, cards)}
             className="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 px-3.5 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 shadow-sm"
             title="Scarica bacheca in formato Word"
@@ -466,8 +466,6 @@ const handleSaveCardFromModal = async (savedCard, isNew) => {
             <span>🚪</span> Esci
           </button>
         </div>
-		
-		
       </div>
 
       {/* AREA COLONNE KANBAN */}
@@ -540,7 +538,6 @@ const handleSaveCardFromModal = async (savedCard, isNew) => {
                     {colCards.length}
                   </span>
 
-                  {/* PULSANTE 3 PALLINI MENU COLONNA */}
                   {!isViewer && (
                     <div className="relative">
                       <button
@@ -555,7 +552,6 @@ const handleSaveCardFromModal = async (savedCard, isNew) => {
                         ⋮
                       </button>
 
-                      {/* MENU DROPDOWN PER LA COLONNA */}
                       {isMenuOpen && (
                         <div 
                           onClick={(e) => e.stopPropagation()}
@@ -591,7 +587,6 @@ const handleSaveCardFromModal = async (savedCard, isNew) => {
                         </div>
                       )}
 
-                      {/* POPUP SELETTORE COLORE */}
                       {isPickerOpen && (
                         <div 
                           onClick={(e) => e.stopPropagation()}
@@ -658,18 +653,18 @@ const handleSaveCardFromModal = async (savedCard, isNew) => {
                             </h4>
                             {!isViewer && (
                               <button
-  type="button"
-  onClick={(e) => {
-    e.stopPropagation(); // Stop alla propagazione: impedisce l'apertura del modale di dettaglio
-    if (window.confirm('Cancellare questa scheda e tutti i suoi allegati?')) {
-      handleDeleteCard(card.id);
-    }
-  }}
-  className="text-slate-400 hover:text-red-500 p-1 rounded-md transition"
-  title="Elimina scheda"
->
-  🗑️
-</button>
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm('Cancellare questa scheda e tutti i suoi allegati?')) {
+                                    handleDeleteCard(card.id);
+                                  }
+                                }}
+                                className="text-slate-400 hover:text-red-500 p-1 rounded-md transition"
+                                title="Elimina scheda"
+                              >
+                                🗑️
+                              </button>
                             )}
                           </div>
 
@@ -749,11 +744,12 @@ const handleSaveCardFromModal = async (savedCard, isNew) => {
         )}
       </div>
 
+      {/* MODALE DETTAGLIO SCHEDA */}
       {modalCard !== null || modalColId !== null ? (
         <CardDetailModal
           card={modalCard}
           columnId={modalColId}
-          currentUser={currentUser} // <--- AGGIUNTO QUI
+          currentUser={currentUser}
           isViewer={isViewer}
           onClose={() => {
             setModalCard(null);
@@ -763,6 +759,36 @@ const handleSaveCardFromModal = async (savedCard, isNew) => {
           onDeleteCard={(id) => handleDeleteCard(id)}
         />
       ) : null}
+
+      {/* MODALE PRESENTAZIONE SCHERMO INTERO (LIM) */}
+      {isPresenting && (() => {
+        const allCardsForPresentation = columns.flatMap((col) => {
+          const colCards = cards.filter((c) => String(c.column_id) === String(col.id));
+          return colCards.map((card) => ({
+            ...card,
+            columnName: col.name,
+            columnColor: col.color
+          }));
+        });
+
+        if (allCardsForPresentation.length === 0) {
+          alert("Non ci sono schede da proiettare in questa bacheca!");
+          setIsPresenting(false);
+          return null;
+        }
+
+        return (
+          <PresentationModal
+            cards={allCardsForPresentation}
+            onClose={() => setIsPresenting(false)}
+            onEditCard={(cardToEdit) => {
+              setIsPresenting(false);
+              setModalCard(cardToEdit);
+              setModalColId(cardToEdit.column_id);
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
