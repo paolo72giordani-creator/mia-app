@@ -289,20 +289,29 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
     e.stopPropagation();
 
     const targetColIdStr = String(targetColumnId);
+    const sourceColIdStr = String(draggedCard.column_id);
 
-    // 1. Estraiamo tutte le schede che non fanno parte della colonna di destinazione
+    // 1. Se rilasciata sulla stessa scheda o senza un target valido nella stessa colonna, annulla
+    if (sourceColIdStr === targetColIdStr && (!dragOverCardId || dragOverCardId === draggedCard.id)) {
+      setDragOverCardColId(null);
+      setDragOverCardId(null);
+      setDraggedCard(null);
+      return;
+    }
+
+    // 2. Estraiamo tutte le schede delle altre colonne
     const otherCards = cards.filter(
       (c) => String(c.column_id) !== targetColIdStr && c.id !== draggedCard.id
     );
 
-    // 2. Prendiamo le schede attuali della colonna di destinazione (esclusa quella trascinata)
+    // 3. Prendiamo le schede della colonna target (esclusa quella trascinata)
     let targetColCards = cards.filter(
       (c) => String(c.column_id) === targetColIdStr && c.id !== draggedCard.id
     );
 
     const updatedDraggedCard = { ...draggedCard, column_id: targetColIdStr };
 
-    // 3. Inseriamo la scheda trascinata nella posizione esatta del target di drop
+    // 4. Inseriamo la scheda nella posizione corretta
     if (dragOverCardId) {
       const dropIndex = targetColCards.findIndex((c) => c.id === dragOverCardId);
       if (dropIndex !== -1) {
@@ -311,22 +320,21 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         targetColCards.push(updatedDraggedCard);
       }
     } else {
-      // Se rilasciata nello spazio vuoto o in fondo alla colonna
       targetColCards.push(updatedDraggedCard);
     }
 
-    // 4. Ricalcoliamo l'indice 'position' ordinato per tutte le schede della colonna target
+    // 5. Ricalcoliamo l'indice 'position' per la colonna target
     const reorderedTargetCards = targetColCards.map((card, idx) => ({
       ...card,
       position: idx
     }));
 
-    // 5. Aggiorniamo lo stato locale con l'ordine corretto
+    // 6. Aggiorniamo lo stato locale
     setCards([...otherCards, ...reorderedTargetCards]);
     setDragOverCardColId(null);
     setDragOverCardId(null);
 
-    // 6. Salviamo le nuove posizioni su Supabase
+    // 7. Salviamo le nuove posizioni su Supabase
     try {
       const updates = reorderedTargetCards.map((card) =>
         supabase
