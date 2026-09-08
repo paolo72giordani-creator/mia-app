@@ -194,17 +194,36 @@ const handleSaveCardFromModal = async (savedCard, isNew) => {
     await fetchBoardData();
   };
 
-  const handleDeleteCard = async (cardId, e) => {
-    if (e) e.stopPropagation();
-    if (isViewer) return;
-    if (!window.confirm('Sei sicuro di voler eliminare questa scheda?')) return;
+  const handleDeleteCard = async (cardId) => {
+    if (!cardId) return;
 
     try {
-      await supabase.from('cards').delete().eq('id', cardId);
-      setCards((prev) => prev.filter((c) => c.id !== cardId));
-      if (modalCard?.id === cardId) setModalCard(null);
+      const folderPath = String(cardId);
+
+      // 1. Pulizia file dallo Storage 'card-attachments'
+      const { data: files } = await supabase.storage
+        .from('card-attachments')
+        .list(folderPath);
+
+      if (files && files.length > 0) {
+        const paths = files.map((f) => `${folderPath}/${f.name}`);
+        await supabase.storage.from('card-attachments').remove(paths);
+      }
+
+      // 2. Cancellazione record collegati nella tabella attachments
+      await supabase.from('attachments').delete().eq('card_id', folderPath);
+
+      // 3. Cancellazione della scheda vera e propria dal database
+      const { error } = await supabase.from('cards').delete().eq('id', cardId);
+
+      if (error) throw error;
+
+      // 4. Aggiorna lo stato locale per rimuovere la scheda dalla UI
+      setCards((prevCards) => prevCards.filter((c) => c.id !== cardId));
+
     } catch (err) {
-      alert('Errore eliminazione: ' + err.message);
+      console.error('Errore durante eliminazione scheda:', err);
+      alert('Errore eliminazione scheda: ' + err.message);
     }
   };
 

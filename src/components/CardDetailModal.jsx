@@ -73,27 +73,9 @@ export default function CardDetailModal({
 
     setIsSaving(true);
     try {
-      const folderPath = String(card.id);
-
-      // 1. Individua i file nello Storage
-      const { data: files } = await supabase.storage
-        .from('card-attachments')
-        .list(folderPath);
-
-      if (files && files.length > 0) {
-        const paths = files.map((f) => `${folderPath}/${f.name}`);
-        // 2. Elimina i file dallo Storage
-        await supabase.storage.from('card-attachments').remove(paths);
-      }
-
-      // 3. Elimina le righe dalla tabella attachments
-      await supabase.from('attachments').delete().eq('card_id', folderPath);
-
-      // 4. Invoca l'eliminazione della scheda genitore
       if (onDeleteCard) {
         await onDeleteCard(card.id);
       }
-
       onClose();
     } catch (err) {
       alert("Errore durante l'eliminazione: " + err.message);
