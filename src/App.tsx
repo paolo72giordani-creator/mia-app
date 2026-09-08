@@ -280,11 +280,52 @@ const handleAuth = async (e) => {
     if (!window.confirm(`Sei sicuro di voler eliminare definitivamente la bacheca "${boardTitle}" e tutti i suoi contenuti?`)) return;
 
     try {
-      // 1. Cancella la bacheca (Il Trigger SQL cancellerà automaticamente schede, allegati e file Storage)
-      const { error } = await supabase.from('boards').delete().eq('id', boardId);
-      if (error) throw error;
+      // 1. Recupera le colonne della bacheca
+      const { data: cols } = await supabase
+        .from('columns')
+        .select('id')
+        .eq('board_id', boardId);
 
-      // 2. Aggiorna lo stato locale
+      if (cols && cols.length > 0) {
+        const columnIds = cols.map((c) => String(c.id));
+
+        // 2. Recupera tutte le schede appartenenti alle colonne della bacheca
+        const { data: boardCards } = await supabase
+          .from('cards')
+          .select('id')
+          .in('column_id', columnIds);
+
+        // 3. Pulisce lo Storage per ciascuna scheda trovata
+        if (boardCards && boardCards.length > 0) {
+          for (const card of boardCards) {
+            const folderPath = String(card.id);
+
+            const { data: files } = await supabase.storage
+              .from('card-attachments')
+              .list(folderPath);
+
+            if (files && files.length > 0) {
+              const paths = files.map((f) => `${folderPath}/${f.name}`);
+              await supabase.storage.from('card-attachments').remove(paths);
+            }
+
+            await supabase.from('attachments').delete().eq('card_id', folderPath);
+          }
+
+          // Cancella le schede
+          const cardIds = boardCards.map((c) => c.id);
+          await supabase.from('cards').delete().in('id', cardIds);
+        }
+
+        // Cancella le colonne
+        await supabase.from('columns').delete().eq('board_id', boardId);
+      }
+
+      // 4. Cancella la bacheca
+      const { error: deleteErr } = await supabase.from('boards').delete().eq('id', boardId);
+      if (deleteErr) throw deleteErr;
+
+      // 5. Aggiorna lo stato UI
       setBoards((prev) => prev.filter((b) => b.id !== boardId));
       if (activeBoard?.id === boardId) setActiveBoard(null);
 
