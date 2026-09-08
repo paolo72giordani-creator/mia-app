@@ -173,7 +173,13 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 
   const handleDeleteColumn = async (columnId) => {
     if (!columnId) return;
-    if (!window.confirm('Cancellare questa colonna, tutte le sue schede e i relativi allegati?')) return;
+
+    // Messaggio chiaro di avvertimento
+    const confirmMessage = 
+      "⚠️ ATTENZIONE: Sei sicuro di voler eliminare questa colonna?\n\n" +
+      "Verranno cancellate DEFINITIVAMENTE tutte le schede contenute al suo interno e tutti i file allegati collegate ad esse.";
+
+    if (!window.confirm(confirmMessage)) return;
 
     try {
       const colIdStr = String(columnId);
@@ -191,7 +197,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
         for (const card of colCards) {
           const folderPath = String(card.id);
 
-          // Elenca i file nello Storage per la scheda corrente
           const { data: files } = await supabase.storage
             .from('card-attachments')
             .list(folderPath);
@@ -201,7 +206,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
             await supabase.storage.from('card-attachments').remove(paths);
           }
 
-          // Cancella le righe collegate nella tabella attachments
           await supabase.from('attachments').delete().eq('card_id', folderPath);
         }
 
