@@ -247,16 +247,13 @@ export default function CardDetailModal({
                     <span className="truncate max-w-[200px] font-medium">
                       📎 {pf.file.name}
                     </span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-blue-600 font-bold">(In attesa)</span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemovePendingFile(pf.id)}
-                        className="text-red-500 hover:text-red-700 font-bold"
-                      >
-                        ✕
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePendingFile(pf.id)}
+                      className="text-red-500 hover:text-red-700 font-bold"
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))}
               </div>
