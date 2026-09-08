@@ -19,8 +19,8 @@ export default function PresentationModal({
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   
-  // Dimensione font di default impostata a 20px
-  const [fontSize, setFontSize] = useState(20);
+  // Dimensione font di default impostata a 24px
+  const [fontSize, setFontSize] = useState(24);
 
   // Stato per il tema (default: scuro/cinema)
   const [isDarkMode, setIsDarkMode] = useState(true);
