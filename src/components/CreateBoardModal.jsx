@@ -7,9 +7,7 @@ const TEACHING_TEMPLATES = [
     icon: '📄',
     description: 'Una bacheca completamente personalizzabile da zero.',
     columns: [
-      { name: 'Da fare', color: 'bg-slate-600' },
-      { name: 'In corso', color: 'bg-amber-600' },
-      { name: 'Completato', color: 'bg-emerald-600' }
+
     ]
   },
   {
