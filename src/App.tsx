@@ -277,14 +277,49 @@ const handleAuth = async (e) => {
   const handleDeleteBoard = async (boardId, boardTitle, e) => {
     if (e) e.stopPropagation();
     setOpenMenuBoardId(null);
-    if (!window.confirm(`Sei sicuro di voler eliminare definitivamente la bacheca "${boardTitle}"?`)) return;
+    if (!window.confirm(`Sei sicuro di voler eliminare definitivamente la bacheca "${boardTitle}" e tutti i suoi allegati?`)) return;
 
     try {
+      // 1. Recupera tutte le schede (cards) collegate a questa bacheca
+      const { data: boardCards, error: cardsErr } = await supabase
+        .from('cards')
+        .select('id')
+        .eq('board_id', boardId);
+
+      if (cardsErr) console.error('Errore recupero schede per la bacheca:', cardsErr);
+
+      // 2. Per ogni scheda, pulisci i file memorizzati su Storage
+      if (boardCards && boardCards.length > 0) {
+        for (const card of boardCards) {
+          const folderPath = String(card.id);
+
+          // Trova i file memorizzati nello Storage
+          const { data: files } = await supabase.storage
+            .from('card-attachments')
+            .list(folderPath);
+
+          if (files && files.length > 0) {
+            const paths = files.map((f) => `${folderPath}/${f.name}`);
+            await supabase.storage.from('card-attachments').remove(paths);
+          }
+
+          // Rimuove i record dalla tabella attachments
+          await supabase.from('attachments').delete().eq('card_id', folderPath);
+        }
+      }
+
+      // 3. Cancella le schede e le colonne correlate dal DB
+      await supabase.from('cards').delete().eq('board_id', boardId);
+      await supabase.from('columns').delete().eq('board_id', boardId);
+
+      // 4. Cancella la bacheca dal DB
       const { error } = await supabase.from('boards').delete().eq('id', boardId);
       if (error) throw error;
 
+      // 5. Aggiorna lo stato locale di App
       setBoards((prev) => prev.filter((b) => b.id !== boardId));
       if (activeBoard?.id === boardId) setActiveBoard(null);
+
     } catch (err) {
       alert('Errore eliminazione bacheca: ' + err.message);
     }
