@@ -67,7 +67,6 @@ export default function CardDetailModal({
     }
   };
 
-  // NUOVA FUNZIONE: Cancella sia la cartella Storage che la scheda
   const handleDeleteCardWithAttachments = async () => {
     if (!card?.id || isSaving) return;
     if (!window.confirm('Cancellare questa scheda e tutti i suoi allegati?')) return;
@@ -76,29 +75,55 @@ export default function CardDetailModal({
     try {
       const currentCardId = String(card.id);
 
-      // 1. Elenca tutti i file contenuti nella cartella di questa scheda nello Storage
-      const { data: fileList, error: listErr } = await supabase.storage
+      // A. Recupera tutti i file memorizzati nel DB per questa scheda
+      const { data: dbAttachments } = await supabase
+        .from('attachments')
+        .select('file_url')
+        .eq('card_id', currentCardId);
+
+      const filesToDelete = [];
+
+      // Estrae i path dai file memorizzati
+      if (dbAttachments && dbAttachments.length > 0) {
+        dbAttachments.forEach((att) => {
+          if (att.file_url) {
+            const parts = att.file_url.split('/card-attachments/');
+            if (parts.length > 1) {
+              filesToDelete.push(decodeURIComponent(parts[1]));
+            }
+          }
+        });
+      }
+
+      // B. Recupera anche eventuali altri file presenti nella cartella dello storage
+      const { data: storageFiles } = await supabase.storage
         .from('card-attachments')
         .list(currentCardId);
 
-      if (!listErr && fileList && fileList.length > 0) {
-        // Costruisce i percorsi "card-id/nomefile"
-        const filesToRemove = fileList.map((f) => `${currentCardId}/${f.name}`);
+      if (storageFiles && storageFiles.length > 0) {
+        storageFiles.forEach((f) => {
+          const path = `${currentCardId}/${f.name}`;
+          if (!filesToDelete.includes(path)) {
+            filesToDelete.push(path);
+          }
+        });
+      }
 
-        // Rimuove i file fisici dal bucket
-        const { error: removeErr } = await supabase.storage
+      // C. Elimina i file dallo Storage
+      if (filesToDelete.length > 0) {
+        const { error: storageErr } = await supabase.storage
           .from('card-attachments')
-          .remove(filesToRemove);
+          .remove(filesToDelete);
 
-        if (removeErr) {
-          console.error('Errore rimozione file da Storage:', removeErr.message);
+        if (storageErr) {
+          console.error('Errore Storage Remove:', storageErr.message);
         }
       }
 
-      // 2. Cancella i record dalla tabella attachments
+      // D. Elimina le righe dal DB
       await supabase.from('attachments').delete().eq('card_id', currentCardId);
 
-      // 3. Cancella la scheda vera e propria
+      // E. Elimina la scheda
       if (onDeleteCard) {
         await onDeleteCard(card.id);
       }
