@@ -59,17 +59,22 @@ export default function PresentationModal({
       {/* HEADER SLIDE SHOW */}
       <div className="flex justify-between items-center max-w-5xl w-full mx-auto">
         <div className="flex items-center gap-3">
+          {/* BADGE NOME COLONNA ADATTIVO */}
           {currentCard.columnName && (
             <span
-              className="text-xs font-bold px-3 py-1 rounded-full border border-white/20 text-white shadow-sm"
-              style={{ backgroundColor: currentCard.columnColor || '#3b82f6' }}
+              className={`text-xs font-black px-3.5 py-1.5 rounded-full shadow-sm flex items-center gap-1.5 border ${
+                isDarkMode
+                  ? 'bg-blue-600/90 text-white border-white/20'
+                  : 'bg-white text-slate-900 border-slate-300/80 shadow-slate-200'
+              }`}
             >
-              📋 {currentCard.columnName}
+              <span>📋</span>
+              <span className="truncate max-w-[200px] sm:max-w-xs">{currentCard.columnName}</span>
             </span>
           )}
           <span
             className={`text-xs font-semibold ${
-              isDarkMode ? 'text-slate-400' : 'text-slate-500'
+              isDarkMode ? 'text-slate-400' : 'text-slate-600'
             }`}
           >
             Scheda {currentIndex + 1} di {cards.length}
@@ -81,10 +86,10 @@ export default function PresentationModal({
           <button
             type="button"
             onClick={() => setIsDarkMode(!isDarkMode)}
-            className={`px-3 py-1 text-xs font-bold rounded-xl transition border flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition border flex items-center gap-1.5 ${
               isDarkMode
                 ? 'bg-white/10 hover:bg-white/20 border-white/10 text-amber-300'
-                : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-800'
+                : 'bg-white hover:bg-slate-200 border-slate-300 text-slate-800 shadow-sm'
             }`}
             title="Cambia tema della presentazione"
           >
@@ -96,7 +101,7 @@ export default function PresentationModal({
             className={`flex items-center rounded-xl border p-0.5 ${
               isDarkMode
                 ? 'bg-white/10 border-white/10'
-                : 'bg-slate-200 border-slate-300'
+                : 'bg-white border-slate-300 shadow-sm'
             }`}
           >
             <button
@@ -105,14 +110,14 @@ export default function PresentationModal({
               className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
                 isDarkMode
                   ? 'text-slate-300 hover:text-white hover:bg-white/10'
-                  : 'text-slate-700 hover:text-black hover:bg-slate-300'
+                  : 'text-slate-700 hover:text-black hover:bg-slate-100'
               }`}
               title="Riduci testo"
             >
               A-
             </button>
             <span
-              className={`text-[10px] px-1 font-mono ${
+              className={`text-[10px] px-1 font-mono font-bold ${
                 isDarkMode ? 'text-slate-400' : 'text-slate-600'
               }`}
             >
@@ -124,7 +129,7 @@ export default function PresentationModal({
               className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
                 isDarkMode
                   ? 'text-slate-300 hover:text-white hover:bg-white/10'
-                  : 'text-slate-700 hover:text-black hover:bg-slate-300'
+                  : 'text-slate-700 hover:text-black hover:bg-slate-100'
               }`}
               title="Ingrandisci testo"
             >
@@ -142,7 +147,7 @@ export default function PresentationModal({
               className={`text-xs font-bold px-3.5 py-1.5 rounded-xl transition border flex items-center gap-1.5 ${
                 isDarkMode
                   ? 'bg-white/10 hover:bg-white/20 border-white/10 text-white'
-                  : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-800'
+                  : 'bg-white hover:bg-slate-200 border-slate-300 text-slate-800 shadow-sm'
               }`}
             >
               ✏️ Modifica
@@ -243,7 +248,7 @@ export default function PresentationModal({
           className={`font-extrabold text-sm px-5 py-2.5 rounded-2xl transition border flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed disabled:opacity-20 ${
             isDarkMode
               ? 'bg-white/10 hover:bg-white/20 border-white/10 text-white'
-              : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-800'
+              : 'bg-white hover:bg-slate-200 border-slate-300 text-slate-800 shadow-sm'
           }`}
         >
           ← Precedente
@@ -251,12 +256,12 @@ export default function PresentationModal({
 
         <span
           className={`text-xs font-medium hidden sm:block ${
-            isDarkMode ? 'text-slate-400' : 'text-slate-500'
+            isDarkMode ? 'text-slate-400' : 'text-slate-600'
           }`}
         >
           Usa le frecce{' '}
           <kbd
-            className={`px-1.5 py-0.5 rounded text-[10px] ${
+            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
               isDarkMode
                 ? 'bg-slate-800 text-slate-300'
                 : 'bg-slate-200 text-slate-700'
@@ -265,7 +270,7 @@ export default function PresentationModal({
             ←
           </kbd>{' '}
           <kbd
-            className={`px-1.5 py-0.5 rounded text-[10px] ${
+            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
               isDarkMode
                 ? 'bg-slate-800 text-slate-300'
                 : 'bg-slate-200 text-slate-700'
