@@ -7,7 +7,12 @@ export default function PresentationModal({
   onEditCard
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [fontSize, setFontSize] = useState(18);
+  
+  // Dimensione font di default impostata a 20px
+  const [fontSize, setFontSize] = useState(20);
+
+  // Stato per il tema (default: scuro/cinema)
+  const [isDarkMode, setIsDarkMode] = useState(true);
 
   const currentCard = cards[currentIndex];
 
@@ -40,11 +45,17 @@ export default function PresentationModal({
     }
   };
 
-  const handleIncreaseFont = () => setFontSize((prev) => Math.min(prev + 2, 36));
+  const handleIncreaseFont = () => setFontSize((prev) => Math.min(prev + 2, 40));
   const handleDecreaseFont = () => setFontSize((prev) => Math.max(prev - 2, 14));
 
   return (
-    <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col justify-between p-6 z-50 text-white font-sans">
+    <div
+      className={`fixed inset-0 flex flex-col justify-between p-6 z-50 font-sans transition-colors duration-300 ${
+        isDarkMode
+          ? 'bg-slate-950/95 backdrop-blur-md text-white'
+          : 'bg-slate-100/95 backdrop-blur-md text-slate-900'
+      }`}
+    >
       {/* HEADER SLIDE SHOW */}
       <div className="flex justify-between items-center max-w-5xl w-full mx-auto">
         <div className="flex items-center gap-3">
@@ -56,27 +67,65 @@ export default function PresentationModal({
               📋 {currentCard.columnName}
             </span>
           )}
-          <span className="text-xs text-slate-400 font-semibold">
+          <span
+            className={`text-xs font-semibold ${
+              isDarkMode ? 'text-slate-400' : 'text-slate-500'
+            }`}
+          >
             Scheda {currentIndex + 1} di {cards.length}
           </span>
         </div>
 
         <div className="flex items-center gap-3">
+          {/* TOGGLE TEMA CHIARO / SCURO */}
+          <button
+            type="button"
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            className={`px-3 py-1 text-xs font-bold rounded-xl transition border flex items-center gap-1.5 ${
+              isDarkMode
+                ? 'bg-white/10 hover:bg-white/20 border-white/10 text-amber-300'
+                : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-800'
+            }`}
+            title="Cambia tema della presentazione"
+          >
+            {isDarkMode ? '☀️ Chiaro' : '🌙 Scuro'}
+          </button>
+
           {/* SELETTORE DIMENSIONE TESTO */}
-          <div className="flex items-center bg-white/10 rounded-xl border border-white/10 p-0.5">
+          <div
+            className={`flex items-center rounded-xl border p-0.5 ${
+              isDarkMode
+                ? 'bg-white/10 border-white/10'
+                : 'bg-slate-200 border-slate-300'
+            }`}
+          >
             <button
               type="button"
               onClick={handleDecreaseFont}
-              className="px-2.5 py-1 text-xs font-bold text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition"
+              className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+                isDarkMode
+                  ? 'text-slate-300 hover:text-white hover:bg-white/10'
+                  : 'text-slate-700 hover:text-black hover:bg-slate-300'
+              }`}
               title="Riduci testo"
             >
               A-
             </button>
-            <span className="text-[10px] text-slate-400 px-1 font-mono">{fontSize}px</span>
+            <span
+              className={`text-[10px] px-1 font-mono ${
+                isDarkMode ? 'text-slate-400' : 'text-slate-600'
+              }`}
+            >
+              {fontSize}px
+            </span>
             <button
               type="button"
               onClick={handleIncreaseFont}
-              className="px-2.5 py-1 text-xs font-bold text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition"
+              className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+                isDarkMode
+                  ? 'text-slate-300 hover:text-white hover:bg-white/10'
+                  : 'text-slate-700 hover:text-black hover:bg-slate-300'
+              }`}
               title="Ingrandisci testo"
             >
               A+
@@ -90,7 +139,11 @@ export default function PresentationModal({
                 onClose();
                 onEditCard(currentCard);
               }}
-              className="text-xs font-bold bg-white/10 hover:bg-white/20 px-3.5 py-1.5 rounded-xl transition border border-white/10 flex items-center gap-1.5"
+              className={`text-xs font-bold px-3.5 py-1.5 rounded-xl transition border flex items-center gap-1.5 ${
+                isDarkMode
+                  ? 'bg-white/10 hover:bg-white/20 border-white/10 text-white'
+                  : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-800'
+              }`}
             >
               ✏️ Modifica
             </button>
@@ -99,7 +152,11 @@ export default function PresentationModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-white font-black text-lg px-2 py-1 transition"
+            className={`font-black text-lg px-2 py-1 transition ${
+              isDarkMode
+                ? 'text-slate-400 hover:text-white'
+                : 'text-slate-500 hover:text-slate-900'
+            }`}
             title="Chiudi presentazione (ESC)"
           >
             ✕
@@ -108,26 +165,54 @@ export default function PresentationModal({
       </div>
 
       {/* CONTENUTO CENTRALE SLIDE */}
-      <div className="max-w-4xl w-full mx-auto my-auto bg-slate-900/80 border border-slate-800 rounded-3xl p-8 shadow-2xl flex flex-col gap-6 relative overflow-hidden">
-        <h1 className="text-2xl sm:text-4xl font-black text-white leading-tight tracking-tight">
+      <div
+        className={`max-w-4xl w-full mx-auto my-auto border rounded-3xl p-8 shadow-2xl flex flex-col gap-6 relative overflow-hidden transition-colors duration-300 ${
+          isDarkMode
+            ? 'bg-slate-900/90 border-slate-800'
+            : 'bg-white border-slate-200 shadow-slate-300/50'
+        }`}
+      >
+        <h1
+          className={`text-2xl sm:text-4xl font-black leading-tight tracking-tight ${
+            isDarkMode ? 'text-white' : 'text-slate-900'
+          }`}
+        >
           {currentCard.title}
         </h1>
 
-        {/* DESCRIZIONE RENDERIZZATA IN MARKDOWN */}
+        {/* DESCRIZIONE RENDERIZZATA IN MARKDOWN CON FONT DINAMICO */}
         {currentCard.description ? (
-          <div 
-            className="text-slate-300 leading-relaxed font-normal whitespace-pre-wrap max-h-[45vh] overflow-y-auto pr-2"
+          <div
+            className={`leading-relaxed font-normal whitespace-pre-wrap max-h-[45vh] overflow-y-auto pr-2 ${
+              isDarkMode ? 'text-slate-300' : 'text-slate-700'
+            }`}
             style={{ fontSize: `${fontSize}px` }}
           >
             <ReactMarkdown>{currentCard.description}</ReactMarkdown>
           </div>
         ) : (
-          <p className="text-slate-500 italic text-xs">Nessuna descrizione presente per questa scheda.</p>
+          <p
+            className={`italic text-xs ${
+              isDarkMode ? 'text-slate-500' : 'text-slate-400'
+            }`}
+          >
+            Nessuna descrizione presente per questa scheda.
+          </p>
         )}
 
         {currentCard.attachments && currentCard.attachments.length > 0 && (
-          <div className="pt-4 border-t border-slate-800/80">
-            <span className="block text-xs font-bold text-slate-400 mb-2">📎 Allegati della scheda:</span>
+          <div
+            className={`pt-4 border-t ${
+              isDarkMode ? 'border-slate-800' : 'border-slate-100'
+            }`}
+          >
+            <span
+              className={`block text-xs font-bold mb-2 ${
+                isDarkMode ? 'text-slate-400' : 'text-slate-500'
+              }`}
+            >
+              📎 Allegati della scheda:
+            </span>
             <div className="flex flex-wrap gap-2">
               {currentCard.attachments.map((att) => (
                 <a
@@ -135,7 +220,11 @@ export default function PresentationModal({
                   href={att.file_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-blue-300 border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-semibold transition truncate max-w-xs flex items-center gap-2"
+                  className={`border px-3.5 py-2 rounded-xl text-xs font-semibold transition truncate max-w-xs flex items-center gap-2 ${
+                    isDarkMode
+                      ? 'bg-slate-800 hover:bg-slate-700 text-blue-400 border-slate-700'
+                      : 'bg-slate-100 hover:bg-slate-200 text-blue-600 border-slate-200'
+                  }`}
                 >
                   📄 {att.file_name}
                 </a>
@@ -151,13 +240,40 @@ export default function PresentationModal({
           type="button"
           onClick={handlePrev}
           disabled={currentIndex === 0}
-          className="bg-white/10 hover:bg-white/20 disabled:opacity-20 text-white font-extrabold text-sm px-5 py-2.5 rounded-2xl transition border border-white/10 flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+          className={`font-extrabold text-sm px-5 py-2.5 rounded-2xl transition border flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed disabled:opacity-20 ${
+            isDarkMode
+              ? 'bg-white/10 hover:bg-white/20 border-white/10 text-white'
+              : 'bg-slate-200 hover:bg-slate-300 border-slate-300 text-slate-800'
+          }`}
         >
           ← Precedente
         </button>
 
-        <span className="text-xs text-slate-400 font-medium hidden sm:block">
-          Usa le frecce <kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-300">←</kbd> <kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-300">→</kbd> della tastiera
+        <span
+          className={`text-xs font-medium hidden sm:block ${
+            isDarkMode ? 'text-slate-400' : 'text-slate-500'
+          }`}
+        >
+          Usa le frecce{' '}
+          <kbd
+            className={`px-1.5 py-0.5 rounded text-[10px] ${
+              isDarkMode
+                ? 'bg-slate-800 text-slate-300'
+                : 'bg-slate-200 text-slate-700'
+            }`}
+          >
+            ←
+          </kbd>{' '}
+          <kbd
+            className={`px-1.5 py-0.5 rounded text-[10px] ${
+              isDarkMode
+                ? 'bg-slate-800 text-slate-300'
+                : 'bg-slate-200 text-slate-700'
+            }`}
+          >
+            →
+          </kbd>{' '}
+          della tastiera
         </span>
 
         <button
