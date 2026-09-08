@@ -616,12 +616,18 @@ const handleSaveCardFromModal = async (savedCard, isNew) => {
                             </h4>
                             {!isViewer && (
                               <button
-                                onClick={(e) => handleDeleteCard(card.id, e)}
-                                title="Elimina scheda"
-                                className="text-slate-300 hover:text-red-600 transition p-0.5 rounded hover:bg-red-50 text-sm font-bold"
-                              >
-                                🗑️
-                              </button>
+  type="button"
+  onClick={(e) => {
+    e.stopPropagation(); // Stop alla propagazione: impedisce l'apertura del modale di dettaglio
+    if (window.confirm('Cancellare questa scheda e tutti i suoi allegati?')) {
+      handleDeleteCard(card.id);
+    }
+  }}
+  className="text-slate-400 hover:text-red-500 p-1 rounded-md transition"
+  title="Elimina scheda"
+>
+  🗑️
+</button>
                             )}
                           </div>
 
