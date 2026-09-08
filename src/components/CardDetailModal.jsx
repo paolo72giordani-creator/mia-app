@@ -259,6 +259,23 @@ export default function CardDetailModal({
               className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-blue-500 font-medium resize-none text-slate-800"
             />
           </div>
+		  
+		  <div>
+  <label className="block text-xs font-bold text-slate-700 mb-1">
+    Descrizione / Note
+  </label>
+  <textarea
+    rows={4}
+    readOnly={isViewer}
+    value={description}
+    onChange={(e) => setDescription(e.target.value)}
+    placeholder="Aggiungi dettagli, istruzioni o appunti..."
+    className="w-full border border-slate-300 rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-blue-500 font-medium resize-none text-slate-800"
+  />
+  <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1 font-medium">
+    💡 Formattazione rapida: <strong>**grassetto**</strong>, <em>*corsivo*</em>, e - per le liste.
+  </p>
+</div>
 
           {/* ALLEGATI */}
           <div>

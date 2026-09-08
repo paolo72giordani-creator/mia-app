@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 export default function PresentationModal({
   cards = [],
@@ -6,13 +7,10 @@ export default function PresentationModal({
   onEditCard
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  
-  // Stato per la dimensione del font (default: 18px)
   const [fontSize, setFontSize] = useState(18);
 
   const currentCard = cards[currentIndex];
 
-  // Gestione scorciatoie da tastiera (Frecce + ESC)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowRight') {
@@ -115,12 +113,13 @@ export default function PresentationModal({
           {currentCard.title}
         </h1>
 
+        {/* DESCRIZIONE RENDERIZZATA IN MARKDOWN */}
         {currentCard.description ? (
           <div 
             className="text-slate-300 leading-relaxed font-normal whitespace-pre-wrap max-h-[45vh] overflow-y-auto pr-2"
             style={{ fontSize: `${fontSize}px` }}
           >
-            {currentCard.description}
+            <ReactMarkdown>{currentCard.description}</ReactMarkdown>
           </div>
         ) : (
           <p className="text-slate-500 italic text-xs">Nessuna descrizione presente per questa scheda.</p>
