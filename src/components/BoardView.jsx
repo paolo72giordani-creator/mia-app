@@ -735,14 +735,19 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
                 {/* PULSANTE TRATTEGGIATO IN FONDO */}
                 {!isViewer && (
                   <button
-                    onClick={() => {
-                      setModalCard(null);
-                      setModalColId(col.id);
-                    }}
-                    className="w-full py-2 px-3 rounded-lg border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-blue-700 font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm mt-2"
-                  >
-                    <span>+</span> Aggiungi scheda
-                  </button>
+  onClick={() => {
+    setModalColId(col.id);
+    setModalCard({
+      id: null,
+      title: '',
+      description: '',
+      position: colCards.length // <-- La nuova scheda avrà come posizione la lunghezza attuale della colonna
+    });
+  }}
+  className="w-full py-2 px-3 rounded-lg border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-blue-700 font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-sm mt-2"
+>
+  <span>+</span> Aggiungi scheda
+</button>
                 )}
               </div>
             </div>

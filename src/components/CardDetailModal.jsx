@@ -147,7 +147,7 @@ export default function CardDetailModal({
         column_id: String(columnId),
         title: title.trim(),
         description: description.trim(),
-        position: card?.position ?? Math.floor(Math.random() * 1000)
+        position: card?.position ?? 999999 // <-- SOSTITUITO IL NUMERO CASUALE CON 999999
       };
 
       // 1. Salva/Aggiorna la Scheda
