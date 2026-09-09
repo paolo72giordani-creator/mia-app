@@ -720,22 +720,19 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 							</div>
 							)}
 
-                          {/* LISTA ALLEGATI DIRETTI CON LINK CLICCABILE */}
+                          {/* NUOVO CODICE CON LINK IPERTESTUALI REALI */}
 {card.attachments && card.attachments.length > 0 && (
-  <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
-    <span className="text-[10px] font-bold text-slate-400 block">
-      📎 Allegati:
-    </span>
+  <div className="mt-2 pt-1.5 border-t border-slate-100 space-y-1">
     {card.attachments.map((att) => (
       <a
         key={att.id}
         href={att.file_url}
         target="_blank"
         rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()} // Evita l'apertura del modale di modifica al click sul link
-        className="text-[11px] text-blue-600 hover:text-blue-800 hover:underline font-bold flex items-center gap-1 truncate block"
+        onClick={(e) => e.stopPropagation()}
+        className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 truncate block"
       >
-        📄 {att.file_name}
+        📎 {att.file_name}
       </a>
     ))}
   </div>
