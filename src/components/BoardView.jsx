@@ -721,12 +721,29 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 							)}
 
                           {card.attachments && card.attachments.length > 0 && (
-                            <div className="flex justify-end pt-1.5 border-t border-slate-100">
-                              <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200 font-medium">
-                                📎 {card.attachments.length}
-                              </span>
-                            </div>
-                          )}
+							  <div className="mt-2 pt-2 border-t border-slate-100">
+								<span className="text-[10px] font-bold text-slate-400 block mb-1">
+								  📎 Allegati:
+								</span>
+								<div className="flex flex-col gap-1">
+								  {card.attachments.map((att) => (
+									<a
+									  key={att.id}
+									  href={att.file_url}
+									  target="_blank"
+									  rel="noopener noreferrer"
+									  className="text-xs text-blue-600 hover:underline font-semibold flex items-center gap-1"
+									>
+									  <span>📄 {att.file_name}</span>
+									  {/* Mostrare l'URL tra parentesi garantisce la cliccabilità anche se convertito in Word/PDF */}
+									  <span className="text-[9px] text-slate-400 font-normal">
+										({att.file_url})
+									  </span>
+									</a>
+								  ))}
+								</div>
+							  </div>
+							)}
                         </div>
                       </React.Fragment>
                     );
