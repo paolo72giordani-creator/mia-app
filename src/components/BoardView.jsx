@@ -720,30 +720,26 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
 							</div>
 							)}
 
-                          {card.attachments && card.attachments.length > 0 && (
-							  <div className="mt-2 pt-2 border-t border-slate-100">
-								<span className="text-[10px] font-bold text-slate-400 block mb-1">
-								  📎 Allegati:
-								</span>
-								<div className="flex flex-col gap-1">
-								  {card.attachments.map((att) => (
-									<a
-									  key={att.id}
-									  href={att.file_url}
-									  target="_blank"
-									  rel="noopener noreferrer"
-									  className="text-xs text-blue-600 hover:underline font-semibold flex items-center gap-1"
-									>
-									  <span>📄 {att.file_name}</span>
-									  {/* Mostrare l'URL tra parentesi garantisce la cliccabilità anche se convertito in Word/PDF */}
-									  <span className="text-[9px] text-slate-400 font-normal">
-										({att.file_url})
-									  </span>
-									</a>
-								  ))}
-								</div>
-							  </div>
-							)}
+                          {/* LISTA ALLEGATI DIRETTI CON LINK CLICCABILE */}
+{card.attachments && card.attachments.length > 0 && (
+  <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
+    <span className="text-[10px] font-bold text-slate-400 block">
+      📎 Allegati:
+    </span>
+    {card.attachments.map((att) => (
+      <a
+        key={att.id}
+        href={att.file_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()} // Evita l'apertura del modale di modifica al click sul link
+        className="text-[11px] text-blue-600 hover:text-blue-800 hover:underline font-bold flex items-center gap-1 truncate block"
+      >
+        📄 {att.file_name}
+      </a>
+    ))}
+  </div>
+)}
                         </div>
                       </React.Fragment>
                     );
