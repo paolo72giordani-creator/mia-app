@@ -14,27 +14,45 @@ export default function PresentationModal({
   const currentCard = cards[currentIndex];
 
   // Gestione della modalità Fullscreen nativa del browser
+  // Gestione Fullscreen Cross-Browser robusta
   const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().then(() => {
-        setIsFullscreen(true);
-      }).catch((err) => {
-        console.error('Errore durante l\'attivazione dello schermo intero:', err);
-      });
+    const elem = document.documentElement;
+
+    if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
+      if (elem.requestFullscreen) {
+        elem.requestFullscreen().catch((err) => console.log('Errore Fullscreen:', err));
+      } else if (elem.webkitRequestFullscreen) { /* Safari / Chrome vecchi */
+        elem.webkitRequestFullscreen();
+      } else if (elem.msRequestFullscreen) { /* IE/Edge vecchi */
+        elem.msRequestFullscreen();
+      }
+      setIsFullscreen(true);
     } else {
       if (document.exitFullscreen) {
-        document.exitFullscreen().then(() => {
-          setIsFullscreen(false);
-        });
+        document.exitFullscreen().catch((err) => console.log('Errore Exit Fullscreen:', err));
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
       }
+      setIsFullscreen(false);
     }
   };
 
   // Monitora gli eventi di cambio fullscreen (es. se l'utente preme ESC dal browser)
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+      setIsFullscreen(isFull);
     };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+    };
+  }, []);
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
