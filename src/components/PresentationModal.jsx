@@ -13,17 +13,15 @@ export default function PresentationModal({
 
   const currentCard = cards[currentIndex];
 
-  // Gestione della modalità Fullscreen nativa del browser
-  // Gestione Fullscreen Cross-Browser robusta
   const toggleFullscreen = () => {
     const elem = document.documentElement;
 
     if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
       if (elem.requestFullscreen) {
         elem.requestFullscreen().catch((err) => console.log('Errore Fullscreen:', err));
-      } else if (elem.webkitRequestFullscreen) { /* Safari / Chrome vecchi */
+      } else if (elem.webkitRequestFullscreen) {
         elem.webkitRequestFullscreen();
-      } else if (elem.msRequestFullscreen) { /* IE/Edge vecchi */
+      } else if (elem.msRequestFullscreen) {
         elem.msRequestFullscreen();
       }
       setIsFullscreen(true);
@@ -39,7 +37,6 @@ export default function PresentationModal({
     }
   };
 
-  // Monitora gli eventi di cambio fullscreen (es. se l'utente preme ESC dal browser)
   useEffect(() => {
     const handleFullscreenChange = () => {
       const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
@@ -54,14 +51,13 @@ export default function PresentationModal({
     };
   }, []);
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
-
-  // Chiudi lo schermo intero se il modale viene chiuso
   const handleClose = () => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
+    if (document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement) {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
     }
     onClose();
   };
@@ -129,7 +125,6 @@ export default function PresentationModal({
         </div>
 
         <div className="flex items-center gap-3">
-          {/* PULSANTE SCHERMO INTERO (FULLSCREEN) */}
           <button
             type="button"
             onClick={toggleFullscreen}
@@ -143,7 +138,6 @@ export default function PresentationModal({
             {isFullscreen ? '⤢ Riduci' : '⤢ Fullscreen'}
           </button>
 
-          {/* TOGGLE TEMA CHIARO / SCURO */}
           <button
             type="button"
             onClick={() => setIsDarkMode(!isDarkMode)}
@@ -157,7 +151,6 @@ export default function PresentationModal({
             {isDarkMode ? '☀️ Chiaro' : '🌙 Scuro'}
           </button>
 
-          {/* SELETTORE DIMENSIONE TESTO */}
           <div
             className={`flex items-center rounded-xl border p-0.5 ${
               isDarkMode
@@ -246,7 +239,6 @@ export default function PresentationModal({
           {currentCard.title}
         </h1>
 
-        {/* DESCRIZIONE RENDERIZZATA IN MARKDOWN CON FONT DINAMICO */}
         {currentCard.description ? (
           <div
             className={`leading-relaxed font-normal whitespace-pre-wrap max-h-[45vh] overflow-y-auto pr-2 ${
