@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 
 export default function PresentationModal({
@@ -11,34 +11,21 @@ export default function PresentationModal({
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const modalRef = useRef(null);
   const currentCard = cards[currentIndex];
 
-  const toggleFullscreen = () => {
-    // 1. Tenta la chiamata API nativa
-    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-      if (modalRef.current?.requestFullscreen) {
-        modalRef.current.requestFullscreen().catch(() => {});
-      } else if (modalRef.current?.webkitRequestFullscreen) {
-        modalRef.current.webkitRequestFullscreen();
-      }
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {});
-      } else if (document.webkitExitFullscreen) {
-        document.webkitExitFullscreen();
-      }
-    }
+  // Sincronizza lo stato React quando si entra/esce dal fullscreen (anche via ESC)
+  useEffect(() => {
+    const handleChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
 
-    // 2. Forza SEMPRE lo stato CSS per espandere la modale a tutto schermo
-    setIsFullscreen((prev) => !prev);
-  };
+    document.addEventListener('fullscreenchange', handleChange);
+    return () => document.removeEventListener('fullscreenchange', handleChange);
+  }, []);
 
   const handleClose = () => {
-    if (document.fullscreenElement || document.webkitFullscreenElement) {
-      if (document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {});
-      }
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
     }
     onClose();
   };
@@ -79,17 +66,14 @@ export default function PresentationModal({
 
   return (
     <div
-      ref={modalRef}
-      className={`fixed inset-0 z-[9999] w-screen h-screen flex flex-col justify-between font-sans transition-colors duration-300 ${
-        isFullscreen ? 'p-2 sm:p-4' : 'p-6'
-      } ${
+      className={`fixed inset-0 flex flex-col justify-between p-6 z-50 font-sans transition-colors duration-300 ${
         isDarkMode
-          ? 'bg-slate-950 text-white'
-          : 'bg-slate-100 text-slate-900'
+          ? 'bg-slate-950/95 backdrop-blur-md text-white'
+          : 'bg-slate-100/95 backdrop-blur-md text-slate-900'
       }`}
     >
       {/* HEADER SLIDE SHOW */}
-      <div className="flex justify-between items-center max-w-6xl w-full mx-auto shrink-0">
+      <div className="flex justify-between items-center max-w-5xl w-full mx-auto">
         <div className="flex items-center gap-3">
           {currentCard.columnName && (
             <span
@@ -109,15 +93,26 @@ export default function PresentationModal({
         </div>
 
         <div className="flex items-center gap-3">
+          {/* PULSANTE FULLSCREEN IDENTICO AL TUO SCRIPT */}
           <button
             type="button"
-            onClick={toggleFullscreen}
+            onClick={() => {
+              if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch((err) => {
+                  console.error('Errore attivazione fullscreen:', err);
+                });
+              } else {
+                document.exitFullscreen().catch((err) => {
+                  console.error('Errore disattivazione fullscreen:', err);
+                });
+              }
+            }}
             className={`px-3 py-1.5 text-xs font-bold rounded-xl transition border flex items-center gap-1.5 ${
               isDarkMode
                 ? 'bg-white/10 hover:bg-white/20 border-white/10 text-white'
                 : 'bg-white hover:bg-slate-200 border-slate-300 text-slate-800 shadow-sm'
             }`}
-            title="Espandi/Riduci presentazione"
+            title="Attiva o disattiva Schermo Intero"
           >
             {isFullscreen ? '⤢ Riduci' : '⤢ Fullscreen'}
           </button>
@@ -209,16 +204,14 @@ export default function PresentationModal({
 
       {/* CONTENUTO CENTRALE SLIDE */}
       <div
-        className={`w-full mx-auto my-auto border rounded-3xl p-6 sm:p-10 shadow-2xl flex flex-col gap-6 relative overflow-hidden transition-all duration-300 ${
-          isFullscreen ? 'max-w-5xl h-[82vh]' : 'max-w-4xl h-auto'
-        } ${
+        className={`max-w-4xl w-full mx-auto my-auto border rounded-3xl p-8 shadow-2xl flex flex-col gap-6 relative overflow-hidden transition-colors duration-300 ${
           isDarkMode
-            ? 'bg-slate-900/95 border-slate-800'
+            ? 'bg-slate-900/90 border-slate-800'
             : 'bg-white border-slate-200 shadow-slate-300/50'
         }`}
       >
         <h1
-          className={`text-2xl sm:text-4xl font-black leading-tight tracking-tight shrink-0 ${
+          className={`text-2xl sm:text-4xl font-black leading-tight tracking-tight ${
             isDarkMode ? 'text-white' : 'text-slate-900'
           }`}
         >
@@ -227,7 +220,7 @@ export default function PresentationModal({
 
         {currentCard.description ? (
           <div
-            className={`leading-relaxed font-normal whitespace-pre-wrap flex-1 overflow-y-auto pr-2 ${
+            className={`leading-relaxed font-normal whitespace-pre-wrap max-h-[45vh] overflow-y-auto pr-2 ${
               isDarkMode ? 'text-slate-300' : 'text-slate-700'
             }`}
             style={{ fontSize: `${fontSize}px` }}
@@ -246,7 +239,7 @@ export default function PresentationModal({
 
         {currentCard.attachments && currentCard.attachments.length > 0 && (
           <div
-            className={`pt-4 border-t shrink-0 ${
+            className={`pt-4 border-t ${
               isDarkMode ? 'border-slate-800' : 'border-slate-100'
             }`}
           >
@@ -279,7 +272,7 @@ export default function PresentationModal({
       </div>
 
       {/* FOOTER BARRA NAVIGAZIONE */}
-      <div className="flex justify-between items-center max-w-xl w-full mx-auto pt-2 shrink-0">
+      <div className="flex justify-between items-center max-w-xl w-full mx-auto pt-4">
         <button
           type="button"
           onClick={handlePrev}
