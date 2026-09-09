@@ -734,7 +734,6 @@ export default function BoardView({ activeBoard, currentUser, onBack, onOpenShar
       >
         📎 {att.file_name}
       </a>
-	  console.log('Dati schede ricevuti:', data);
     ))}
   </div>
 )}

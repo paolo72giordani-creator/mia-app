@@ -1,24 +1,24 @@
-// Funzione per generare e scaricare un file HTML/Word formattato
-export const exportBoardToWord = (boardTitle, columns, cards) => {
+export function exportBoardToWord(boardTitle, columns, cards) {
   let htmlContent = `
     <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
     <head>
       <meta charset='utf-8'>
       <title>${boardTitle}</title>
       <style>
-        body { font-family: Arial, sans-serif; font-size: 12pt; color: #1e293b; margin: 20px; }
-        h1 { color: #1e3a8a; font-size: 20pt; border-bottom: 2px solid #2563eb; padding-bottom: 8px; }
-        .column { margin-top: 24px; margin-bottom: 16px; page-break-inside: avoid; }
-        .column-title { font-size: 14pt; font-weight: bold; background-color: #f1f5f9; padding: 8px 12px; border-left: 5px solid #2563eb; }
-        .card { border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; margin-top: 10px; background-color: #ffffff; }
-        .card-title { font-size: 12pt; font-weight: bold; color: #0f172a; margin-bottom: 4px; }
-        .card-desc { font-size: 10pt; color: #475569; margin-top: 4px; white-space: pre-wrap; }
-        .attachments { font-size: 9pt; color: #2563eb; margin-top: 6px; font-style: italic; }
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { color: #1e293b; border-bottom: 2px solid #2563eb; padding-bottom: 8px; }
+        .column { margin-top: 24px; }
+        .column-title { font-size: 18px; color: #1e3a8a; background-color: #f1f5f9; padding: 8px 12px; border-radius: 6px; }
+        .card { border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 12px; background-color: #ffffff; }
+        .card-title { font-size: 16px; font-weight: bold; color: #0f172a; margin-bottom: 6px; }
+        .card-description { font-size: 14px; color: #334155; line-height: 1.5; }
+        .attachment-container { margin-top: 10px; padding-top: 8px; border-top: 1px solid #e2e8f0; }
+        .attachment-title { font-size: 12px; font-weight: bold; color: #64748b; margin-bottom: 4px; }
+        .attachment-link { font-size: 13px; color: #2563eb; text-decoration: underline; font-weight: bold; }
       </style>
     </head>
     <body>
-      <h1>Bacheca: ${boardTitle}</h1>
-      <p style="font-size: 10pt; color: #64748b;">Esportato da Doceo Kanban il ${new Date().toLocaleDateString('it-IT')}</p>
+      <h1>📋 ${boardTitle}</h1>
   `;
 
   columns.forEach((col) => {
@@ -26,25 +26,46 @@ export const exportBoardToWord = (boardTitle, columns, cards) => {
 
     htmlContent += `
       <div class="column">
-        <div class="column-title">${col.name} (${colCards.length})</div>
+        <h2 class="column-title">${col.name} (${colCards.length})</h2>
     `;
 
     if (colCards.length === 0) {
-      htmlContent += `<p style="font-size: 10pt; color: #94a3b8; font-style: italic; padding-left: 12px;">Nessuna scheda presente in questa colonna.</p>`;
+      htmlContent += `<p style="font-style: italic; color: #94a3b8;">Nessuna scheda in questa colonna.</p>`;
     } else {
       colCards.forEach((card) => {
         const desc = card.description || card.details || '';
+
         htmlContent += `
           <div class="card">
             <div class="card-title">${card.title}</div>
-            ${desc ? `<div class="card-desc">${desc}</div>` : ''}
-            ${
-              card.attachments && card.attachments.length > 0
-                ? `<div class="attachments">📎 ${card.attachments.length} allegati associati</div>`
-                : ''
-            }
-          </div>
+            ${desc ? `<div class="card-description">${desc}</div>` : ''}
         `;
+
+        // GENERAZIONE LINK IPERTESTUALI DIRETTI AGLI ALLEGATI
+        if (card.attachments && card.attachments.length > 0) {
+          htmlContent += `
+            <div class="attachment-container">
+              <div class="attachment-title">📎 Allegati:</div>
+              <ul>
+          `;
+
+          card.attachments.forEach((att) => {
+            htmlContent += `
+              <li style="margin-bottom: 4px;">
+                <a href="${att.file_url}" target="_blank" class="attachment-link">
+                  📄 ${att.file_name}
+                </a>
+              </li>
+            `;
+          });
+
+          htmlContent += `
+              </ul>
+            </div>
+          `;
+        }
+
+        htmlContent += `</div>`;
       });
     }
 
@@ -56,8 +77,11 @@ export const exportBoardToWord = (boardTitle, columns, cards) => {
     </html>
   `;
 
-  // Download del file leggibile da Word (.doc / .docx)
-  const blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword' });
+  // Conversione in file .doc scaricabile
+  const blob = new Blob(['\ufeff' + htmlContent], {
+    type: 'application/msword'
+  });
+
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -65,4 +89,5 @@ export const exportBoardToWord = (boardTitle, columns, cards) => {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-};
+  URL.revokeObjectURL(url);
+}
