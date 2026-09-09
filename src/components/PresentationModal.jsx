@@ -1,31 +1,52 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 
-// Mappa per associare le classi Tailwind dei colori colonna ai relativi stili di background per i temi
-const colorMap = {
-  'bg-blue-600': { bg: 'bg-blue-600', text: 'text-white' },
-  'bg-slate-800': { bg: 'bg-slate-800', text: 'text-white' },
-  'bg-indigo-600': { bg: 'bg-indigo-600', text: 'text-white' },
-  'bg-emerald-600': { bg: 'bg-emerald-600', text: 'text-white' },
-  'bg-amber-600': { bg: 'bg-amber-600', text: 'text-white' },
-  'bg-rose-600': { bg: 'bg-rose-600', text: 'text-white' },
-  'bg-purple-600': { bg: 'bg-purple-600', text: 'text-white' }
-};
-
 export default function PresentationModal({
   cards = [],
   onClose,
   onEditCard
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  
-  // Dimensione font di default impostata a 24px
   const [fontSize, setFontSize] = useState(24);
-
-  // Stato per il tema (default: scuro/cinema)
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const currentCard = cards[currentIndex];
+
+  // Gestione della modalità Fullscreen nativa del browser
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullscreen(true);
+      }).catch((err) => {
+        console.error('Errore durante l\'attivazione dello schermo intero:', err);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().then(() => {
+          setIsFullscreen(false);
+        });
+      }
+    }
+  };
+
+  // Monitora gli eventi di cambio fullscreen (es. se l'utente preme ESC dal browser)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // Chiudi lo schermo intero se il modale viene chiuso
+  const handleClose = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+    onClose();
+  };
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -34,7 +55,7 @@ export default function PresentationModal({
       } else if (e.key === 'ArrowLeft') {
         handlePrev();
       } else if (e.key === 'Escape') {
-        onClose();
+        handleClose();
       }
     };
 
@@ -59,7 +80,6 @@ export default function PresentationModal({
   const handleIncreaseFont = () => setFontSize((prev) => Math.min(prev + 2, 40));
   const handleDecreaseFont = () => setFontSize((prev) => Math.max(prev - 2, 14));
 
-  // Determina il colore dello sfondo del badge colonna
   const columnBgClass = currentCard.columnColor || 'bg-blue-600';
 
   return (
@@ -73,7 +93,6 @@ export default function PresentationModal({
       {/* HEADER SLIDE SHOW */}
       <div className="flex justify-between items-center max-w-5xl w-full mx-auto">
         <div className="flex items-center gap-3">
-          {/* BADGE NOME COLONNA CON COLORE REALE DELLA COLONNA */}
           {currentCard.columnName && (
             <span
               className={`text-xs font-black px-3.5 py-1.5 rounded-full shadow-md flex items-center gap-1.5 border border-white/20 text-white ${columnBgClass}`}
@@ -92,6 +111,20 @@ export default function PresentationModal({
         </div>
 
         <div className="flex items-center gap-3">
+          {/* PULSANTE SCHERMO INTERO (FULLSCREEN) */}
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition border flex items-center gap-1.5 ${
+              isDarkMode
+                ? 'bg-white/10 hover:bg-white/20 border-white/10 text-white'
+                : 'bg-white hover:bg-slate-200 border-slate-300 text-slate-800 shadow-sm'
+            }`}
+            title="Attiva/Disattiva schermo intero"
+          >
+            {isFullscreen ? '⤢ Riduci' : '⤢ Fullscreen'}
+          </button>
+
           {/* TOGGLE TEMA CHIARO / SCURO */}
           <button
             type="button"
@@ -151,7 +184,7 @@ export default function PresentationModal({
             <button
               type="button"
               onClick={() => {
-                onClose();
+                handleClose();
                 onEditCard(currentCard);
               }}
               className={`text-xs font-bold px-3.5 py-1.5 rounded-xl transition border flex items-center gap-1.5 ${
@@ -166,7 +199,7 @@ export default function PresentationModal({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className={`font-black text-lg px-2 py-1 transition ${
               isDarkMode
                 ? 'text-slate-400 hover:text-white'
@@ -249,7 +282,7 @@ export default function PresentationModal({
         )}
       </div>
 
-      {/* FOOTER BARRA NAVIGAZIONE CON ENTRAMBI I PULSANTI BLU */}
+      {/* FOOTER BARRA NAVIGAZIONE */}
       <div className="flex justify-between items-center max-w-xl w-full mx-auto pt-4">
         <button
           type="button"
