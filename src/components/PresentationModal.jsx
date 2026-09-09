@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 
 export default function PresentationModal({
@@ -11,35 +11,33 @@ export default function PresentationModal({
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // Riferimento al div principale del modale
+  const modalRef = useRef(null);
+
   const currentCard = cards[currentIndex];
 
+  // Gestione Fullscreen affidabile legata all'elemento modale
   const toggleFullscreen = () => {
-    const elem = document.documentElement;
+    if (!modalRef.current) return;
 
-    if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
-      if (elem.requestFullscreen) {
-        elem.requestFullscreen().catch((err) => console.log('Errore Fullscreen:', err));
-      } else if (elem.webkitRequestFullscreen) {
-        elem.webkitRequestFullscreen();
-      } else if (elem.msRequestFullscreen) {
-        elem.msRequestFullscreen();
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+      if (modalRef.current.requestFullscreen) {
+        modalRef.current.requestFullscreen();
+      } else if (modalRef.current.webkitRequestFullscreen) {
+        modalRef.current.webkitRequestFullscreen();
       }
-      setIsFullscreen(true);
     } else {
       if (document.exitFullscreen) {
-        document.exitFullscreen().catch((err) => console.log('Errore Exit Fullscreen:', err));
+        document.exitFullscreen();
       } else if (document.webkitExitFullscreen) {
         document.webkitExitFullscreen();
-      } else if (document.msExitFullscreen) {
-        document.msExitFullscreen();
       }
-      setIsFullscreen(false);
     }
   };
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+      const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement);
       setIsFullscreen(isFull);
     };
 
@@ -52,7 +50,7 @@ export default function PresentationModal({
   }, []);
 
   const handleClose = () => {
-    if (document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement) {
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
       if (document.exitFullscreen) {
         document.exitFullscreen().catch(() => {});
       } else if (document.webkitExitFullscreen) {
@@ -98,10 +96,11 @@ export default function PresentationModal({
 
   return (
     <div
+      ref={modalRef}
       className={`fixed inset-0 flex flex-col justify-between p-6 z-50 font-sans transition-colors duration-300 ${
         isDarkMode
-          ? 'bg-slate-950/95 backdrop-blur-md text-white'
-          : 'bg-slate-100/95 backdrop-blur-md text-slate-900'
+          ? 'bg-slate-950 text-white'
+          : 'bg-slate-100 text-slate-900'
       }`}
     >
       {/* HEADER SLIDE SHOW */}
@@ -125,6 +124,7 @@ export default function PresentationModal({
         </div>
 
         <div className="flex items-center gap-3">
+          {/* PULSANTE FULLSCREEN */}
           <button
             type="button"
             onClick={toggleFullscreen}
