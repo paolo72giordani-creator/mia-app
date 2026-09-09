@@ -11,50 +11,33 @@ export default function PresentationModal({
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Riferimento al div principale del modale
   const modalRef = useRef(null);
-
   const currentCard = cards[currentIndex];
 
-  // Gestione Fullscreen affidabile legata all'elemento modale
   const toggleFullscreen = () => {
-    if (!modalRef.current) return;
-
+    // 1. Tenta la chiamata API nativa
     if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-      if (modalRef.current.requestFullscreen) {
-        modalRef.current.requestFullscreen();
-      } else if (modalRef.current.webkitRequestFullscreen) {
+      if (modalRef.current?.requestFullscreen) {
+        modalRef.current.requestFullscreen().catch(() => {});
+      } else if (modalRef.current?.webkitRequestFullscreen) {
         modalRef.current.webkitRequestFullscreen();
       }
     } else {
       if (document.exitFullscreen) {
-        document.exitFullscreen();
+        document.exitFullscreen().catch(() => {});
       } else if (document.webkitExitFullscreen) {
         document.webkitExitFullscreen();
       }
     }
+
+    // 2. Forza SEMPRE lo stato CSS per espandere la modale a tutto schermo
+    setIsFullscreen((prev) => !prev);
   };
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement);
-      setIsFullscreen(isFull);
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-    };
-  }, []);
 
   const handleClose = () => {
     if (document.fullscreenElement || document.webkitFullscreenElement) {
       if (document.exitFullscreen) {
         document.exitFullscreen().catch(() => {});
-      } else if (document.webkitExitFullscreen) {
-        document.webkitExitFullscreen();
       }
     }
     onClose();
@@ -97,14 +80,16 @@ export default function PresentationModal({
   return (
     <div
       ref={modalRef}
-      className={`fixed inset-0 flex flex-col justify-between p-6 z-50 font-sans transition-colors duration-300 ${
+      className={`fixed inset-0 z-[9999] w-screen h-screen flex flex-col justify-between font-sans transition-colors duration-300 ${
+        isFullscreen ? 'p-2 sm:p-4' : 'p-6'
+      } ${
         isDarkMode
           ? 'bg-slate-950 text-white'
           : 'bg-slate-100 text-slate-900'
       }`}
     >
       {/* HEADER SLIDE SHOW */}
-      <div className="flex justify-between items-center max-w-5xl w-full mx-auto">
+      <div className="flex justify-between items-center max-w-6xl w-full mx-auto shrink-0">
         <div className="flex items-center gap-3">
           {currentCard.columnName && (
             <span
@@ -124,7 +109,6 @@ export default function PresentationModal({
         </div>
 
         <div className="flex items-center gap-3">
-          {/* PULSANTE FULLSCREEN */}
           <button
             type="button"
             onClick={toggleFullscreen}
@@ -133,7 +117,7 @@ export default function PresentationModal({
                 ? 'bg-white/10 hover:bg-white/20 border-white/10 text-white'
                 : 'bg-white hover:bg-slate-200 border-slate-300 text-slate-800 shadow-sm'
             }`}
-            title="Attiva/Disattiva schermo intero"
+            title="Espandi/Riduci presentazione"
           >
             {isFullscreen ? '⤢ Riduci' : '⤢ Fullscreen'}
           </button>
@@ -225,14 +209,16 @@ export default function PresentationModal({
 
       {/* CONTENUTO CENTRALE SLIDE */}
       <div
-        className={`max-w-4xl w-full mx-auto my-auto border rounded-3xl p-8 shadow-2xl flex flex-col gap-6 relative overflow-hidden transition-colors duration-300 ${
+        className={`w-full mx-auto my-auto border rounded-3xl p-6 sm:p-10 shadow-2xl flex flex-col gap-6 relative overflow-hidden transition-all duration-300 ${
+          isFullscreen ? 'max-w-5xl h-[82vh]' : 'max-w-4xl h-auto'
+        } ${
           isDarkMode
-            ? 'bg-slate-900/90 border-slate-800'
+            ? 'bg-slate-900/95 border-slate-800'
             : 'bg-white border-slate-200 shadow-slate-300/50'
         }`}
       >
         <h1
-          className={`text-2xl sm:text-4xl font-black leading-tight tracking-tight ${
+          className={`text-2xl sm:text-4xl font-black leading-tight tracking-tight shrink-0 ${
             isDarkMode ? 'text-white' : 'text-slate-900'
           }`}
         >
@@ -241,7 +227,7 @@ export default function PresentationModal({
 
         {currentCard.description ? (
           <div
-            className={`leading-relaxed font-normal whitespace-pre-wrap max-h-[45vh] overflow-y-auto pr-2 ${
+            className={`leading-relaxed font-normal whitespace-pre-wrap flex-1 overflow-y-auto pr-2 ${
               isDarkMode ? 'text-slate-300' : 'text-slate-700'
             }`}
             style={{ fontSize: `${fontSize}px` }}
@@ -260,7 +246,7 @@ export default function PresentationModal({
 
         {currentCard.attachments && currentCard.attachments.length > 0 && (
           <div
-            className={`pt-4 border-t ${
+            className={`pt-4 border-t shrink-0 ${
               isDarkMode ? 'border-slate-800' : 'border-slate-100'
             }`}
           >
@@ -293,7 +279,7 @@ export default function PresentationModal({
       </div>
 
       {/* FOOTER BARRA NAVIGAZIONE */}
-      <div className="flex justify-between items-center max-w-xl w-full mx-auto pt-4">
+      <div className="flex justify-between items-center max-w-xl w-full mx-auto pt-2 shrink-0">
         <button
           type="button"
           onClick={handlePrev}
